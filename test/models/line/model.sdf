@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<sdf version="1.11">
+  <model name="BlackLine">
+
+    <static>true</static>
+
+    <link name="body">
+      
+      <collision name="surface">
+        <geometry>
+          <box>
+            <size>2.0 0.1 0.01</size>
+          </box>
+        </geometry>
+      </collision>
+ 
+      <visual name="visual">
+        <geometry>
+          <box>
+            <size>2.0 0.1 0.01</size>
+          </box>
+        </geometry>
+
+        <material>
+          <ambient>0.0 0.0 0.0 1.0</ambient> 
+          <diffuse>0.0 0.0 0.0 1.0</diffuse> 
+          <specular>0.1 0.1 0.1 1.0</specular> 
+        </material>
+      </visual>
+    </link>
+    
+  </model>
+</sdf>
