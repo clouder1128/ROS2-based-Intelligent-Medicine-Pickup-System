@@ -15,7 +15,7 @@ A comprehensive experimental project for intelligent medicine pickup using ROS2 
 
 ## 🧪 项目简介 (TODO)
 
-本项目旨在开发一个基于ROS2的智能药品拣选系统，通过仿真环境验证机器人自主导航、物品抓取等算法。系统在Gazebo Harmonic中构建医院药房场景，利用ROS2 Jazzy进行节点通信与控制。
+本项目旨在开发一个基于ROS2的智能药品拣选系统，通过仿真环境验证(TODO)。系统在Gazebo Harmonic中构建医院药房场景，利用ROS2 Jazzy进行节点通信与控制。
 
 当前版本主要面向合作者提供统一开发环境，确保所有成员使用一致的软件栈：**Ubuntu 24.04 + ROS2 Jazzy + Gazebo Harmonic**。
 
