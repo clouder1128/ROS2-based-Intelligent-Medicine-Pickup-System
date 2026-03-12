@@ -27,16 +27,16 @@ class LineFollower(Node):
         # --------------- 可调参数（全部可通过 launch 传入） ---------------
         self.declare_parameter('image_topic', '/camera')
         self.declare_parameter('cmd_vel_topic', '/cmd_vel')
-        self.declare_parameter('linear_speed', 5.0) # 1m/s
+        self.declare_parameter('linear_speed', 1) # 1m/s
         self.declare_parameter('kp', 0.005) # 0.005 rad/s
         self.declare_parameter('kd', 0.001) # 0.001 rad/s
         self.declare_parameter('stop_duration', 3.0) # 3s
         self.declare_parameter('red_pixel_threshold', 500) # 500
         self.declare_parameter('line_lost_rotate_speed', 0.3) # 0.3 rad/s
-        self.declare_parameter('roi_ratio', 0.25) # 0.25
+        self.declare_parameter('roi_ratio', 0.25) # 看到更远的线，避免丢线掉头
         self.declare_parameter('red_cooldown', 2.0) # 2s
         self.declare_parameter('binary_thresh', 80) # 80
-        self.declare_parameter('resume_duration', 1.0) # 停车后盲走前进的秒数（不够就改成1.5/2.0）
+        self.declare_parameter('resume_duration', 1.0) # 停车后盲走前进的秒数
 
         image_topic = self.get_parameter('image_topic').value
         cmd_vel_topic = self.get_parameter('cmd_vel_topic').value
@@ -127,7 +127,7 @@ class LineFollower(Node):
 
         M = cv2.moments(mask)
         if M['m00'] < 100:
-            # 丢线：缓慢前进 + 小幅转弯寻找（避免原地掉头）
+            # 丢线：只往前走，绝不转弯（宁可走直线也不掉头）
             self._pub(self.linear_speed * 0.3, self.lost_rotate)
             return
 
