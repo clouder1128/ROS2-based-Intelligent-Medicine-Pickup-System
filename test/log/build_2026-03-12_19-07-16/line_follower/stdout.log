@@ -1,0 +1,22 @@
+running egg_info
+writing ../build/line_follower/line_follower.egg-info/PKG-INFO
+writing dependency_links to ../build/line_follower/line_follower.egg-info/dependency_links.txt
+writing entry points to ../build/line_follower/line_follower.egg-info/entry_points.txt
+writing requirements to ../build/line_follower/line_follower.egg-info/requires.txt
+writing top-level names to ../build/line_follower/line_follower.egg-info/top_level.txt
+reading manifest file '../build/line_follower/line_follower.egg-info/SOURCES.txt'
+writing manifest file '../build/line_follower/line_follower.egg-info/SOURCES.txt'
+running build
+running build_py
+copying line_follower/line_follower_node.py -> /home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/test/build/line_follower/build/lib/line_follower
+running install
+running install_lib
+copying /home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/test/build/line_follower/build/lib/line_follower/line_follower_node.py -> /home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/test/install/line_follower/lib/python3.12/site-packages/line_follower
+byte-compiling /home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/test/install/line_follower/lib/python3.12/site-packages/line_follower/line_follower_node.py to line_follower_node.cpython-312.pyc
+running install_data
+running install_egg_info
+removing '/home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/test/install/line_follower/lib/python3.12/site-packages/line_follower-0.1.0-py3.12.egg-info' (and everything under it)
+Copying ../build/line_follower/line_follower.egg-info to /home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/test/install/line_follower/lib/python3.12/site-packages/line_follower-0.1.0-py3.12.egg-info
+running install_scripts
+Installing line_follower script to /home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/test/install/line_follower/lib/line_follower
+writing list of installed files to '/home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/test/build/line_follower/install.log'

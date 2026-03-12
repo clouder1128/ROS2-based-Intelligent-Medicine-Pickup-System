@@ -125,7 +125,7 @@
     </link>
 
     <link name="camera">
-      <pose degrees="true">0.53 0 0.62 0 30 0</pose>
+      <pose degrees="true">0.53 0 1 0 30 0</pose>
       <inertial auto="true">
         <density>1000</density>
       </inertial>

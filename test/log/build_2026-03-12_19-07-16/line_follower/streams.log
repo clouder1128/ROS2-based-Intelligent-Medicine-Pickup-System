@@ -1,0 +1,24 @@
+[0.840s] Invoking command in '/home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/test/line_follower': DEBUGINFOD_URLS=https://debuginfod.ubuntu.com PYTHONPATH=/home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/test/build/line_follower/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/test/install/line_follower/lib/python3.12/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../build/line_follower build --build-base /home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/test/build/line_follower/build install --record /home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/test/build/line_follower/install.log --single-version-externally-managed install_data
+[1.109s] running egg_info
+[1.127s] writing ../build/line_follower/line_follower.egg-info/PKG-INFO
+[1.127s] writing dependency_links to ../build/line_follower/line_follower.egg-info/dependency_links.txt
+[1.127s] writing entry points to ../build/line_follower/line_follower.egg-info/entry_points.txt
+[1.127s] writing requirements to ../build/line_follower/line_follower.egg-info/requires.txt
+[1.127s] writing top-level names to ../build/line_follower/line_follower.egg-info/top_level.txt
+[1.163s] reading manifest file '../build/line_follower/line_follower.egg-info/SOURCES.txt'
+[1.164s] writing manifest file '../build/line_follower/line_follower.egg-info/SOURCES.txt'
+[1.164s] running build
+[1.164s] running build_py
+[1.164s] copying line_follower/line_follower_node.py -> /home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/test/build/line_follower/build/lib/line_follower
+[1.165s] running install
+[1.173s] running install_lib
+[1.190s] copying /home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/test/build/line_follower/build/lib/line_follower/line_follower_node.py -> /home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/test/install/line_follower/lib/python3.12/site-packages/line_follower
+[1.191s] byte-compiling /home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/test/install/line_follower/lib/python3.12/site-packages/line_follower/line_follower_node.py to line_follower_node.cpython-312.pyc
+[1.195s] running install_data
+[1.195s] running install_egg_info
+[1.214s] removing '/home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/test/install/line_follower/lib/python3.12/site-packages/line_follower-0.1.0-py3.12.egg-info' (and everything under it)
+[1.214s] Copying ../build/line_follower/line_follower.egg-info to /home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/test/install/line_follower/lib/python3.12/site-packages/line_follower-0.1.0-py3.12.egg-info
+[1.215s] running install_scripts
+[1.343s] Installing line_follower script to /home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/test/install/line_follower/lib/line_follower
+[1.343s] writing list of installed files to '/home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/test/build/line_follower/install.log'
+[1.372s] Invoked command in '/home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/test/line_follower' returned '0': DEBUGINFOD_URLS=https://debuginfod.ubuntu.com PYTHONPATH=/home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/test/build/line_follower/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/test/install/line_follower/lib/python3.12/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../build/line_follower build --build-base /home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/test/build/line_follower/build install --record /home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/test/build/line_follower/install.log --single-version-externally-managed install_data

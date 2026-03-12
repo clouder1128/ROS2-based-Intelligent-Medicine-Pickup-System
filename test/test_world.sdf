@@ -27,7 +27,7 @@
     <include>
       <uri>models/new_car</uri>
       <name>mycar</name>
-      <pose degrees="true">-12 -10 0 0 0 180 </pose>
+      <pose degrees="true">12 -10 0 0 0 180 </pose>
     </include>
 
     <include>
