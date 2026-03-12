@@ -1,0 +1,37 @@
+running egg_info
+creating ../build/line_follower/line_follower.egg-info
+writing ../build/line_follower/line_follower.egg-info/PKG-INFO
+writing dependency_links to ../build/line_follower/line_follower.egg-info/dependency_links.txt
+writing entry points to ../build/line_follower/line_follower.egg-info/entry_points.txt
+writing requirements to ../build/line_follower/line_follower.egg-info/requires.txt
+writing top-level names to ../build/line_follower/line_follower.egg-info/top_level.txt
+writing manifest file '../build/line_follower/line_follower.egg-info/SOURCES.txt'
+reading manifest file '../build/line_follower/line_follower.egg-info/SOURCES.txt'
+writing manifest file '../build/line_follower/line_follower.egg-info/SOURCES.txt'
+running build
+running build_py
+creating /home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/test/build/line_follower/build
+creating /home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/test/build/line_follower/build/lib
+creating /home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/test/build/line_follower/build/lib/line_follower
+copying line_follower/line_follower_node.py -> /home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/test/build/line_follower/build/lib/line_follower
+copying line_follower/__init__.py -> /home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/test/build/line_follower/build/lib/line_follower
+running install
+running install_lib
+creating /home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/test/install/line_follower/lib/python3.12/site-packages/line_follower
+copying /home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/test/build/line_follower/build/lib/line_follower/line_follower_node.py -> /home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/test/install/line_follower/lib/python3.12/site-packages/line_follower
+copying /home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/test/build/line_follower/build/lib/line_follower/__init__.py -> /home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/test/install/line_follower/lib/python3.12/site-packages/line_follower
+byte-compiling /home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/test/install/line_follower/lib/python3.12/site-packages/line_follower/line_follower_node.py to line_follower_node.cpython-312.pyc
+byte-compiling /home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/test/install/line_follower/lib/python3.12/site-packages/line_follower/__init__.py to __init__.cpython-312.pyc
+running install_data
+creating /home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/test/install/line_follower/share/ament_index
+creating /home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/test/install/line_follower/share/ament_index/resource_index
+creating /home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/test/install/line_follower/share/ament_index/resource_index/packages
+copying resource/line_follower -> /home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/test/install/line_follower/share/ament_index/resource_index/packages
+copying package.xml -> /home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/test/install/line_follower/share/line_follower
+creating /home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/test/install/line_follower/share/line_follower/launch
+copying launch/line_follower.launch.py -> /home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/test/install/line_follower/share/line_follower/launch
+running install_egg_info
+Copying ../build/line_follower/line_follower.egg-info to /home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/test/install/line_follower/lib/python3.12/site-packages/line_follower-0.1.0-py3.12.egg-info
+running install_scripts
+Installing line_follower script to /home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/test/install/line_follower/lib/line_follower
+writing list of installed files to '/home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/test/build/line_follower/install.log'

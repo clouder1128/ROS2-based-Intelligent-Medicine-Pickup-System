@@ -1,0 +1,39 @@
+[0.753s] Invoking command in '/home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/test/line_follower': DEBUGINFOD_URLS=https://debuginfod.ubuntu.com PYTHONPATH=/home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/test/build/line_follower/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/test/install/line_follower/lib/python3.12/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../build/line_follower build --build-base /home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/test/build/line_follower/build install --record /home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/test/build/line_follower/install.log --single-version-externally-managed install_data
+[1.011s] running egg_info
+[1.011s] creating ../build/line_follower/line_follower.egg-info
+[1.027s] writing ../build/line_follower/line_follower.egg-info/PKG-INFO
+[1.027s] writing dependency_links to ../build/line_follower/line_follower.egg-info/dependency_links.txt
+[1.027s] writing entry points to ../build/line_follower/line_follower.egg-info/entry_points.txt
+[1.027s] writing requirements to ../build/line_follower/line_follower.egg-info/requires.txt
+[1.027s] writing top-level names to ../build/line_follower/line_follower.egg-info/top_level.txt
+[1.027s] writing manifest file '../build/line_follower/line_follower.egg-info/SOURCES.txt'
+[1.061s] reading manifest file '../build/line_follower/line_follower.egg-info/SOURCES.txt'
+[1.062s] writing manifest file '../build/line_follower/line_follower.egg-info/SOURCES.txt'
+[1.062s] running build
+[1.062s] running build_py
+[1.062s] creating /home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/test/build/line_follower/build
+[1.062s] creating /home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/test/build/line_follower/build/lib
+[1.062s] creating /home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/test/build/line_follower/build/lib/line_follower
+[1.062s] copying line_follower/line_follower_node.py -> /home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/test/build/line_follower/build/lib/line_follower
+[1.062s] copying line_follower/__init__.py -> /home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/test/build/line_follower/build/lib/line_follower
+[1.063s] running install
+[1.070s] running install_lib
+[1.087s] creating /home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/test/install/line_follower/lib/python3.12/site-packages/line_follower
+[1.088s] copying /home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/test/build/line_follower/build/lib/line_follower/line_follower_node.py -> /home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/test/install/line_follower/lib/python3.12/site-packages/line_follower
+[1.088s] copying /home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/test/build/line_follower/build/lib/line_follower/__init__.py -> /home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/test/install/line_follower/lib/python3.12/site-packages/line_follower
+[1.088s] byte-compiling /home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/test/install/line_follower/lib/python3.12/site-packages/line_follower/line_follower_node.py to line_follower_node.cpython-312.pyc
+[1.090s] byte-compiling /home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/test/install/line_follower/lib/python3.12/site-packages/line_follower/__init__.py to __init__.cpython-312.pyc
+[1.091s] running install_data
+[1.091s] creating /home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/test/install/line_follower/share/ament_index
+[1.091s] creating /home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/test/install/line_follower/share/ament_index/resource_index
+[1.091s] creating /home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/test/install/line_follower/share/ament_index/resource_index/packages
+[1.091s] copying resource/line_follower -> /home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/test/install/line_follower/share/ament_index/resource_index/packages
+[1.091s] copying package.xml -> /home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/test/install/line_follower/share/line_follower
+[1.091s] creating /home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/test/install/line_follower/share/line_follower/launch
+[1.091s] copying launch/line_follower.launch.py -> /home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/test/install/line_follower/share/line_follower/launch
+[1.092s] running install_egg_info
+[1.110s] Copying ../build/line_follower/line_follower.egg-info to /home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/test/install/line_follower/lib/python3.12/site-packages/line_follower-0.1.0-py3.12.egg-info
+[1.111s] running install_scripts
+[1.227s] Installing line_follower script to /home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/test/install/line_follower/lib/line_follower
+[1.227s] writing list of installed files to '/home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/test/build/line_follower/install.log'
+[1.257s] Invoked command in '/home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/test/line_follower' returned '0': DEBUGINFOD_URLS=https://debuginfod.ubuntu.com PYTHONPATH=/home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/test/build/line_follower/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/test/install/line_follower/lib/python3.12/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../build/line_follower build --build-base /home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/test/build/line_follower/build install --record /home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/test/build/line_follower/install.log --single-version-externally-managed install_data

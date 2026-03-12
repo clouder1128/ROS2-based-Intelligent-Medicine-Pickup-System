@@ -26,7 +26,7 @@ A comprehensive experimental project for intelligent medicine pickup using ROS2 
 - **操作系统**：Ubuntu 24.04 LTS (Noble Numbat)
 - **ROS2发行版**：Jazzy Jalisco
 - **Gazebo版本**：Harmonic (与ROS2 Jazzy兼容)
-- **其他依赖**:(TODO ,比如python)
+- **python版本**：python 3.12.3
 
 ## 🎮 使用说明
 
