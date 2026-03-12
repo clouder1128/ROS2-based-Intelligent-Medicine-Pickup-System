@@ -1,7 +1,0 @@
-Metadata-Version: 2.1
-Name: line-follower
-Version: 0.1.0
-Summary: Line following with red-dot stop for Gazebo Harmonic simulation
-Maintainer: team
-Maintainer-email: 2093667965@qq.com
-License: MIT
