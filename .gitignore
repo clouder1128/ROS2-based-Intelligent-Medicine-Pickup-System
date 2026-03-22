@@ -1,0 +1,4 @@
+# 编译产物目录（ROS2 colcon 默认生成）
+test/build/
+test/install/
+test/log/

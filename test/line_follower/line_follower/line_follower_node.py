@@ -27,7 +27,7 @@ class LineFollower(Node):
         # --------------- 可调参数（全部可通过 launch 传入） ---------------
         self.declare_parameter('image_topic', '/camera')
         self.declare_parameter('cmd_vel_topic', '/cmd_vel')
-        self.declare_parameter('linear_speed', 1) # 1m/s
+        self.declare_parameter('linear_speed', 1.0) # 1m/s
         self.declare_parameter('kp', 0.005) # 0.005 rad/s
         self.declare_parameter('kd', 0.001) # 0.001 rad/s
         self.declare_parameter('stop_duration', 3.0) # 3s
