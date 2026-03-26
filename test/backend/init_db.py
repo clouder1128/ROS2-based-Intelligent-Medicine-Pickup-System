@@ -1,11 +1,10 @@
 """
 数据库初始化脚本
 创建 inventory（药品表）和 order_log（任务/订单表），并插入示例数据
-
-expiry_date: 倒计时（剩余天数），为 0 或负数表示已过期
 """
 import os
 import sqlite3
+from datetime import date
 
 DB_PATH = os.path.join(os.path.dirname(__file__), 'pharmacy.db')
 
@@ -14,7 +13,7 @@ def init_db():
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
 
-    # 药品表（expiry_date = 剩余天数，0 或负数表示已过期）
+    # 药品表（expiry_date = 剩余天数，0 表示已过期）
     c.execute('''
         CREATE TABLE IF NOT EXISTS inventory (
             drug_id INTEGER PRIMARY KEY,
@@ -39,6 +38,14 @@ def init_db():
         )
     ''')
 
+    # 应用元数据（记录过期清扫上次执行日期，避免重复扣减）
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS app_meta (
+            k TEXT PRIMARY KEY,
+            v TEXT NOT NULL
+        )
+    ''')
+
     conn.commit()
 
     # 清空并插入示例数据（expiry_date = 剩余天数）
@@ -58,9 +65,17 @@ def init_db():
         VALUES (3, '维生素C', 100, 0, 2, 1, 2)
     ''')  # expiry_date=0 已过期，用于测试
 
+    # 过期清扫从本次初始化当日为「基准日」；次日及以后由后端按日期差扣减剩余天数
+    sweep_anchor = date.today().isoformat()
+    c.execute(
+        "INSERT OR REPLACE INTO app_meta (k, v) VALUES ('expiry_sweep_date', ?)",
+        (sweep_anchor,),
+    )
+
     conn.commit()
     conn.close()
     print('数据库初始化成功')
+    print(f'过期清扫基准日（从 init_db 起算）: {sweep_anchor}')
 
 
 if __name__ == '__main__':

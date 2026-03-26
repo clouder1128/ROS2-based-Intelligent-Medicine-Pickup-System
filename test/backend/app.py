@@ -5,6 +5,8 @@ import json
 import os
 import sqlite3
 import threading
+import time
+from datetime import date
 from flask import Flask, request, jsonify
 
 # ROS2 可选：若环境未配置则跳过发布
@@ -60,6 +62,128 @@ except ImportError:
 
 DB_PATH = os.path.join(os.path.dirname(__file__), 'pharmacy.db')
 
+_expiry_sweep_lock = threading.Lock()
+_expiry_bg_started = False
+_expiry_bg_lock = threading.Lock()
+EXPIRY_SWEEP_INTERVAL_SEC = int(os.environ.get('EXPIRY_SWEEP_INTERVAL_SEC', '3600'))
+
+
+def _ensure_app_meta(conn: sqlite3.Connection) -> None:
+    conn.execute('''
+        CREATE TABLE IF NOT EXISTS app_meta (
+            k TEXT PRIMARY KEY,
+            v TEXT NOT NULL
+        )
+    ''')
+
+
+def run_expiry_sweep() -> dict:
+    """
+    按本地日期推进「剩余天数」并清理过期品可售库存（同一天只执行一次）。
+    基准日由 init_db 写入 app_meta.expiry_sweep_date；旧库无该记录时首次访问仅写入当天不扣减。
+    关机多日后再启动会按日期差一次性扣减，避免时间丢失。
+    返回本次执行摘要（便于日志/调试）。
+    """
+    if not os.path.exists(DB_PATH):
+        return {'skipped': True, 'reason': 'no database'}
+
+    today = date.today()
+    today_s = today.isoformat()
+
+    with _expiry_sweep_lock:
+        conn = sqlite3.connect(DB_PATH)
+        try:
+            _ensure_app_meta(conn)
+            row = conn.execute(
+                "SELECT v FROM app_meta WHERE k = 'expiry_sweep_date'"
+            ).fetchone()
+            last_s = row[0] if row else None
+
+            if last_s == today_s:
+                return {'skipped': True, 'reason': 'already_swept_today', 'date': today_s}
+
+            if last_s is None:
+                # 未执行过新版 init_db 的旧库：补上基准日，当日不扣减
+                conn.execute(
+                    "INSERT OR REPLACE INTO app_meta (k, v) VALUES ('expiry_sweep_date', ?)",
+                    (today_s,),
+                )
+                conn.commit()
+                return {'skipped': True, 'reason': 'legacy_baseline_no_init_meta', 'date': today_s}
+
+            try:
+                last_d = date.fromisoformat(last_s)
+            except ValueError:
+                conn.execute(
+                    "INSERT OR REPLACE INTO app_meta (k, v) VALUES ('expiry_sweep_date', ?)",
+                    (today_s,),
+                )
+                conn.commit()
+                return {'skipped': True, 'reason': 'reset_invalid_last_date', 'date': today_s}
+
+            delta = (today - last_d).days
+            if delta <= 0:
+                return {'skipped': True, 'reason': 'no_new_day', 'date': today_s}
+
+            conn.execute(
+                'UPDATE inventory SET expiry_date = expiry_date - ? WHERE expiry_date > 0',
+                (delta,),
+            )
+            cur = conn.execute(
+                '''SELECT drug_id, name, quantity, expiry_date, shelf_x, shelf_y, shelve_id
+                   FROM inventory WHERE expiry_date <= 0 AND quantity > 0'''
+            )
+            expired_to_remove = [dict(r) for r in cur.fetchall()]
+
+            cur = conn.execute(
+                'UPDATE inventory SET quantity = 0 WHERE expiry_date <= 0'
+            )
+            cleared_rows = cur.rowcount
+
+            conn.execute(
+                "INSERT OR REPLACE INTO app_meta (k, v) VALUES ('expiry_sweep_date', ?)",
+                (today_s,),
+            )
+            conn.commit()
+
+            ros_n = 0
+            for drug in expired_to_remove:
+                publish_expiry_removal(drug, int(drug['quantity']))
+                ros_n += 1
+
+            return {
+                'ok': True,
+                'date': today_s,
+                'days_applied': delta,
+                'expired_rows_cleared_qty': cleared_rows,
+                'expiry_ros_published': ros_n,
+            }
+        finally:
+            conn.close()
+
+
+def _expiry_sweep_loop():
+    while True:
+        try:
+            summary = run_expiry_sweep()
+            if summary.get('ok'):
+                print(f'[expiry] 清扫完成: {summary}')
+            elif not summary.get('skipped'):
+                print(f'[expiry] 清扫结果: {summary}')
+        except Exception as e:
+            print(f'[expiry] 清扫异常: {e}')
+        time.sleep(EXPIRY_SWEEP_INTERVAL_SEC)
+
+
+def _boot_expiry_worker_once():
+    """在「会长期驻留的服务进程」里只启动一条定时清扫线程。"""
+    global _expiry_bg_started
+    with _expiry_bg_lock:
+        if _expiry_bg_started:
+            return
+        _expiry_bg_started = True
+    threading.Thread(target=_expiry_sweep_loop, daemon=True).start()
+
 
 def get_db():
     conn = sqlite3.connect(DB_PATH)
@@ -114,6 +238,34 @@ def publish_task(task_id: int, drug: dict, quantity: int):
         print(f'[ROS2] 已发布任务 task_id={task_id} -> ({drug["shelf_x"]},{drug["shelf_y"]})')
     except Exception as e:
         print(f'[ROS2] 发布失败: {e}')
+
+
+def publish_expiry_removal(drug: dict, remove_quantity: int):
+    """向 ROS2 /task_request 发布过期药品清柜任务（定期清扫发现仍有库存的过期品时调用）"""
+    global task_publisher
+    if not ros2_available or task_publisher is None:
+        return
+    try:
+        from std_msgs.msg import String
+        msg = String()
+        msg.data = json.dumps({
+            'task_id': None,
+            'type': 'expiry_removal',
+            'drug_id': drug['drug_id'],
+            'name': drug['name'],
+            'shelve_id': drug['shelve_id'],
+            'x': drug['shelf_x'],
+            'y': drug['shelf_y'],
+            'quantity': remove_quantity,
+            'reason': 'expired',
+        }, ensure_ascii=False)
+        task_publisher.pub.publish(msg)
+        print(
+            f'[ROS2] 已发布过期清柜 type=expiry_removal drug_id={drug["drug_id"]} '
+            f'qty={remove_quantity} -> ({drug["shelf_x"]},{drug["shelf_y"]})'
+        )
+    except Exception as e:
+        print(f'[ROS2] 过期清柜发布失败: {e}')
 
 
 # ---------------------------------------------------------------------------
@@ -295,8 +447,18 @@ def list_orders():
         conn.close()
 
 
+# Werkzeug 开启自动重载时，仅子进程会带 WERKZEUG_RUN_MAIN=true；在此启动可避免父进程再挂一套线程导致重复扣减。
+if os.environ.get('WERKZEUG_RUN_MAIN') == 'true':
+    _boot_expiry_worker_once()
+
+
 if __name__ == '__main__':
     if not os.path.exists(DB_PATH):
-        print('请先运行: python3 init_db2.py')
+        print('请先运行: python3 init_db.py')
         exit(1)
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    _debug = True
+    _use_reloader = _debug
+    # debug + 自动重载时由子进程 import 时启动；当前若是「只起监控不重载」的父进程则不应在此启动
+    if not (_debug and _use_reloader):
+        _boot_expiry_worker_once()
+    app.run(host='0.0.0.0', port=5000, debug=_debug, use_reloader=_use_reloader)
