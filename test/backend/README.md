@@ -27,8 +27,19 @@ python3 app.py
 | `inventory` | 药品：名称、可售 `quantity`、剩余天数 `expiry_date`（≤0 视为已超出保质期）、货架坐标等 |
 | `order_log` | 取药任务记录（关联 `task_id`，状态含 `pending` 等） |
 | `app_meta` | 键 `expiry_sweep_date`：由 **init_db 写入当天日期**，作为按日扣减 `expiry_date` 的日历锚点 |
+| `audit_logs` | 审计流水（`audit_logger.py` 首次写入时自动建表） |
+| `approvals` | 医生审批单（`approval.py` 首次使用时自动建表，见下节） |
 
 每次执行 `init_db.py` 会重置示例数据并**刷新**清扫基准日为当日。旧库若无该键，后端首次清扫会仅补写当天、当日不扣减（兼容迁移）。
+
+## 审批单（`approval.py`）
+
+面向「AI 给出用药建议 → **医生审批** → 再调药房/仿真」的流程，与说明文档中的 **`approvals` 表**一致。
+
+- **模块**：`ApprovalManager`，通过 **`get_approval_manager()`** 获取单例；默认与上文共用 **`pharmacy.db`**，也可设环境变量 **`APPROVAL_DB_PATH`** 指向其他 SQLite 文件。
+- **状态**：`pending` → `approve(doctor_id)` 后为 **`approved`**，或 `reject(doctor_id, reason)` 后为 **`rejected`**（仅 `pending` 可审批）。
+- **常用接口**：`create(patient_name, advice, …)` 返回主键 **`id`**（形如 `AP-YYYYMMDD-XXXXXXXX`）；`get`、`list_pending` 查询。
+- **与当前 Flask**：`app.py` **未**暴露审批相关 HTTP 路由；集成 AI 主后端（如 FastAPI）时在 `/chat`、`/approve` 等路由里调用上述方法即可。
 
 ## 过期清扫（后台线程）
 
