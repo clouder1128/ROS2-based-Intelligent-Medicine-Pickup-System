@@ -1,0 +1,20 @@
+# 核心依赖
+python-dotenv>=1.0.0
+pytest>=7.0.0
+pytest-asyncio>=0.21.0
+
+# LLM相关（根据配置选择）
+# anthropic>=0.25.0  # 如果需要Claude
+# openai>=1.0.0      # 如果需要OpenAI
+
+# 工具和工具执行
+# 注意：实际工具实现可能在P2/P4模块中
+
+# 开发依赖
+black>=23.0.0
+flake8>=6.0.0
+mypy>=1.0.0
+
+# 测试依赖
+pytest-cov>=4.0.0
+pytest-mock>=3.0.0
