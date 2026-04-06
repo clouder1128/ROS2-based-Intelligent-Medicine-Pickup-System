@@ -2,7 +2,7 @@
 注意：RosCar\ROSPackage_Data\StreamingAssets目录中ip.txt中为linux侧的ip地址，ROS2运行在linux中
 
 linux 下操作  
-2. 进入\newros_ws\src 目录新开终端 运行：source install/setup.bash
+2. 进入\newros_ws 目录新开终端 运行：source install/setup.bash
 3.运行ROS2
 ros2 run ros_tcp_endpoint default_server_endpoint --ros-args -p ROS_IP:=0.0.0.0 -p ROS_TCP_PORT:=10000
 
