@@ -97,13 +97,13 @@ def get_server_port(default_port: int = DEFAULT_PORT) -> int:
 # CORS：允许前端跨域访问
 try:
     from flask_cors import CORS
-    CORS(app)
+    CORS(app, resources={r"/api/*": {"origins": "*", "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"], "allow_headers": ["Content-Type", "Authorization"]}})
 except ImportError:
     @app.after_request
     def add_cors(resp):
         resp.headers['Access-Control-Allow-Origin'] = '*'
-        resp.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'
-        resp.headers['Access-Control-Allow-Headers'] = 'Content-Type'
+        resp.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
+        resp.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
         return resp
 
 DB_PATH = os.path.join(os.path.dirname(__file__), 'pharmacy.db')
@@ -497,9 +497,9 @@ def list_orders():
 def create_approval():
     """Create a new approval request"""
     try:
-        data = request.get_json()
-        if not data:
-            return jsonify({"error": True, "message": "No JSON data provided"}), 400
+        data = request.get_json(silent=True)
+        if data is None:
+            return jsonify({"error": True, "message": "Invalid JSON data provided"}), 400
 
         # Validate required fields
         required_fields = ['patient_name', 'advice']
@@ -567,7 +567,7 @@ def get_approval(approval_id):
 
         return jsonify({
             "success": True,
-            **approval
+            "approval": approval
         }), 200
 
     except Exception as e:
@@ -575,6 +575,127 @@ def get_approval(approval_id):
             "error": True,
             "message": f"Failed to get approval: {str(e)}",
             "code": "RETRIEVAL_ERROR"
+        }), 500
+
+
+@app.route('/api/approvals/pending', methods=['GET'])
+def get_pending_approvals():
+    """Get list of pending approvals"""
+    try:
+        from approval import get_approval_manager
+
+        manager = get_approval_manager()
+        limit = request.args.get('limit', default=100, type=int)
+        pending = manager.list_pending(limit=limit)
+
+        # Convert SQLite Rows to dicts
+        approvals = []
+        for item in pending:
+            if hasattr(item, 'keys'):
+                approvals.append(dict(item))
+            else:
+                approvals.append(item)
+
+        return jsonify({
+            "success": True,
+            "approvals": approvals,
+            "count": len(approvals),
+            "limit": limit
+        }), 200
+
+    except Exception as e:
+        return jsonify({
+            "error": True,
+            "message": f"Failed to get pending approvals: {str(e)}",
+            "code": "RETRIEVAL_ERROR"
+        }), 500
+
+
+@app.route('/api/approvals/<approval_id>/approve', methods=['POST'])
+def approve_approval(approval_id):
+    """Approve an approval request"""
+    try:
+        data = request.get_json()
+        if not data or 'doctor_id' not in data:
+            return jsonify({
+                "error": True,
+                "message": "Missing doctor_id in request",
+                "code": "MISSING_DOCTOR_ID"
+            }), 400
+
+        from approval import get_approval_manager
+
+        manager = get_approval_manager()
+        success = manager.approve(approval_id, data['doctor_id'])
+
+        if not success:
+            return jsonify({
+                "error": True,
+                "message": f"Cannot approve approval {approval_id}. It may not exist or not be pending.",
+                "code": "APPROVAL_FAILED"
+            }), 400
+
+        return jsonify({
+            "success": True,
+            "message": "Approval approved successfully",
+            "approval_id": approval_id,
+            "doctor_id": data['doctor_id'],
+            "approved_at": datetime.now().isoformat()
+        }), 200
+
+    except Exception as e:
+        return jsonify({
+            "error": True,
+            "message": f"Failed to approve approval: {str(e)}",
+            "code": "APPROVAL_ERROR"
+        }), 500
+
+
+@app.route('/api/approvals/<approval_id>/reject', methods=['POST'])
+def reject_approval(approval_id):
+    """Reject an approval request"""
+    try:
+        data = request.get_json()
+        if not data or 'doctor_id' not in data:
+            return jsonify({
+                "error": True,
+                "message": "Missing doctor_id in request",
+                "code": "MISSING_DOCTOR_ID"
+            }), 400
+
+        if 'reason' not in data:
+            return jsonify({
+                "error": True,
+                "message": "Missing rejection reason",
+                "code": "MISSING_REASON"
+            }), 400
+
+        from approval import get_approval_manager
+
+        manager = get_approval_manager()
+        success = manager.reject(approval_id, data['doctor_id'], data['reason'])
+
+        if not success:
+            return jsonify({
+                "error": True,
+                "message": f"Cannot reject approval {approval_id}. It may not exist or not be pending.",
+                "code": "REJECTION_FAILED"
+            }), 400
+
+        return jsonify({
+            "success": True,
+            "message": "Approval rejected successfully",
+            "approval_id": approval_id,
+            "doctor_id": data['doctor_id'],
+            "reason": data['reason'],
+            "rejected_at": datetime.now().isoformat()
+        }), 200
+
+    except Exception as e:
+        return jsonify({
+            "error": True,
+            "message": f"Failed to reject approval: {str(e)}",
+            "code": "REJECTION_ERROR"
         }), 500
 
 
