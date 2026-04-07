@@ -9,6 +9,9 @@ import logging
 from typing import Dict, List, Any, Optional
 from datetime import datetime, timedelta
 
+from utils.http_client import PharmacyHTTPClient
+import drug_db
+
 logger = logging.getLogger(__name__)
 
 # ==================== 库存记录工具 ====================
@@ -30,12 +33,10 @@ def record_transaction(drug_id: int, quantity: int, transaction_type: str, reaso
     try:
         if transaction_type == "out":
             # Use backend order API for out transactions
-            from utils.http_client import PharmacyHTTPClient
-
             client = PharmacyHTTPClient()
             order_result = client.create_order([{"id": drug_id, "num": quantity}])
 
-            if order_result and order_result.get('success'):
+            if order_result and order_result.get('success', False):
                 response = {
                     "success": True,
                     "transaction_id": f"TX-{datetime.now().strftime('%Y%m%d%H%M%S')}",
@@ -90,31 +91,31 @@ def record_transaction(drug_id: int, quantity: int, transaction_type: str, reaso
         return json.dumps(response, ensure_ascii=False, indent=2)
 
 # ==================== 库存报告工具 ====================
-def get_stock_report(start_date: str = None, end_date: str = None) -> str:
+def get_stock_report(start_date: str = None, end_date: str = None, limit: int = 100) -> str:
     """
     获取库存报告
 
     Args:
         start_date: 开始日期（YYYY-MM-DD）
         end_date: 结束日期（YYYY-MM-DD）
+        limit: 返回药品数量限制，默认100，设为0或负数表示无限制
 
     Returns:
         库存报告JSON字符串
     """
-    logger.info(f"获取库存报告: start={start_date}, end={end_date}")
+    logger.info(f"获取库存报告: start={start_date}, end={end_date}, limit={limit}")
 
     try:
         # Get current stock from backend
-        from utils.http_client import PharmacyHTTPClient
-        import drug_db
-
         client = PharmacyHTTPClient()
         all_drugs = drug_db.get_all_drugs()
 
         # For now, generate simple report from current stock
         # Backend doesn't have transaction history API yet
         report_drugs = []
-        for drug in all_drugs[:10]:  # Limit to 10 for demo
+        # Apply limit if specified (limit > 0)
+        drugs_to_process = all_drugs[:limit] if limit > 0 else all_drugs
+        for drug in drugs_to_process:
             report_drug = {
                 "drug_name": drug.get('name', '未知'),
                 "drug_id": drug.get('drug_id'),
@@ -169,17 +170,20 @@ def get_stock_report(start_date: str = None, end_date: str = None) -> str:
             }
         ]
 
+        # Apply limit if specified (limit > 0)
+        limited_mock_report = mock_report[:limit] if limit > 0 else mock_report
+
         response = {
             "report_period": {
                 "start_date": start_date or (datetime.now() - timedelta(days=30)).strftime("%Y-%m-%d"),
                 "end_date": end_date or datetime.now().strftime("%Y-%m-%d")
             },
             "generated_at": datetime.now().isoformat(),
-            "total_drugs": len(mock_report),
-            "total_transactions": sum(item["transactions"] for item in mock_report),
-            "total_in": sum(item["in"] for item in mock_report),
-            "total_out": sum(item["out"] for item in mock_report),
-            "stock_changes": mock_report,
+            "total_drugs": len(limited_mock_report),
+            "total_transactions": sum(item["transactions"] for item in limited_mock_report),
+            "total_in": sum(item["in"] for item in limited_mock_report),
+            "total_out": sum(item["out"] for item in limited_mock_report),
+            "stock_changes": limited_mock_report,
             "note": f"获取真实库存数据失败，使用mock数据: {str(e)}"
         }
 
