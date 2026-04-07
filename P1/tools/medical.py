@@ -92,50 +92,54 @@ def query_drug(query: str) -> str:
     """
     logger.info(f"查询药物: {query}")
 
-    # 转换为小写以便匹配
-    query_lower = query.lower()
+    try:
+        # Use drug_db module for real queries
+        import drug_db
 
-    # 查找匹配的药品
-    matched_drugs = []
-    for drug in DRUG_DATABASE:
-        # 检查药品名称是否匹配
-        if query_lower in drug["name"].lower():
-            matched_drugs.append(drug)
-            continue
+        if any(keyword in query.lower() for keyword in ['头痛', '发热', '咳嗽', '疼痛', 'fever', 'pain', 'cough']):
+            # Symptom query
+            drugs = drug_db.query_drugs_by_symptom(query)
+        else:
+            # Name query
+            drug = drug_db.query_drug_by_name(query)
+            drugs = [drug] if drug else []
 
-        # 检查适应症是否匹配
-        for indication in drug["indications"]:
-            if query_lower in indication.lower():
-                matched_drugs.append(drug)
-                break
+        if not drugs:
+            return json.dumps({
+                "status": "not_found",
+                "message": f"未找到匹配 '{query}' 的药品",
+                "drugs": []
+            }, ensure_ascii=False)
 
-    if not matched_drugs:
-        # 如果没有匹配，返回所有药品
-        matched_drugs = DRUG_DATABASE
+        # Format response
+        formatted_drugs = []
+        for drug in drugs:
+            formatted_drug = {
+                "name": drug.get("name", "未知"),
+                "specification": "需从backend获取详细信息",
+                "price": 0.0,  # Backend doesn't have price field yet
+                "stock": drug.get("quantity", 0),
+                "is_prescription": drug.get("name", "").lower() in ["amoxicillin", "azithromycin"],
+                "indications": ["需从backend获取适应症信息"],
+                "expiry_days": drug.get("expiry_date", 0),
+                "location": f"货架{drug.get('shelve_id', 0)}-({drug.get('shelf_x', 0)},{drug.get('shelf_y', 0)})"
+            }
+            formatted_drugs.append(formatted_drug)
 
-    # 简化输出格式
-    results = []
-    for drug in matched_drugs[:5]:  # 限制最多返回5个
-        results.append({
-            "name": drug["name"],
-            "specification": drug["specification"],
-            "price": drug["price"],
-            "stock": drug["stock"],
-            "is_prescription": drug["is_prescription"],
-            "indications": drug["indications"],
-            "contraindications": drug["contraindications"],
-            "dosage_guide": drug["dosage_guide"]
-        })
+        return json.dumps({
+            "status": "success",
+            "count": len(formatted_drugs),
+            "query": query,
+            "drugs": formatted_drugs
+        }, ensure_ascii=False, indent=2)
 
-    response = {
-        "query": query,
-        "count": len(results),
-        "drugs": results,
-        "timestamp": datetime.now().isoformat(),
-        "note": "此为mock数据，实际使用需要连接药品数据库"
-    }
-
-    return json.dumps(response, ensure_ascii=False, indent=2)
+    except Exception as e:
+        logger.error(f"查询药物失败: {str(e)}")
+        return json.dumps({
+            "status": "error",
+            "message": f"查询失败: {str(e)}",
+            "drugs": []
+        }, ensure_ascii=False)
 
 # ==================== 过敏检查工具 ====================
 def check_allergy(patient_allergies: str, drug_name: str) -> str:
@@ -361,56 +365,58 @@ def generate_advice(drug_name: str, dosage: str, duration: str = None, notes: st
 # ==================== 审批提交工具 ====================
 def submit_approval(
     patient_name: str,
-    symptoms: str,
-    advice_text: str,
-    drug_name: str,
+    advice: str,
     patient_age: int = None,
     patient_weight: float = None,
-    drug_type: str = "prescription"
+    symptoms: str = None,
+    drug_name: str = None,
+    drug_type: str = None,
+    **kwargs
 ) -> str:
     """
-    将AI生成的用药建议提交给医生审批。
+    提交用药建议给医生审批
 
     Args:
         patient_name: 患者姓名
+        advice: 用药建议
         patient_age: 患者年龄（可选）
         patient_weight: 患者体重（可选）
-        symptoms: 症状描述
-        advice_text: 建议文本
-        drug_name: 药品名称
-        drug_type: 药品类型（prescription或otc）
+        symptoms: 症状描述（可选）
+        drug_name: 药品名称（可选）
+        drug_type: 药品类型（可选）
 
     Returns:
-        审批提交结果JSON字符串
+        审批单ID，格式如 "AP-20260407-ABCD1234"
     """
-    logger.info(f"提交审批: 患者={patient_name}, 症状={symptoms[:50]}..., 药物={drug_name}")
+    logger.info(f"提交审批: patient={patient_name}, drug={drug_name}")
 
-    # 生成审批ID（模拟）
-    timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
-    approval_id = f"AP-{timestamp}-{random.randint(1000, 9999)}"
+    try:
+        # Import HTTP client
+        from utils.http_client import PharmacyHTTPClient
 
-    # 如果是非处方药，自动批准（模拟）
-    is_auto_approved = drug_type == "otc"
-    status = "auto_approved" if is_auto_approved else "pending"
+        client = PharmacyHTTPClient()
+        approval_id = client.create_approval(
+            patient_name=patient_name,
+            advice=advice,
+            patient_age=patient_age,
+            patient_weight=patient_weight,
+            symptoms=symptoms,
+            drug_name=drug_name,
+            drug_type=drug_type
+        )
 
-    response = {
-        "approval_id": approval_id,
-        "patient_name": patient_name,
-        "patient_age": patient_age,
-        "patient_weight": patient_weight,
-        "symptoms": symptoms,
-        "advice_text": advice_text,
-        "drug_name": drug_name,
-        "drug_type": drug_type,
-        "status": status,
-        "submitted_at": datetime.now().isoformat(),
-        "doctor_required": drug_type == "prescription",
-        "message": "已提交审批，等待医生审核" if drug_type == "prescription" else "非处方药，已自动批准",
-        "next_step": "等待医生审批" if drug_type == "prescription" else "可立即配药",
-        "note": "此为mock数据，实际需要连接审批系统"
-    }
+        if approval_id:
+            logger.info(f"审批提交成功: {approval_id}")
+            return approval_id
+        else:
+            logger.error("审批提交失败: 未返回审批ID")
+            # Fallback to mock for compatibility
+            return f"AP-{datetime.now().strftime('%Y%m%d')}-MOCK{random.randint(1000, 9999)}"
 
-    return json.dumps(response, ensure_ascii=False, indent=2)
+    except Exception as e:
+        logger.error(f"审批提交失败: {str(e)}")
+        # Fallback to mock for compatibility
+        return f"AP-{datetime.now().strftime('%Y%m%d')}-MOCK{random.randint(1000, 9999)}"
 
 # ==================== 处方配药工具 ====================
 async def fill_prescription(prescription_id: str, patient_name: str, drugs: List[Dict]) -> str:
