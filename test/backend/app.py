@@ -6,7 +6,7 @@ import os
 import sqlite3
 import threading
 import time
-from datetime import date
+from datetime import date, datetime
 from flask import Flask, request, jsonify
 
 # ROS2 可选：若环境未配置则跳过发布
@@ -47,6 +47,52 @@ _ros_thread.start()
 
 # Flask
 app = Flask(__name__)
+
+# Port configuration for P1 compatibility
+# Using port 8001 to avoid conflicts with common services (5000 for Flask dev, 8000 for Python HTTP server)
+# and to ensure compatibility with P1 medical assistant system requirements
+DEFAULT_PORT = 8001  # Changed from 5000 for P1 compatibility
+
+
+def get_server_port(default_port: int = DEFAULT_PORT) -> int:
+    """
+    Get the server port from environment variable with proper error handling.
+
+    Args:
+        default_port: Default port to use if PORT environment variable is not set or invalid
+
+    Returns:
+        Valid port number between 1 and 65535
+
+    Raises:
+        ValueError: If PORT environment variable contains a value that cannot be converted to int
+                   or is outside valid port range (1-65535)
+    """
+    port_str = os.environ.get('PORT')
+
+    if port_str is None:
+        # No PORT environment variable, use default
+        print(f"[Config] Using default port: {default_port}")
+        return default_port
+
+    try:
+        port = int(port_str)
+    except ValueError:
+        raise ValueError(
+            f"Invalid PORT environment variable value: '{port_str}'. "
+            f"Must be an integer. Using default port {default_port} instead."
+        ) from None
+
+    # Validate port range
+    if port < 1 or port > 65535:
+        raise ValueError(
+            f"Invalid port number: {port}. Port must be between 1 and 65535. "
+            f"Using default port {default_port} instead."
+        )
+
+    print(f"[Config] Using port from environment variable: {port}")
+    return port
+
 
 # CORS：允许前端跨域访问
 try:
@@ -447,6 +493,91 @@ def list_orders():
         conn.close()
 
 
+@app.route('/api/approvals', methods=['POST'])
+def create_approval():
+    """Create a new approval request"""
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": True, "message": "No JSON data provided"}), 400
+
+        # Validate required fields
+        required_fields = ['patient_name', 'advice']
+        for field in required_fields:
+            if field not in data:
+                return jsonify({
+                    "error": True,
+                    "message": f"Missing required field: {field}",
+                    "code": "MISSING_FIELD"
+                }), 400
+
+        # Import ApprovalManager
+        from approval import get_approval_manager
+
+        # Create approval
+        manager = get_approval_manager()
+        approval_id = manager.create(
+            patient_name=data['patient_name'],
+            advice=data['advice'],
+            patient_age=data.get('patient_age'),
+            patient_weight=data.get('patient_weight'),
+            symptoms=data.get('symptoms'),
+            drug_name=data.get('drug_name'),
+            drug_type=data.get('drug_type')
+        )
+
+        return jsonify({
+            "success": True,
+            "approval_id": approval_id,
+            "message": "Approval created successfully",
+            "created_at": datetime.now().isoformat()
+        }), 201
+
+    except Exception as e:
+        return jsonify({
+            "error": True,
+            "message": f"Failed to create approval: {str(e)}",
+            "code": "CREATION_ERROR"
+        }), 500
+
+
+@app.route('/api/approvals/<approval_id>', methods=['GET'])
+def get_approval(approval_id):
+    """Get approval details by ID"""
+    try:
+        from approval import get_approval_manager
+
+        manager = get_approval_manager()
+        approval = manager.get(approval_id)
+
+        if not approval:
+            return jsonify({
+                "error": True,
+                "message": f"Approval not found: {approval_id}",
+                "code": "NOT_FOUND"
+            }), 404
+
+        # Convert SQLite Row to dict if needed
+        if hasattr(approval, 'keys'):
+            approval = dict(approval)
+
+        # Rename 'id' to 'approval_id' for API consistency
+        if 'id' in approval:
+            approval['approval_id'] = approval.pop('id')
+
+        return jsonify({
+            "success": True,
+            **approval
+        }), 200
+
+    except Exception as e:
+        return jsonify({
+            "error": True,
+            "message": f"Failed to get approval: {str(e)}",
+            "code": "RETRIEVAL_ERROR"
+        }), 500
+
+
 # Werkzeug 开启自动重载时，仅子进程会带 WERKZEUG_RUN_MAIN=true；在此启动可避免父进程再挂一套线程导致重复扣减。
 if os.environ.get('WERKZEUG_RUN_MAIN') == 'true':
     _boot_expiry_worker_once()
@@ -461,4 +592,11 @@ if __name__ == '__main__':
     # debug + 自动重载时由子进程 import 时启动；当前若是「只起监控不重载」的父进程则不应在此启动
     if not (_debug and _use_reloader):
         _boot_expiry_worker_once()
-    app.run(host='0.0.0.0', port=5000, debug=_debug, use_reloader=_use_reloader)
+
+    try:
+        port = get_server_port()
+        app.run(host='0.0.0.0', port=port, debug=_debug, use_reloader=_use_reloader)
+    except ValueError as e:
+        print(f"[Error] {e}")
+        print(f"[Config] Falling back to default port: {DEFAULT_PORT}")
+        app.run(host='0.0.0.0', port=DEFAULT_PORT, debug=_debug, use_reloader=_use_reloader)
