@@ -40,12 +40,13 @@ def _filter_drugs_by_symptom(drugs: List[Dict[str, Any]], symptom: str) -> List[
 
     # Mock症状匹配逻辑 - 实际应该基于药品适应症数据
     # 这里使用简单的关键词匹配
+    # 注意：backend返回的是中文药品名称，但为了兼容性，同时包含英文名称
     symptom_keywords = {
-        "头痛": ["ibuprofen", "paracetamol", "aspirin"],
-        "发热": ["ibuprofen", "paracetamol"],
-        "咳嗽": ["dextromethorphan", "codeine"],
-        "过敏": ["loratadine", "cetirizine"],
-        "感染": ["amoxicillin", "azithromycin"],
+        "头痛": ["布洛芬", "ibuprofen", "对乙酰氨基酚", "paracetamol", "阿司匹林", "aspirin"],
+        "发热": ["布洛芬", "ibuprofen", "对乙酰氨基酚", "paracetamol"],
+        "咳嗽": ["头孢克肟", "cephalosporin", "dextromethorphan", "codeine"],
+        "过敏": ["氯雷他定", "loratadine", "西替利嗪", "cetirizine"],
+        "感染": ["阿莫西林", "amoxicillin", "头孢克肟", "cephalosporin", "阿奇霉素", "azithromycin"],
     }
 
     # 查找症状对应的药品名称关键词
@@ -55,13 +56,10 @@ def _filter_drugs_by_symptom(drugs: List[Dict[str, Any]], symptom: str) -> List[
             matched_keywords.extend(keywords)
 
     if not matched_keywords:
-        # 如果没有预定义匹配，尝试基于名称的简单匹配
-        for drug in drugs:
-            drug_name_lower = drug.get('name', '').lower()
-            # 简单逻辑：如果药品名称包含症状关键词的一部分
-            if any(keyword in symptom_lower for keyword in ['pain', 'fever', 'cough', 'allergy', 'infection']):
-                matched_drugs.append(drug)
-        return matched_drugs
+        # 如果没有预定义匹配，返回空列表
+        # 在实际应用中，应该基于药品适应症数据库进行匹配
+        logger.warning(f"未找到症状 '{symptom}' 的预定义匹配")
+        return []
 
     # 基于关键词过滤
     for drug in drugs:
