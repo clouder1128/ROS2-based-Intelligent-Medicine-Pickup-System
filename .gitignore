@@ -66,3 +66,7 @@ sessions/
 
 # Claude specific
 .claude/
+# ROS2编译目录（来自原仓库）
+test/build/
+test/install/
+test/log/

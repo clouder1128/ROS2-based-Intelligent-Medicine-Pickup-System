@@ -123,3 +123,11 @@ def is_tool_registered(name: str) -> bool:
 def get_executor() -> ToolExecutor:
     """获取工具执行器实例（新接口）"""
     return _executor
+
+
+# 自动注册医疗工具
+try:
+    from .medical import register_tools
+    register_tools(_executor)
+except ImportError:
+    pass
