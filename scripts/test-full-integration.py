@@ -4,28 +4,47 @@ Full integration test - tests complete P1-backend integration
 """
 import os
 import sys
-import time
-import subprocess
 import httpx
 import json
 
 def check_backend():
-    """Check if backend is running and healthy"""
-    try:
-        response = httpx.get('http://localhost:8001/api/health', timeout=5)
-        if response.status_code == 200:
-            data = response.json()
-            print(f"✓ Backend running: {data.get('message', 'unknown')}")
-            return True
-        else:
-            print(f"✗ Backend responded with {response.status_code}")
-            return False
-    except httpx.ConnectError:
-        print("✗ Backend not reachable at http://localhost:8001")
-        return False
-    except Exception as e:
-        print(f"✗ Backend check failed: {e}")
-        return False
+    """Check if backend is running and healthy with retries"""
+    max_retries = 3
+    retry_delay = 1  # seconds
+
+    for attempt in range(max_retries):
+        try:
+            response = httpx.get('http://localhost:8001/api/health', timeout=5)
+            if response.status_code == 200:
+                data = response.json()
+                backend_name = data.get('message', 'unknown')
+                if attempt > 0:
+                    print(f"✓ Backend running after {attempt + 1} attempts: {backend_name}")
+                else:
+                    print(f"✓ Backend running: {backend_name}")
+                return True
+            else:
+                if attempt == max_retries - 1:
+                    print(f"✗ Backend responded with {response.status_code}")
+                else:
+                    print(f"⚠ Backend responded with {response.status_code}, retrying...")
+        except httpx.ConnectError:
+            if attempt == max_retries - 1:
+                print("✗ Backend not reachable at http://localhost:8001")
+            else:
+                print(f"⚠ Backend not reachable, retrying... (attempt {attempt + 1}/{max_retries})")
+        except Exception as e:
+            if attempt == max_retries - 1:
+                print(f"✗ Backend check failed: {e}")
+            else:
+                print(f"⚠ Backend check failed, retrying: {e}")
+
+        # Wait before retry (except on last attempt)
+        if attempt < max_retries - 1:
+            import time
+            time.sleep(retry_delay)
+
+    return False
 
 def test_p1_modules():
     """Test P1 modules integration"""
@@ -77,6 +96,16 @@ def test_p1_modules():
     )
     if approval_id and approval_id.startswith('AP-'):
         print(f"✓ Created approval: {approval_id}")
+
+        # Verify approval exists in backend
+        try:
+            response = httpx.get(f'http://localhost:8001/api/approvals/{approval_id}', timeout=5)
+            if response.status_code == 200:
+                print(f"✓ Verified approval exists in backend")
+            else:
+                print(f"⚠ Approval created but not found in backend (status: {response.status_code})")
+        except Exception as e:
+            print(f"⚠ Could not verify approval in backend: {e}")
     else:
         print("✗ Failed to create approval")
 

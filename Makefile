@@ -1,17 +1,22 @@
 # Makefile for Backend-P1 Integration Project
 
-.PHONY: help test-integration quick-start backend-start backend-stop clean
+.PHONY: help test test-integration quick-start backend-start backend-stop clean
 
 help:
 	@echo "Backend-P1 Integration Project Makefile"
 	@echo ""
 	@echo "Available targets:"
+	@echo "  test              Run unit tests (mocked)"
 	@echo "  test-integration   Run full integration test (requires backend running)"
 	@echo "  quick-start        Start backend and P1 CLI in integrated mode"
 	@echo "  backend-start      Start backend server"
 	@echo "  backend-stop       Stop backend server"
 	@echo "  clean              Clean up temporary files"
 	@echo ""
+
+test:
+	@echo "Running unit tests..."
+	@cd P1 && pytest tests/ -v --tb=short
 
 test-integration:
 	@echo "Running full integration test..."
@@ -28,7 +33,12 @@ backend-start:
 
 backend-stop:
 	@echo "Stopping backend server..."
-	@pkill -f "python app.py" || true
+	@if pgrep -f "python.*app\.py" > /dev/null; then \
+		pkill -f "python.*app\.py"; \
+		echo "Backend stopped"; \
+	else \
+		echo "Backend not running"; \
+	fi
 
 clean:
 	@echo "Cleaning up..."
