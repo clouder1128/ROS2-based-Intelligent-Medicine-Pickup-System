@@ -325,13 +325,74 @@ def health():
 
 @app.route('/api/drugs', methods=['GET'])
 def list_drugs():
+    """Get list of drugs with optional name filtering
+
+    Query parameters:
+    - name: Optional partial name filter (case-sensitive)
+
+    Returns:
+    - New format: {"success": True, "drugs": [...], "count": N, "filters": {"name": <value>}}
+    - Old format (backward compatibility): {"ok": True, "data": [...]}
+    """
+    name_filter = request.args.get('name')
+
+    conn = get_db()
+    try:
+        if name_filter is not None:
+            # Use LIKE for partial matching
+            cur = conn.execute(
+                'SELECT drug_id, name, quantity, expiry_date, shelf_x, shelf_y, shelve_id FROM inventory WHERE name LIKE ?',
+                (f'%{name_filter}%',)
+            )
+        else:
+            cur = conn.execute(
+                'SELECT drug_id, name, quantity, expiry_date, shelf_x, shelf_y, shelve_id FROM inventory'
+            )
+
+        drugs = [dict(row) for row in cur.fetchall()]
+
+        # Return both new format for P1 compatibility and old format for backward compatibility
+        response_data = {
+            'success': True,  # New format
+            'ok': True,       # Old format for backward compatibility
+            'drugs': drugs,   # New format
+            'data': drugs,    # Old format for backward compatibility
+            'count': len(drugs),
+            'filters': {'name': name_filter if name_filter is not None else ''}
+        }
+        return jsonify(response_data)
+    finally:
+        conn.close()
+
+
+@app.route('/api/drugs/<int:drug_id>', methods=['GET'])
+def get_drug(drug_id):
+    """Get a single drug by ID
+
+    Returns:
+    - Success: {"success": True, "drug": {...}}
+    - Not found: {"error": True, "message": "...", "code": "DRUG_NOT_FOUND"} with 404 status
+    """
     conn = get_db()
     try:
         cur = conn.execute(
-            'SELECT drug_id, name, quantity, expiry_date, shelf_x, shelf_y, shelve_id FROM inventory'
+            'SELECT drug_id, name, quantity, expiry_date, shelf_x, shelf_y, shelve_id FROM inventory WHERE drug_id = ?',
+            (drug_id,)
         )
-        drugs = [dict(row) for row in cur.fetchall()]
-        return jsonify({'ok': True, 'data': drugs})
+        row = cur.fetchone()
+
+        if row is None:
+            return jsonify({
+                'error': True,
+                'message': f'Drug not found: id={drug_id}',
+                'code': 'DRUG_NOT_FOUND'
+            }), 404
+
+        drug = dict(row)
+        return jsonify({
+            'success': True,
+            'drug': drug
+        })
     finally:
         conn.close()
 
