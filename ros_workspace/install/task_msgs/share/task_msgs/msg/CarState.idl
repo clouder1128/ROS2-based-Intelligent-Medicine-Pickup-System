@@ -1,0 +1,20 @@
+// generated from rosidl_adapter/resource/msg.idl.em
+// with input from task_msgs/msg/CarState.msg
+// generated code does not contain a copyright notice
+
+
+module task_msgs {
+  module msg {
+    @verbatim (language="comment", text=
+      "CarState.msg")
+    struct CarState {
+      uint8 car_id;
+
+      float x;
+
+      float y;
+
+      uint8 isrunning;
+    };
+  };
+};

@@ -1,0 +1,19 @@
+1.RUN Unity程序，在WINDOWS下，xiaoche.zip
+注意：RosCar\ROSPackage_Data\StreamingAssets目录中ip.txt中为linux侧的ip地址，ROS2运行在linux中
+
+linux 下操作  
+2. 进入\newros_ws\src 目录新开终端 运行：source install/setup.bash
+3.运行ROS2
+ros2 run ros_tcp_endpoint default_server_endpoint --ros-args -p ROS_IP:=0.0.0.0 -p ROS_TCP_PORT:=10000
+
+4. 进入\newros_ws\src 目录新开终端  运行：source install/setup.bash
+5.运行测试程序  python3 src/task_msgs/pyScripts/test_task_publisher.py
+
+（可选）
+6.进入\newros_ws\src 目录新开终端  运行：source install/setup.bash
+7.运行ROS主体查询指令：
+ros2 topic list
+ros2 topic echo /CabinetRunning_U --full
+ros2 topic echo /CabinetState_U --full
+ros2 topic echo /CarState_U --full
+ros2 topic echo /TaskData_U --full

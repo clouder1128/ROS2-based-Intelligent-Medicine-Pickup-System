@@ -1,0 +1,13 @@
+{
+  "package_name": "task_msgs",
+  "output_dir": "/home/ubuntu/newros_ws/build/task_msgs/rosidl_generator_type_description/task_msgs",
+  "idl_tuples": [
+    "/home/ubuntu/newros_ws/build/task_msgs/rosidl_adapter/task_msgs:msg/MedicineData.idl",
+    "/home/ubuntu/newros_ws/build/task_msgs/rosidl_adapter/task_msgs:msg/CabinetOrder.idl",
+    "/home/ubuntu/newros_ws/build/task_msgs/rosidl_adapter/task_msgs:msg/Task.idl",
+    "/home/ubuntu/newros_ws/build/task_msgs/rosidl_adapter/task_msgs:msg/CabinetRunning.idl",
+    "/home/ubuntu/newros_ws/build/task_msgs/rosidl_adapter/task_msgs:msg/CabinetState.idl",
+    "/home/ubuntu/newros_ws/build/task_msgs/rosidl_adapter/task_msgs:msg/CarState.idl",
+    "/home/ubuntu/newros_ws/build/task_msgs/rosidl_adapter/task_msgs:msg/TaskState.idl"
+  ]
+}

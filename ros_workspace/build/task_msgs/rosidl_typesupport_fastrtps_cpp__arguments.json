@@ -1,0 +1,31 @@
+{
+  "package_name": "task_msgs",
+  "output_dir": "/home/ubuntu/newros_ws/build/task_msgs/rosidl_typesupport_fastrtps_cpp/task_msgs",
+  "template_dir": "/opt/ros/jazzy/share/rosidl_typesupport_fastrtps_cpp/resource",
+  "idl_tuples": [
+    "/home/ubuntu/newros_ws/build/task_msgs/rosidl_adapter/task_msgs:msg/MedicineData.idl",
+    "/home/ubuntu/newros_ws/build/task_msgs/rosidl_adapter/task_msgs:msg/CabinetOrder.idl",
+    "/home/ubuntu/newros_ws/build/task_msgs/rosidl_adapter/task_msgs:msg/Task.idl",
+    "/home/ubuntu/newros_ws/build/task_msgs/rosidl_adapter/task_msgs:msg/CabinetRunning.idl",
+    "/home/ubuntu/newros_ws/build/task_msgs/rosidl_adapter/task_msgs:msg/CabinetState.idl",
+    "/home/ubuntu/newros_ws/build/task_msgs/rosidl_adapter/task_msgs:msg/CarState.idl",
+    "/home/ubuntu/newros_ws/build/task_msgs/rosidl_adapter/task_msgs:msg/TaskState.idl"
+  ],
+  "target_dependencies": [
+    "/opt/ros/jazzy/lib/rosidl_typesupport_fastrtps_cpp/rosidl_typesupport_fastrtps_cpp",
+    "/opt/ros/jazzy/lib/python3.12/site-packages/rosidl_typesupport_fastrtps_cpp/__init__.py",
+    "/opt/ros/jazzy/share/rosidl_typesupport_fastrtps_cpp/resource/idl__rosidl_typesupport_fastrtps_cpp.hpp.em",
+    "/opt/ros/jazzy/share/rosidl_typesupport_fastrtps_cpp/resource/idl__type_support.cpp.em",
+    "/opt/ros/jazzy/share/rosidl_typesupport_fastrtps_cpp/resource/msg__rosidl_typesupport_fastrtps_cpp.hpp.em",
+    "/opt/ros/jazzy/share/rosidl_typesupport_fastrtps_cpp/resource/msg__type_support.cpp.em",
+    "/opt/ros/jazzy/share/rosidl_typesupport_fastrtps_cpp/resource/srv__rosidl_typesupport_fastrtps_cpp.hpp.em",
+    "/opt/ros/jazzy/share/rosidl_typesupport_fastrtps_cpp/resource/srv__type_support.cpp.em",
+    "/home/ubuntu/newros_ws/build/task_msgs/rosidl_adapter/task_msgs/msg/MedicineData.idl",
+    "/home/ubuntu/newros_ws/build/task_msgs/rosidl_adapter/task_msgs/msg/CabinetOrder.idl",
+    "/home/ubuntu/newros_ws/build/task_msgs/rosidl_adapter/task_msgs/msg/Task.idl",
+    "/home/ubuntu/newros_ws/build/task_msgs/rosidl_adapter/task_msgs/msg/CabinetRunning.idl",
+    "/home/ubuntu/newros_ws/build/task_msgs/rosidl_adapter/task_msgs/msg/CabinetState.idl",
+    "/home/ubuntu/newros_ws/build/task_msgs/rosidl_adapter/task_msgs/msg/CarState.idl",
+    "/home/ubuntu/newros_ws/build/task_msgs/rosidl_adapter/task_msgs/msg/TaskState.idl"
+  ]
+}
