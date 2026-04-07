@@ -11,7 +11,7 @@ P1医疗用药助手Agent系统已支持通过DeepSeek API（兼容Anthropic API
 ```bash
 # DeepSeek API配置
 export ANTHROPIC_BASE_URL="https://api.deepseek.com/anthropic"
-export ANTHROPIC_AUTH_TOKEN="sk-fda9dd8c7d804a23aebd85c283e55e68"  # 您的DeepSeek API密钥
+export ANTHROPIC_AUTH_TOKEN="your_deepseek_api_key_here"  # 您的DeepSeek API密钥
 export ANTHROPIC_MODEL="deepseek-chat"  # 或使用其他支持的模型
 export ANTHROPIC_SMALL_FAST_MODEL="deepseek-chat"  # 快速模型（可选）
 
