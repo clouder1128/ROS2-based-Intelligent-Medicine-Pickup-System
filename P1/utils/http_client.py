@@ -8,6 +8,7 @@ import asyncio
 import logging
 import sys
 from typing import Dict, List, Any, Optional, Union
+from urllib.parse import urlparse
 import httpx
 from tenacity import (
     retry,
@@ -47,6 +48,12 @@ class PharmacyHTTPClient:
             retry_backoff: 重试退避系数
         """
         self.base_url = base_url or Config.PHARMACY_BASE_URL
+
+        # Validate URL format
+        parsed = urlparse(self.base_url)
+        if not parsed.scheme or not parsed.netloc:
+            raise ValueError(f"Invalid base_url format: {self.base_url}. Must include scheme (http/https) and hostname.")
+
         self.timeout = timeout
         self.max_retries = max_retries
         self.retry_delay = retry_delay
@@ -100,15 +107,9 @@ class PharmacyHTTPClient:
         """Run async coroutine in a separate thread with its own event loop
 
         This is used when called from within a running event loop to avoid deadlock.
+        Uses asyncio.run() which handles event loop creation and cleanup safely.
         """
-        import asyncio
-        # Create a new event loop for this thread
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        try:
-            return loop.run_until_complete(coro)
-        finally:
-            loop.close()
+        return asyncio.run(coro)
 
     async def _make_request(
         self,

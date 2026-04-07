@@ -198,7 +198,7 @@ def run_expiry_sweep() -> dict:
                 ros_n += 1
 
             return {
-                'ok': True,
+                'success': True, 'ok': True,
                 'date': today_s,
                 'days_applied': delta,
                 'expired_rows_cleared_qty': cleared_rows,
@@ -320,7 +320,7 @@ def publish_expiry_removal(drug: dict, remove_quantity: int):
 
 @app.route('/api/health', methods=['GET'])
 def health():
-    return jsonify({'status': 'ok', 'message': 'backend running', 'ros2': ros2_available})
+    return jsonify({'success': True, 'status': 'ok', 'message': 'backend running', 'ros2': ros2_available})
 
 
 @app.route('/api/drugs', methods=['GET'])
@@ -409,7 +409,7 @@ def order():
 
     data = request.get_json(silent=True)
     if not data:
-        return jsonify({'ok': False, 'error': '请求体必须为 JSON'}), 400
+        return jsonify({'success': False, 'success': False, 'ok': False, 'error': '请求体必须为 JSON'}), 400
 
     if not isinstance(data, list):
         data = [data]
@@ -419,23 +419,23 @@ def order():
         drug_id = item.get('id')
         num = item.get('num')
         if drug_id is None or num is None:
-            return jsonify({'ok': False, 'error': '每项需包含 id 和 num'}), 400
+            return jsonify({'success': False, 'ok': False, 'error': '每项需包含 id 和 num'}), 400
         try:
             order_data.append((int(drug_id), int(num)))
         except (TypeError, ValueError):
-            return jsonify({'ok': False, 'error': 'id 和 num 必须为整数'}), 400
+            return jsonify({'success': False, 'ok': False, 'error': 'id 和 num 必须为整数'}), 400
 
     if not order_data:
-        return jsonify({'ok': False, 'error': '药单为空'}), 400
+        return jsonify({'success': False, 'ok': False, 'error': '药单为空'}), 400
 
     # 预校验全部
     tasks = []
     for drug_id, num in order_data:
         if num <= 0:
-            return jsonify({'ok': False, 'error': f'药品 {drug_id} 数量必须大于 0'}), 400
+            return jsonify({'success': False, 'ok': False, 'error': f'药品 {drug_id} 数量必须大于 0'}), 400
         drug, err = validate_and_get_drug(drug_id, num)
         if err:
-            return jsonify({'ok': False, 'error': err}), 400
+            return jsonify({'success': False, 'ok': False, 'error': err}), 400
         tasks.append((drug_id, num, drug))
 
     # 全部通过：扣减库存 + 写入 order_log + 发布 ROS2（同一事务）
@@ -450,7 +450,7 @@ def order():
             )
             if cur.rowcount == 0:
                 conn.rollback()
-                return jsonify({'ok': False, 'error': f'库存不足: {drug["name"]}，请刷新后重试'}), 400
+                return jsonify({'success': False, 'ok': False, 'error': f'库存不足: {drug["name"]}，请刷新后重试'}), 400
 
             cur = conn.execute(
                 'INSERT INTO order_log (status, target_drug_id, quantity) VALUES (?, ?, ?)',
@@ -461,7 +461,7 @@ def order():
         for (drug_id, num, drug), task_id in zip(tasks, task_ids):
             publish_task(task_id, drug, num)
         return jsonify({
-            'ok': True,
+            'success': True, 'ok': True,
             'task_ids': task_ids,
             'message': f'已下发 {len(task_ids)} 个取药任务，库存已扣减',
         })
@@ -477,22 +477,22 @@ def pickup():
     """
     data = request.get_json(silent=True)
     if not data:
-        return jsonify({'ok': False, 'error': '请求体必须为 JSON'}), 400
+        return jsonify({'success': False, 'success': False, 'ok': False, 'error': '请求体必须为 JSON'}), 400
 
     drug_id = data.get('id')
     num = data.get('num')
     if drug_id is None or num is None:
-        return jsonify({'ok': False, 'error': '缺少 id 或 num'}), 400
+        return jsonify({'success': False, 'ok': False, 'error': '缺少 id 或 num'}), 400
     try:
         drug_id, num = int(drug_id), int(num)
     except (TypeError, ValueError):
-        return jsonify({'ok': False, 'error': 'id 和 num 必须为整数'}), 400
+        return jsonify({'success': False, 'ok': False, 'error': 'id 和 num 必须为整数'}), 400
     if num <= 0:
-        return jsonify({'ok': False, 'error': 'num 必须大于 0'}), 400
+        return jsonify({'success': False, 'ok': False, 'error': 'num 必须大于 0'}), 400
 
     drug, err = validate_and_get_drug(drug_id, num)
     if err:
-        return jsonify({'ok': False, 'error': err}), 400
+        return jsonify({'success': False, 'ok': False, 'error': err}), 400
 
     conn = get_db()
     try:
@@ -503,7 +503,7 @@ def pickup():
         )
         if cur.rowcount == 0:
             conn.rollback()
-            return jsonify({'ok': False, 'error': f'库存不足或已被占用: {drug["name"]}，请刷新后重试'}), 400
+            return jsonify({'success': False, 'ok': False, 'error': f'库存不足或已被占用: {drug["name"]}，请刷新后重试'}), 400
 
         cur = conn.execute(
             'INSERT INTO order_log (status, target_drug_id, quantity) VALUES (?, ?, ?)',
@@ -513,7 +513,7 @@ def pickup():
         conn.commit()
         publish_task(task_id, drug, num)
         return jsonify({
-            'ok': True,
+            'success': True, 'ok': True,
             'task_id': task_id,
             'drug_id': drug_id,
             'name': drug['name'],
@@ -549,7 +549,7 @@ def list_orders():
                 'created_at': r[4],
                 'drug_name': r[5],
             })
-        return jsonify({'ok': True, 'data': orders})
+        return jsonify({'success': True, 'ok': True, 'data': orders})
     finally:
         conn.close()
 
