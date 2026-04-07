@@ -3,8 +3,76 @@
 import sys
 import os
 import pytest
+import argparse
 
-if __name__ == "__main__":
+def run_integration_tests():
+    """Run integration tests (requires backend running)"""
+    print("Running integration tests...")
+    print("Note: Backend service must be running on port 8001")
+    print()
+
+    # Set environment variable to enable integration tests
+    os.environ['RUN_INTEGRATION_TESTS'] = '1'
+
+    # Run integration tests
+    result = pytest.main([
+        'tests/integration/',
+        '-v',
+        '--tb=short'
+    ])
+
+    return result == 0
+
+def run_unit_tests():
+    """Run unit tests only"""
+    print("Running unit tests...")
+
+    # Run unit tests (excluding integration tests)
+    result = pytest.main([
+        "tests/",
+        "-v",
+        "--tb=short",
+        "--disable-warnings",
+        "-p", "no:launch_testing_ros_pytest_entrypoint",
+        "-p", "no:launch_testing_ros",
+        "-p", "no:launch_testing",
+        "-p", "no:ament_pep257",
+        "-p", "no:ament_lint",
+        "-p", "no:ament_xmllint",
+        "-p", "no:ament_copyright",
+        "-p", "no:ament_flake8",
+        "-k", "not integration"
+    ])
+
+    return result == 0
+
+def run_all_tests():
+    """Run all tests (unit tests only by default)"""
+    print("Running all tests (excluding integration tests)...")
+    print("Use --integration to run integration tests")
+    print()
+
+    # Run all tests except integration tests
+    result = pytest.main([
+        "tests/",
+        "-v",
+        "--tb=short",
+        "--disable-warnings",
+        "-p", "no:launch_testing_ros_pytest_entrypoint",
+        "-p", "no:launch_testing_ros",
+        "-p", "no:launch_testing",
+        "-p", "no:ament_pep257",
+        "-p", "no:ament_lint",
+        "-p", "no:ament_xmllint",
+        "-p", "no:ament_copyright",
+        "-p", "no:ament_flake8",
+        "-k", "not integration"
+    ])
+
+    return result == 0
+
+def setup_environment():
+    """Setup test environment variables"""
     # 添加项目根目录到Python路径
     sys.path.insert(0, os.path.dirname(__file__))
 
@@ -34,20 +102,29 @@ if __name__ == "__main__":
     # 设置PYTEST_PLUGINS为空，防止加载ROS插件
     os.environ["PYTEST_PLUGINS"] = ""
 
-    # 运行pytest测试，禁用ROS插件
-    exit_code = pytest.main([
-        "tests/",
-        "-v",
-        "--tb=short",
-        "--disable-warnings",
-        "-p", "no:launch_testing_ros_pytest_entrypoint",
-        "-p", "no:launch_testing_ros",
-        "-p", "no:launch_testing",
-        "-p", "no:ament_pep257",
-        "-p", "no:ament_lint",
-        "-p", "no:ament_xmllint",
-        "-p", "no:ament_copyright",
-        "-p", "no:ament_flake8"
-    ])
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description='Run tests for P1 project')
+    parser.add_argument('--integration', action='store_true',
+                       help='Run integration tests (requires backend running)')
+    parser.add_argument('--unit', action='store_true',
+                       help='Run unit tests only')
+    parser.add_argument('--all', action='store_true',
+                       help='Run all tests (default)')
 
-    sys.exit(exit_code)
+    args = parser.parse_args()
+
+    # Setup environment
+    setup_environment()
+
+    # Determine which tests to run
+    success = True
+
+    if args.integration:
+        success = run_integration_tests()
+    elif args.unit:
+        success = run_unit_tests()
+    else:
+        # Default: run all tests (excluding integration)
+        success = run_all_tests()
+
+    sys.exit(0 if success else 1)
