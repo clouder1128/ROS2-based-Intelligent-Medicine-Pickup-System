@@ -4,8 +4,13 @@ Full integration test - tests complete P1-backend integration
 """
 import os
 import sys
+import time
 import httpx
 import json
+
+# Configuration
+BACKEND_PORT = os.getenv('PHARMACY_PORT', '8001')
+BACKEND_URL = f'http://localhost:{BACKEND_PORT}'
 
 def check_backend():
     """Check if backend is running and healthy with retries"""
@@ -14,7 +19,7 @@ def check_backend():
 
     for attempt in range(max_retries):
         try:
-            response = httpx.get('http://localhost:8001/api/health', timeout=5)
+            response = httpx.get(f'{BACKEND_URL}/api/health', timeout=5)
             if response.status_code == 200:
                 data = response.json()
                 backend_name = data.get('message', 'unknown')
@@ -30,7 +35,7 @@ def check_backend():
                     print(f"⚠ Backend responded with {response.status_code}, retrying...")
         except httpx.ConnectError:
             if attempt == max_retries - 1:
-                print("✗ Backend not reachable at http://localhost:8001")
+                print(f"✗ Backend not reachable at {BACKEND_URL}")
             else:
                 print(f"⚠ Backend not reachable, retrying... (attempt {attempt + 1}/{max_retries})")
         except Exception as e:
@@ -41,7 +46,6 @@ def check_backend():
 
         # Wait before retry (except on last attempt)
         if attempt < max_retries - 1:
-            import time
             time.sleep(retry_delay)
 
     return False
@@ -99,7 +103,7 @@ def test_p1_modules():
 
         # Verify approval exists in backend
         try:
-            response = httpx.get(f'http://localhost:8001/api/approvals/{approval_id}', timeout=5)
+            response = httpx.get(f'{BACKEND_URL}/api/approvals/{approval_id}', timeout=5)
             if response.status_code == 200:
                 print(f"✓ Verified approval exists in backend")
             else:
@@ -126,7 +130,7 @@ def main():
     print("=" * 60)
 
     # Set environment
-    os.environ['PHARMACY_BASE_URL'] = 'http://localhost:8001'
+    os.environ['PHARMACY_BASE_URL'] = BACKEND_URL
 
     # Check backend
     if not check_backend():
