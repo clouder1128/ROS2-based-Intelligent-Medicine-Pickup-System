@@ -426,7 +426,10 @@ class PharmacyHTTPClient:
         """
         result = await self._make_request('POST', '/api/order', json=items)
 
-        if result and result.get('success'):
+        if result and (result.get('success') or result.get('ok')):
+            # Normalize response to always have 'success' field
+            if 'ok' in result and 'success' not in result:
+                result['success'] = result['ok']
             return result
         return None
 
