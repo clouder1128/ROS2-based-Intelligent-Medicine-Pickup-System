@@ -15,6 +15,10 @@ black>=23.0.0
 flake8>=6.0.0
 mypy>=1.0.0
 
+# HTTP客户端和重试库
+httpx>=0.25.0
+tenacity>=8.2.0
+
 # 测试依赖
 pytest-cov>=4.0.0
 pytest-mock>=3.0.0

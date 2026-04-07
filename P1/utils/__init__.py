@@ -44,6 +44,12 @@ except ImportError:
     create_error_response = None
     create_success_response = None
 
+# 导入http_client模块中的类
+try:
+    from .http_client import PharmacyHTTPClient
+except ImportError:
+    PharmacyHTTPClient = None
+
 __all__ = [
     # json_tools
     'extract_json_from_text', 'safe_parse_json', 'format_tool_result',
@@ -58,5 +64,8 @@ __all__ = [
     'retry_on_exception',
 
     # validation
-    'create_error_response', 'create_success_response'
+    'create_error_response', 'create_success_response',
+
+    # http_client
+    'PharmacyHTTPClient'
 ]
