@@ -125,3 +125,25 @@ python3 app.py
 ## 前端对接
 
 前端 `index.html` 可请求 `http://localhost:5000/api/order`。若前后端不同机，将前端中的 `API_BASE` 改为实际后端地址。
+
+## P1 Integration
+This backend is integrated with P1 medical assistant system.
+
+### API Endpoints for P1
+- `GET /api/drugs` - Get all drugs (with optional name filter)
+- `GET /api/drugs/{id}` - Get specific drug
+- `POST /api/approvals` - Create approval request
+- `GET /api/approvals/{id}` - Get approval details
+- `GET /api/approvals/pending` - Get pending approvals
+- `POST /api/approvals/{id}/approve` - Approve approval
+- `POST /api/approvals/{id}/reject` - Reject approval
+- `POST /api/order` - Create order (dispense medication)
+
+### Running for P1 Integration
+```bash
+# Use port 8001 for P1 compatibility
+PORT=8001 python app.py
+# Or modify DEFAULT_PORT in app.py
+```
+
+See [Integration Guide](../docs/integration-guide.md) for details.

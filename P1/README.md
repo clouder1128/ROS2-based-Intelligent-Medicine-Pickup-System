@@ -1088,6 +1088,31 @@ logger.info(f"执行时间: {elapsed:.2f}秒")
 - 测试覆盖率不应降低
 - 边缘情况和错误处理需要测试
 
+## Backend Integration
+P1 now integrates with the smart pharmacy backend for real drug data and approval management.
+
+### Configuration
+Set `PHARMACY_BASE_URL` environment variable:
+```bash
+export PHARMACY_BASE_URL=http://localhost:8001
+```
+
+### Integrated Modules
+- `drug_db.py` - Real drug queries from backend
+- `tools/medical.py` - Real approval submission
+- `tools/inventory.py` - Real inventory operations
+
+### Testing
+```bash
+# Unit tests (mocked)
+pytest tests/
+
+# Integration tests (requires backend running)
+RUN_INTEGRATION_TESTS=1 pytest tests/integration/
+```
+
+See [Integration Guide](docs/integration-guide.md) for details.
+
 ## 许可证
 
 本项目采用MIT许可证。详见LICENSE文件。
