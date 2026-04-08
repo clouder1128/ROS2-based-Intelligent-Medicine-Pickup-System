@@ -14,36 +14,15 @@ from models.drug import Drug
 from models.order import Order
 from models.approval import Approval
 
+# Utility imports
+from utils.database import get_db_connection, init_database, json_serializer, DB_PATH
+from utils.ros2_bridge import init_ros2, publish_task, publish_expiry_removal, check_ros2_status, ros2_available, task_publisher
+from utils.logger import setup_logger
+
 # ROS2 可选：若环境未配置则跳过发布
-ros2_available = False
-task_publisher = None
+# ros2_available and task_publisher are now imported from utils.ros2_bridge
 
 
-def init_ros2():
-    """在后台线程中初始化 ROS2 并持续 spin"""
-    global ros2_available, task_publisher
-    try:
-        import rclpy
-        from rclpy.node import Node
-        from std_msgs.msg import String
-
-        class TaskPublisher(Node):
-            def __init__(self):
-                super().__init__('backend_task_publisher')
-                self.pub = self.create_publisher(String, '/task_request', 10)
-
-        rclpy.init()
-        node = TaskPublisher()
-        task_publisher = node
-        ros2_available = True
-        print('[ROS2] 已连接，任务将发布到 /task_request')
-
-        executor = rclpy.executors.SingleThreadedExecutor()
-        executor.add_node(node)
-        while rclpy.ok():
-            executor.spin_once(timeout_sec=0.1)
-    except Exception as e:
-        print(f'[ROS2] 未启用: {e}，任务将仅记录到数据库')
 
 
 # 启动时尝试初始化 ROS2（后台线程）
@@ -110,8 +89,6 @@ except ImportError:
         resp.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
         resp.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
         return resp
-
-DB_PATH = os.path.join(os.path.dirname(__file__), 'pharmacy.db')
 
 _expiry_sweep_lock = threading.Lock()
 _expiry_bg_started = False
@@ -236,14 +213,10 @@ def _boot_expiry_worker_once():
     threading.Thread(target=_expiry_sweep_loop, daemon=True).start()
 
 
-def get_db():
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    return conn
 
 
 def query_drug(drug_id: int) -> dict | None:
-    conn = get_db()
+    conn = get_db_connection()
     try:
         cur = conn.execute(
             'SELECT drug_id, name, quantity, expiry_date, shelf_x, shelf_y, shelve_id FROM inventory WHERE drug_id = ?',
@@ -267,56 +240,6 @@ def validate_and_get_drug(drug_id: int, num: int) -> tuple[dict | None, str | No
     return drug, None
 
 
-def publish_task(task_id: int, drug: dict, quantity: int):
-    """向 ROS2 /task_request 发布取药任务"""
-    global task_publisher
-    if not ros2_available or task_publisher is None:
-        return
-    try:
-        from std_msgs.msg import String
-        msg = String()
-        msg.data = json.dumps({
-            'task_id': task_id,
-            'type': 'pickup',
-            'drug_id': drug['drug_id'],
-            'name': drug['name'],
-            'shelve_id': drug['shelve_id'],
-            'x': drug['shelf_x'],
-            'y': drug['shelf_y'],
-            'quantity': quantity,
-        })
-        task_publisher.pub.publish(msg)
-        print(f'[ROS2] 已发布任务 task_id={task_id} -> ({drug["shelf_x"]},{drug["shelf_y"]})')
-    except Exception as e:
-        print(f'[ROS2] 发布失败: {e}')
-
-
-def publish_expiry_removal(drug: dict, remove_quantity: int):
-    """向 ROS2 /task_request 发布过期药品清柜任务（定期清扫发现仍有库存的过期品时调用）"""
-    global task_publisher
-    if not ros2_available or task_publisher is None:
-        return
-    try:
-        from std_msgs.msg import String
-        msg = String()
-        msg.data = json.dumps({
-            'task_id': None,
-            'type': 'expiry_removal',
-            'drug_id': drug['drug_id'],
-            'name': drug['name'],
-            'shelve_id': drug['shelve_id'],
-            'x': drug['shelf_x'],
-            'y': drug['shelf_y'],
-            'quantity': remove_quantity,
-            'reason': 'expired',
-        }, ensure_ascii=False)
-        task_publisher.pub.publish(msg)
-        print(
-            f'[ROS2] 已发布过期清柜 type=expiry_removal drug_id={drug["drug_id"]} '
-            f'qty={remove_quantity} -> ({drug["shelf_x"]},{drug["shelf_y"]})'
-        )
-    except Exception as e:
-        print(f'[ROS2] 过期清柜发布失败: {e}')
 
 
 # ---------------------------------------------------------------------------
@@ -341,7 +264,7 @@ def list_drugs():
     """
     name_filter = request.args.get('name')
 
-    conn = get_db()
+    conn = get_db_connection()
     try:
         if name_filter is not None:
             # Use LIKE for partial matching
@@ -378,7 +301,7 @@ def get_drug(drug_id):
     - Success: {"success": True, "drug": {...}}
     - Not found: {"error": True, "message": "...", "code": "DRUG_NOT_FOUND"} with 404 status
     """
-    conn = get_db()
+    conn = get_db_connection()
     try:
         cur = conn.execute(
             'SELECT drug_id, name, quantity, expiry_date, shelf_x, shelf_y, shelve_id FROM inventory WHERE drug_id = ?',
@@ -444,7 +367,7 @@ def order():
         tasks.append((drug_id, num, drug))
 
     # 全部通过：扣减库存 + 写入 order_log + 发布 ROS2（同一事务）
-    conn = get_db()
+    conn = get_db_connection()
     try:
         task_ids = []
         for drug_id, num, drug in tasks:
@@ -499,7 +422,7 @@ def pickup():
     if err:
         return jsonify({'success': False, 'ok': False, 'error': err}), 400
 
-    conn = get_db()
+    conn = get_db_connection()
     try:
         # 原子扣减库存（防止并发）
         cur = conn.execute(
@@ -604,7 +527,7 @@ def dispense():
         order_items.append((drug_id, quantity, drug_name))
 
     # 创建订单（逐个药品处理）
-    conn = get_db()
+    conn = get_db_connection()
     try:
         task_ids = []
         for drug_id, quantity, drug_name in order_items:
@@ -667,7 +590,7 @@ def dispense():
 @app.route('/api/orders', methods=['GET'])
 def list_orders():
     """查看取药记录"""
-    conn = get_db()
+    conn = get_db_connection()
     try:
         cur = conn.execute('''
             SELECT o.task_id, o.status, o.target_drug_id, o.quantity, o.created_at, i.name
@@ -868,7 +791,7 @@ def approve_approval(approval_id):
                     # 验证药品
                     drug, err = validate_and_get_drug(drug_id, quantity)
                     if not err:
-                        conn = get_db()
+                        conn = get_db_connection()
                         # 原子扣减库存
                         cur = conn.execute(
                             'UPDATE inventory SET quantity = quantity - ? WHERE drug_id = ? AND quantity >= ?',
@@ -988,7 +911,7 @@ def find_drug_id_by_name(drug_name: str) -> int | None:
     # 创建规范化版本：去除所有空白和标点符号
     cleaned = re.sub(r'[\s\W_]+', '', normalized)
 
-    conn = get_db()
+    conn = get_db_connection()
     try:
         # 1. 精确匹配
         cur = conn.execute(
