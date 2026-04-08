@@ -53,6 +53,7 @@ class ApprovalManager:
                 advice TEXT NOT NULL,
                 drug_name TEXT,
                 drug_type TEXT,
+                quantity INTEGER DEFAULT 1,
                 status TEXT NOT NULL,
                 doctor_id TEXT,
                 reject_reason TEXT,
@@ -60,6 +61,11 @@ class ApprovalManager:
                 approved_at DATETIME
             )
         ''')
+        # 尝试添加quantity列（如果表已存在但缺少该列）
+        try:
+            conn.execute('ALTER TABLE approvals ADD COLUMN quantity INTEGER DEFAULT 1')
+        except sqlite3.OperationalError:
+            pass  # 列已存在，忽略错误
         conn.execute(
             'CREATE INDEX IF NOT EXISTS idx_approvals_status ON approvals(status)'
         )
@@ -86,6 +92,7 @@ class ApprovalManager:
         symptoms: str | None = None,
         drug_name: str | None = None,
         drug_type: str | None = None,
+        quantity: int = 1,
     ) -> str:
         """
         新建待审批单，返回 approval_id（如 AP-20260403-A1B2C3D4）。
@@ -97,8 +104,8 @@ class ApprovalManager:
                 conn.execute(
                     '''INSERT INTO approvals (
                         id, patient_name, patient_age, patient_weight, symptoms,
-                        advice, drug_name, drug_type, status
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+                        advice, drug_name, drug_type, quantity, status
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
                     (
                         aid,
                         patient_name,
@@ -108,6 +115,7 @@ class ApprovalManager:
                         advice,
                         drug_name,
                         drug_type,
+                        quantity,
                         self.STATUS_PENDING,
                     ),
                 )
@@ -140,22 +148,49 @@ class ApprovalManager:
         finally:
             conn.close()
 
-    def approve(self, approval_id: str, doctor_id: str) -> bool:
-        """通过审批；仅 pending 可成功。"""
+    def approve(self, approval_id: str, doctor_id: str, notes: str = None) -> bool:
+        """通过审批；仅 pending 可成功。可添加医生建议。"""
         with _lock:
             conn = self._connect()
             try:
-                cur = conn.execute(
-                    '''UPDATE approvals SET status = ?, doctor_id = ?, approved_at = ?
-                       WHERE id = ? AND status = ?''',
-                    (
-                        self.STATUS_APPROVED,
-                        doctor_id,
-                        _utc_iso(),
-                        approval_id,
-                        self.STATUS_PENDING,
-                    ),
-                )
+                # 如果需要添加医生建议，先查询原有建议
+                if notes:
+                    cur = conn.execute(
+                        'SELECT advice FROM approvals WHERE id = ?',
+                        (approval_id,)
+                    )
+                    row = cur.fetchone()
+                    if row:
+                        new_advice = row['advice'] + '\n[doctor] ' + notes
+                        # 更新状态和医生建议
+                        cur = conn.execute(
+                            '''UPDATE approvals SET status = ?, doctor_id = ?, approved_at = ?, advice = ?
+                               WHERE id = ? AND status = ?''',
+                            (
+                                self.STATUS_APPROVED,
+                                doctor_id,
+                                _utc_iso(),
+                                new_advice,
+                                approval_id,
+                                self.STATUS_PENDING,
+                            ),
+                        )
+                    else:
+                        # 审批单不存在
+                        return False
+                else:
+                    # 不添加医生建议，只更新状态
+                    cur = conn.execute(
+                        '''UPDATE approvals SET status = ?, doctor_id = ?, approved_at = ?
+                           WHERE id = ? AND status = ?''',
+                        (
+                            self.STATUS_APPROVED,
+                            doctor_id,
+                            _utc_iso(),
+                            approval_id,
+                            self.STATUS_PENDING,
+                        ),
+                    )
                 conn.commit()
                 return cur.rowcount == 1
             finally:

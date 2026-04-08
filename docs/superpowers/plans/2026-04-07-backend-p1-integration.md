@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Integrate the smart pharmacy backend (`test/backend/`) into P1 medical assistant system via HTTP API, preserving ROS2 and scheduled task functionality for future simulation integration.
+**Goal:** Integrate the smart pharmacy backend (`backend/`) into P1 medical assistant system via HTTP API, preserving ROS2 and scheduled task functionality for future simulation integration.
 
 **Architecture:** Backend runs as standalone Flask service on port 8001, P1 tools become HTTP clients calling backend APIs. Backend retains ROS2 publishing and expiry sweeping threads. API-first design with JSON request/responses, comprehensive error handling, and team-friendly documentation.
 
@@ -12,7 +12,7 @@
 
 ## File Structure
 
-### Backend Modifications (`test/backend/`)
+### Backend Modifications (`backend/`)
 - **`app.py`**: Add approval API endpoints, modify port to 8001, enhance error handling
 - **`requirements.txt`**: Ensure Flask-CORS dependency
 - **`README.md`**: Update with new API endpoints and integration instructions
@@ -35,8 +35,8 @@
 ## Task 1: Backend Port Configuration and Basic Setup
 
 **Files:**
-- Modify: `test/backend/app.py:1-50`
-- Modify: `test/backend/app.py:5000` references
+- Modify: `backend/app.py:1-50`
+- Modify: `backend/app.py:5000` references
 
 - [ ] **Step 1: Create test for port configuration**
 
@@ -63,7 +63,7 @@ Expected: PASS (placeholder test) or import error
 - [ ] **Step 3: Modify app.py to use port 8001**
 
 ```python
-# test/backend/app.py modifications
+# backend/app.py modifications
 # Find the Flask app initialization section (around line 49)
 app = Flask(__name__)
 
@@ -99,7 +99,7 @@ Expected: Both tests PASS
 - [ ] **Step 6: Commit**
 
 ```bash
-cd test/backend
+cd backend
 git add app.py
 cd ../..
 git add tests/test_backend_config.py
@@ -111,14 +111,14 @@ git commit -m "feat: configure backend for port 8001 (P1 compatibility)"
 ## Task 2: Backend Approval API Endpoints
 
 **Files:**
-- Modify: `test/backend/app.py` (add approval routes)
-- Create: `test/backend/tests/test_approval_api.py`
-- Modify: `test/backend/requirements.txt` (ensure Flask-CORS)
+- Modify: `backend/app.py` (add approval routes)
+- Create: `backend/tests/test_approval_api.py`
+- Modify: `backend/requirements.txt` (ensure Flask-CORS)
 
 - [ ] **Step 1: Create test for approval creation API**
 
 ```python
-# test/backend/tests/test_approval_api.py
+# backend/tests/test_approval_api.py
 import json
 import pytest
 from app import app
@@ -155,13 +155,13 @@ def test_create_approval_success(client):
 
 - [ ] **Step 2: Run test to verify it fails (endpoint not exists)**
 
-Run: `cd test/backend && pytest tests/test_approval_api.py::test_create_approval_success -v`
+Run: `cd backend && pytest tests/test_approval_api.py::test_create_approval_success -v`
 Expected: FAIL with 404 Not Found
 
 - [ ] **Step 3: Add approval creation endpoint to app.py**
 
 ```python
-# In test/backend/app.py, after other route definitions (around line 200)
+# In backend/app.py, after other route definitions (around line 200)
 @app.route('/api/approvals', methods=['POST'])
 def create_approval():
     """Create a new approval request"""
@@ -220,13 +220,13 @@ from flask import request, jsonify
 
 - [ ] **Step 5: Run test to verify endpoint works**
 
-Run: `cd test/backend && pytest tests/test_approval_api.py::test_create_approval_success -v`
+Run: `cd backend && pytest tests/test_approval_api.py::test_create_approval_success -v`
 Expected: PASS
 
 - [ ] **Step 6: Create test for get approval endpoint**
 
 ```python
-# test/backend/tests/test_approval_api.py
+# backend/tests/test_approval_api.py
 def test_get_approval_success(client):
     """Test retrieving an approval by ID"""
     # First create an approval
@@ -254,7 +254,7 @@ def test_get_approval_success(client):
 - [ ] **Step 7: Add get approval endpoint to app.py**
 
 ```python
-# In test/backend/app.py, after create_approval route
+# In backend/app.py, after create_approval route
 @app.route('/api/approvals/<approval_id>', methods=['GET'])
 def get_approval(approval_id):
     """Get approval details by ID"""
@@ -290,13 +290,13 @@ def get_approval(approval_id):
 
 - [ ] **Step 8: Run all approval API tests**
 
-Run: `cd test/backend && pytest tests/test_approval_api.py -v`
+Run: `cd backend && pytest tests/test_approval_api.py -v`
 Expected: Both tests PASS
 
 - [ ] **Step 9: Commit**
 
 ```bash
-cd test/backend
+cd backend
 git add app.py tests/test_approval_api.py
 cd ../..
 git commit -m "feat: add approval creation and retrieval API endpoints"
@@ -307,13 +307,13 @@ git commit -m "feat: add approval creation and retrieval API endpoints"
 ## Task 3: Complete Backend Approval API
 
 **Files:**
-- Modify: `test/backend/app.py` (add remaining approval routes)
-- Modify: `test/backend/tests/test_approval_api.py` (add more tests)
+- Modify: `backend/app.py` (add remaining approval routes)
+- Modify: `backend/tests/test_approval_api.py` (add more tests)
 
 - [ ] **Step 1: Create test for pending approvals endpoint**
 
 ```python
-# test/backend/tests/test_approval_api.py
+# backend/tests/test_approval_api.py
 def test_get_pending_approvals(client):
     """Test retrieving pending approvals list"""
     # Create a pending approval
@@ -341,7 +341,7 @@ def test_get_pending_approvals(client):
 - [ ] **Step 2: Add pending approvals endpoint to app.py**
 
 ```python
-# In test/backend/app.py, after get_approval route
+# In backend/app.py, after get_approval route
 @app.route('/api/approvals/pending', methods=['GET'])
 def get_pending_approvals():
     """Get list of pending approvals"""
@@ -377,13 +377,13 @@ def get_pending_approvals():
 
 - [ ] **Step 3: Run pending approvals test**
 
-Run: `cd test/backend && pytest tests/test_approval_api.py::test_get_pending_approvals -v`
+Run: `cd backend && pytest tests/test_approval_api.py::test_get_pending_approvals -v`
 Expected: PASS
 
 - [ ] **Step 4: Create test for approve endpoint**
 
 ```python
-# test/backend/tests/test_approval_api.py
+# backend/tests/test_approval_api.py
 def test_approve_approval(client):
     """Test approving an approval"""
     # Create a pending approval
@@ -421,7 +421,7 @@ def test_approve_approval(client):
 - [ ] **Step 5: Add approve endpoint to app.py**
 
 ```python
-# In test/backend/app.py, after get_pending_approvals route
+# In backend/app.py, after get_pending_approvals route
 @app.route('/api/approvals/<approval_id>/approve', methods=['POST'])
 def approve_approval(approval_id):
     """Approve an approval request"""
@@ -464,13 +464,13 @@ def approve_approval(approval_id):
 
 - [ ] **Step 6: Run approve test**
 
-Run: `cd test/backend && pytest tests/test_approval_api.py::test_approve_approval -v`
+Run: `cd backend && pytest tests/test_approval_api.py::test_approve_approval -v`
 Expected: PASS
 
 - [ ] **Step 7: Create test for reject endpoint**
 
 ```python
-# test/backend/tests/test_approval_api.py
+# backend/tests/test_approval_api.py
 def test_reject_approval(client):
     """Test rejecting an approval"""
     # Create a pending approval
@@ -509,7 +509,7 @@ def test_reject_approval(client):
 - [ ] **Step 8: Add reject endpoint to app.py**
 
 ```python
-# In test/backend/app.py, after approve_approval route
+# In backend/app.py, after approve_approval route
 @app.route('/api/approvals/<approval_id>/reject', methods=['POST'])
 def reject_approval(approval_id):
     """Reject an approval request"""
@@ -560,13 +560,13 @@ def reject_approval(approval_id):
 
 - [ ] **Step 9: Run all approval API tests**
 
-Run: `cd test/backend && pytest tests/test_approval_api.py -v`
+Run: `cd backend && pytest tests/test_approval_api.py -v`
 Expected: All 4 tests PASS
 
 - [ ] **Step 10: Add CORS headers for P1 access**
 
 ```python
-# In test/backend/app.py, after CORS import/configuration
+# In backend/app.py, after CORS import/configuration
 # Add to the add_cors function or modify CORS configuration
 @app.after_request
 def add_cors_headers(response):
@@ -580,7 +580,7 @@ def add_cors_headers(response):
 - [ ] **Step 11: Commit**
 
 ```bash
-cd test/backend
+cd backend
 git add app.py tests/test_approval_api.py
 cd ../..
 git commit -m "feat: complete approval API with pending, approve, reject endpoints and CORS"
@@ -591,13 +591,13 @@ git commit -m "feat: complete approval API with pending, approve, reject endpoin
 ## Task 4: Enhanced Drug Query API for P1
 
 **Files:**
-- Modify: `test/backend/app.py` (enhance /api/drugs endpoint)
-- Create: `test/backend/tests/test_drug_api.py`
+- Modify: `backend/app.py` (enhance /api/drugs endpoint)
+- Create: `backend/tests/test_drug_api.py`
 
 - [ ] **Step 1: Create test for enhanced drug query by name**
 
 ```python
-# test/backend/tests/test_drug_api.py
+# backend/tests/test_drug_api.py
 import json
 import pytest
 from app import app
@@ -623,7 +623,7 @@ def test_get_drugs_with_name_filter(client):
 
 - [ ] **Step 2: Run test to verify current behavior**
 
-Run: `cd test/backend && pytest tests/test_drug_api.py::test_get_drugs_with_name_filter -v`
+Run: `cd backend && pytest tests/test_drug_api.py::test_get_drugs_with_name_filter -v`
 Expected: PASS (if endpoint returns all drugs) or FAIL (if no filtering)
 
 - [ ] **Step 3: Enhance /api/drugs endpoint in app.py**
@@ -677,7 +677,7 @@ def get_drugs():
 - [ ] **Step 4: Create test for get single drug by ID**
 
 ```python
-# test/backend/tests/test_drug_api.py
+# backend/tests/test_drug_api.py
 def test_get_drug_by_id(client):
     """Test getting a specific drug by ID"""
     response = client.get('/api/drugs/1')  # Test with ID 1 from init_db
@@ -693,7 +693,7 @@ def test_get_drug_by_id(client):
 - [ ] **Step 5: Add /api/drugs/<id> endpoint to app.py**
 
 ```python
-# In test/backend/app.py, after get_drugs route
+# In backend/app.py, after get_drugs route
 @app.route('/api/drugs/<int:drug_id>', methods=['GET'])
 def get_drug(drug_id):
     """Get a specific drug by ID"""
@@ -729,13 +729,13 @@ def get_drug(drug_id):
 
 - [ ] **Step 6: Run all drug API tests**
 
-Run: `cd test/backend && pytest tests/test_drug_api.py -v`
+Run: `cd backend && pytest tests/test_drug_api.py -v`
 Expected: Both tests PASS
 
 - [ ] **Step 7: Commit**
 
 ```bash
-cd test/backend
+cd backend
 git add app.py tests/test_drug_api.py
 cd ../..
 git commit -m "feat: enhance drug API with filtering and single drug endpoint"
@@ -1282,7 +1282,7 @@ Expected: Tests PASS
 
 ```bash
 # Start backend in another terminal first
-cd test/backend
+cd backend
 python app.py  # Should be on port 8001
 
 # In another terminal, test drug_db
@@ -1708,7 +1708,7 @@ Expected: Tests PASS
 
 ```bash
 # Start backend first
-cd test/backend
+cd backend
 python app.py
 
 # In another terminal, test the full flow
@@ -1934,7 +1934,7 @@ git commit -m "feat: add integration tests for backend-P1 integration"
 - Create: `docs/integration-guide.md`
 - Create: `docs/api-reference.md`
 - Create: `docs/troubleshooting.md`
-- Update: `test/backend/README.md`
+- Update: `backend/README.md`
 - Update: `P1/README.md`
 
 - [ ] **Step 1: Create integration guide**
@@ -1954,7 +1954,7 @@ This guide explains how to integrate the smart pharmacy backend with the P1 medi
 
 ### 1. Backend Setup
 ```bash
-cd test/backend/
+cd backend/
 pip install -r requirements.txt
 python init_db.py  # Initialize database
 python app.py      # Start on port 8001
@@ -2023,7 +2023,7 @@ curl -X POST http://localhost:8001/api/approvals/AP-20260407-ABCD1234/approve \
 
 ### 1. Start Backend
 ```bash
-cd test/backend
+cd backend
 python app.py
 ```
 
@@ -2047,7 +2047,7 @@ RUN_INTEGRATION_TESTS=1 pytest tests/integration/
 ## Common Tasks
 
 ### Adding New API Endpoints
-1. Add route in `test/backend/app.py`
+1. Add route in `backend/app.py`
 2. Add corresponding method in `P1/utils/http_client.py`
 3. Update relevant P1 module (`drug_db.py`, `tools/medical.py`, etc.)
 4. Add tests
@@ -2375,7 +2375,7 @@ fuser pharmacy.db
 **Issue:** `Table not found`
 **Solution:**
 ```bash
-cd test/backend
+cd backend
 python init_db.py  # Reinitialize database
 ```
 
@@ -2409,7 +2409,7 @@ logging.basicConfig(level=logging.DEBUG)
 
 ### Check Backend Logs
 ```bash
-cd test/backend
+cd backend
 python app.py 2>&1 | tee backend.log
 ```
 
@@ -2469,7 +2469,7 @@ logger.debug(f"Response: {response.status_code}")
 
 ### Database Corruption
 ```bash
-cd test/backend
+cd backend
 mv pharmacy.db pharmacy.db.backup
 python init_db.py
 ```
@@ -2477,7 +2477,7 @@ python init_db.py
 ### Complete Reset
 ```bash
 # Backend
-cd test/backend
+cd backend
 rm -f pharmacy.db
 python init_db.py
 python app.py
@@ -2492,7 +2492,7 @@ python -c "import drug_db; drug_db.health_check()"
 - [ ] **Step 4: Update backend README**
 
 ```markdown
-# Update test/backend/README.md with:
+# Update backend/README.md with:
 ## P1 Integration
 This backend is integrated with P1 medical assistant system.
 
@@ -2550,7 +2550,7 @@ See [Integration Guide](docs/integration-guide.md) for details.
 
 ```bash
 git add docs/integration-guide.md docs/api-reference.md docs/troubleshooting.md
-git add test/backend/README.md P1/README.md
+git add backend/README.md P1/README.md
 git commit -m "docs: add comprehensive integration documentation"
 ```
 
@@ -2650,7 +2650,7 @@ def main():
     # Check backend
     if not check_backend():
         print("\nPlease start backend first:")
-        print("  cd test/backend && python app.py")
+        print("  cd backend && python app.py")
         return 1
     
     # Test P1 modules
@@ -2680,7 +2680,7 @@ if __name__ == '__main__':
 echo "Starting Backend-P1 Integration Environment..."
 
 # Start backend
-cd test/backend
+cd backend
 echo "Starting backend on port 8001..."
 python app.py &
 BACKEND_PID=$!

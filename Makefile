@@ -29,7 +29,7 @@ quick-start:
 
 backend-start:
 	@echo "Starting backend server..."
-	@cd test/backend && python app.py &
+	@cd backend && python app.py &
 
 backend-stop:
 	@echo "Stopping backend server..."

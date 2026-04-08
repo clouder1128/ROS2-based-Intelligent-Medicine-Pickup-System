@@ -51,6 +51,7 @@ class InteractiveCLI:
             "/save": self._cmd_save,
             "/load": self._cmd_load,
             "/status": self._cmd_status,
+            "/check-status": self._cmd_check_status,
             "/history": self._cmd_history,
             "/workflow": self._cmd_workflow,
             "/stats": self._cmd_stats,
@@ -86,6 +87,7 @@ class InteractiveCLI:
         print("  /save [文件名]       - 保存当前会话状态")
         print("  /load <文件名>       - 加载会话状态")
         print("  /status              - 显示当前会话状态")
+        print("  /check-status [ID]   - 检查审批状态")
         print("  /history             - 显示对话历史")
         print("  /workflow            - 显示工作流状态")
         print("  /stats               - 显示统计信息")
@@ -209,6 +211,80 @@ class InteractiveCLI:
             print("Agent: 未初始化")
 
         print("=" * 60)
+        return False
+
+    def _cmd_check_status(self, args: List[str] = None) -> bool:
+        """检查审批状态
+
+        用法: /check-status [approval_id]
+        如果未提供approval_id，则使用当前会话的审批ID
+        """
+        if not self.agent:
+            print("! Agent未初始化，请先开始对话")
+            return False
+
+        approval_id = None
+        if args and len(args) > 0:
+            approval_id = args[0]
+        else:
+            approval_id = self.agent.get_approval_id()
+
+        if not approval_id:
+            print("! 未找到审批ID")
+            print("  请先提交用药建议获取审批ID，或手动指定审批ID")
+            print("  示例: /check-status AP-20260408-ABCD1234")
+            return False
+
+        print(f"\n查询审批状态: {approval_id}")
+        print("=" * 40)
+
+        status_info = self.agent.get_approval_status(approval_id)
+        if not status_info:
+            print("! 查询失败：审批单可能不存在或网络错误")
+            print("  请确认审批ID正确，并检查后端服务是否运行")
+            print(f"  后端URL: http://localhost:8001 (默认)")
+            return False
+
+        # 显示状态信息
+        status = status_info.get('status', 'unknown')
+        status_display = {
+            'pending': '🟡 待审批',
+            'approved': '✅ 已批准',
+            'rejected': '❌ 已拒绝',
+            'unknown': '❓ 未知'
+        }.get(status, f'❓ {status}')
+
+        print(f"状态: {status_display}")
+
+        approval_data = status_info.get('approval_data', {})
+        if approval_data:
+            print(f"患者: {approval_data.get('patient_name', '未知')}")
+            print(f"症状: {approval_data.get('symptoms', '未指定')[:50]}...")
+            print(f"创建时间: {approval_data.get('created_at', '未知')}")
+            print(f"批准时间: {approval_data.get('approved_at', '未批准')}")
+            print(f"批准医生: {approval_data.get('doctor_id', '未批准')}")
+            quantity = approval_data.get('quantity', 1)
+            print(f"药品数量: {quantity}")
+
+        # 显示订单信息（如果已批准）
+        order_info = status_info.get('order_info')
+        if order_info:
+            print(f"\n📦 订单信息:")
+            print(f"   订单ID: {order_info.get('task_id', '未知')}")
+            print(f"   药品ID: {order_info.get('target_drug_id', '未知')}")
+            print(f"   数量: {order_info.get('quantity', 1)}")
+            print(f"   状态: {order_info.get('status', '未知')}")
+            print(f"   创建时间: {order_info.get('created_at', '未知')}")
+
+        # 显示操作指引
+        instructions = status_info.get('instructions', '')
+        if instructions:
+            print(f"\n📋 下一步: {instructions}")
+
+        # 显示API调用方式（供前端参考）
+        print(f"\n🔗 API接口:")
+        print(f"   GET http://localhost:8001/api/approvals/{approval_id}")
+
         return False
 
     def _cmd_history(self, args: List[str] = None) -> bool:

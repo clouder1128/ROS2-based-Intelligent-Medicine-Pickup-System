@@ -526,6 +526,139 @@ def pickup():
         conn.close()
 
 
+@app.route('/api/dispense', methods=['POST'])
+def dispense():
+    """
+    配药端点，用于fill_prescription工具调用
+    接收: {
+        "prescription_id": "处方ID",
+        "patient_name": "患者姓名",
+        "drugs": [{"name": "药品名称", "dosage": "剂量", "quantity": 数量}]
+    }
+    返回: 类似/order端点的订单创建结果
+    """
+    data = request.get_json(silent=True)
+    if not data:
+        return jsonify({'success': False, 'ok': False, 'error': '请求体必须为 JSON'}), 400
+
+    prescription_id = data.get('prescription_id')
+    patient_name = data.get('patient_name')
+    drugs = data.get('drugs')
+
+    if not prescription_id or not patient_name or not drugs:
+        return jsonify({
+            'success': False,
+            'ok': False,
+            'error': '缺少必要参数: prescription_id, patient_name, drugs'
+        }), 400
+
+    if not isinstance(drugs, list):
+        return jsonify({
+            'success': False,
+            'ok': False,
+            'error': 'drugs必须为数组'
+        }), 400
+
+    # 转换药品名称到药品ID并验证
+    order_items = []
+    for drug_item in drugs:
+        drug_name = drug_item.get('name')
+        quantity = drug_item.get('quantity', 1)
+
+        if not drug_name:
+            return jsonify({
+                'success': False,
+                'ok': False,
+                'error': '药品缺少name字段'
+            }), 400
+
+        try:
+            quantity = int(quantity)
+            if quantity <= 0:
+                return jsonify({
+                    'success': False,
+                    'ok': False,
+                    'error': f'药品数量必须大于0: {drug_name}'
+                }), 400
+        except (TypeError, ValueError):
+            return jsonify({
+                'success': False,
+                'ok': False,
+                'error': f'药品数量必须为整数: {drug_name}'
+            }), 400
+
+        # 查找药品ID
+        drug_id = find_drug_id_by_name(drug_name)
+        if not drug_id:
+            return jsonify({
+                'success': False,
+                'ok': False,
+                'error': f'未找到药品: {drug_name}'
+            }), 400
+
+        order_items.append((drug_id, quantity, drug_name))
+
+    # 创建订单（逐个药品处理）
+    conn = get_db()
+    try:
+        task_ids = []
+        for drug_id, quantity, drug_name in order_items:
+            # 验证药品
+            drug, err = validate_and_get_drug(drug_id, quantity)
+            if err:
+                conn.rollback()
+                return jsonify({'success': False, 'ok': False, 'error': err}), 400
+
+            # 原子扣减库存
+            cur = conn.execute(
+                'UPDATE inventory SET quantity = quantity - ? WHERE drug_id = ? AND quantity >= ?',
+                (quantity, drug_id, quantity)
+            )
+            if cur.rowcount == 0:
+                conn.rollback()
+                return jsonify({
+                    'success': False,
+                    'ok': False,
+                    'error': f'库存不足: {drug_name}，请刷新后重试'
+                }), 400
+
+            # 写入order_log
+            cur = conn.execute(
+                'INSERT INTO order_log (status, target_drug_id, quantity) VALUES (?, ?, ?)',
+                ('pending', drug_id, quantity)
+            )
+            task_id = cur.lastrowid
+            task_ids.append(task_id)
+
+        conn.commit()
+
+        # 发布ROS2任务
+        for (drug_id, quantity, drug_name), task_id in zip(order_items, task_ids):
+            drug, _ = validate_and_get_drug(drug_id, quantity)
+            if drug:
+                publish_task(task_id, drug, quantity)
+
+        return jsonify({
+            'success': True,
+            'ok': True,
+            'prescription_id': prescription_id,
+            'patient_name': patient_name,
+            'task_ids': task_ids,
+            'message': f'处方配药成功，创建了{len(task_ids)}个取药任务',
+            'mode': 'real_api'
+        })
+    except Exception as e:
+        conn.rollback()
+        return jsonify({
+            'success': False,
+            'ok': False,
+            'error': f'配药失败: {str(e)}',
+            'mode': 'error'
+        })
+    finally:
+        conn.close()
+
+
 @app.route('/api/orders', methods=['GET'])
 def list_orders():
     """查看取药记录"""
@@ -577,6 +710,15 @@ def create_approval():
 
         # Create approval
         manager = get_approval_manager()
+        # 处理quantity字段，确保为整数，默认为1
+        quantity = data.get('quantity', 1)
+        try:
+            quantity = int(quantity)
+            if quantity <= 0:
+                quantity = 1  # 数量必须大于0，否则使用默认值
+        except (TypeError, ValueError):
+            quantity = 1  # 转换失败时使用默认值
+
         approval_id = manager.create(
             patient_name=data['patient_name'],
             advice=data['advice'],
@@ -584,7 +726,8 @@ def create_approval():
             patient_weight=data.get('patient_weight'),
             symptoms=data.get('symptoms'),
             drug_name=data.get('drug_name'),
-            drug_type=data.get('drug_type')
+            drug_type=data.get('drug_type'),
+            quantity=quantity
         )
 
         return jsonify({
@@ -657,6 +800,11 @@ def get_pending_approvals():
             else:
                 approvals.append(item)
 
+        # Rename 'id' to 'approval_id' for API consistency
+        for approval in approvals:
+            if 'id' in approval:
+                approval['approval_id'] = approval.pop('id')
+
         return jsonify({
             "success": True,
             "approvals": approvals,
@@ -687,7 +835,8 @@ def approve_approval(approval_id):
         from approval import get_approval_manager
 
         manager = get_approval_manager()
-        success = manager.approve(approval_id, data['doctor_id'])
+        notes = data.get('notes')
+        success = manager.approve(approval_id, data['doctor_id'], notes=notes)
 
         if not success:
             return jsonify({
@@ -696,13 +845,69 @@ def approve_approval(approval_id):
                 "code": "APPROVAL_FAILED"
             }), 400
 
-        return jsonify({
+        # 审批成功后自动创建订单
+        order_created = False
+        order_message = ""
+        task_id = None
+        try:
+            # 获取审批单详情
+            approval = manager.get(approval_id)
+            if approval and approval.get('drug_name'):
+                drug_name = approval['drug_name']
+                quantity = approval.get('quantity', 1)
+
+                # 使用多级匹配策略查找药品ID
+                drug_id = find_drug_id_by_name(drug_name)
+
+                if drug_id:
+                    # 验证药品
+                    drug, err = validate_and_get_drug(drug_id, quantity)
+                    if not err:
+                        conn = get_db()
+                        # 原子扣减库存
+                        cur = conn.execute(
+                            'UPDATE inventory SET quantity = quantity - ? WHERE drug_id = ? AND quantity >= ?',
+                            (quantity, drug_id, quantity)
+                        )
+                        if cur.rowcount > 0:
+                            # 写入order_log
+                            cur = conn.execute(
+                                'INSERT INTO order_log (status, target_drug_id, quantity) VALUES (?, ?, ?)',
+                                ('pending', drug_id, quantity)
+                            )
+                            task_id = cur.lastrowid
+                            conn.commit()
+                            # 发布ROS2任务
+                            publish_task(task_id, drug, quantity)
+                            order_created = True
+                            order_message = f"订单创建成功，任务ID: {task_id}，数量: {quantity}"
+                        else:
+                            order_message = f"库存不足，需要{quantity}个，库存不足"
+                    else:
+                        order_message = f"药品验证失败: {err}"
+                else:
+                    order_message = f"未找到药品: {drug_name}"
+            else:
+                order_message = "审批单未指定药品名称"
+        except Exception as e:
+            order_message = f"订单创建过程中出错: {str(e)}"
+            # 不影响审批成功，仅记录错误
+
+        # 返回审批成功，同时包含订单创建状态
+        response_data = {
             "success": True,
             "message": "Approval approved successfully",
             "approval_id": approval_id,
             "doctor_id": data['doctor_id'],
-            "approved_at": datetime.now().isoformat()
-        }), 200
+            "approved_at": datetime.now().isoformat(),
+            "order_created": order_created,
+            "order_message": order_message
+        }
+        if notes:
+            response_data['notes'] = notes
+        if task_id:
+            response_data["task_id"] = task_id
+        return jsonify(response_data), 200
 
     except Exception as e:
         return jsonify({
@@ -758,6 +963,58 @@ def reject_approval(approval_id):
             "message": f"Failed to reject approval: {str(e)}",
             "code": "REJECTION_ERROR"
         }), 500
+
+
+def find_drug_id_by_name(drug_name: str) -> int | None:
+    """
+    根据药品名称查找药品ID，使用多级匹配策略：
+    1. 精确匹配（完全相等）
+    2. 去除空白和标点后匹配
+    3. 模糊匹配（LIKE %drug_name%）
+    返回ID或None
+    """
+    import re
+
+    # 规范化药品名称：去除前后空白，转换为小写（中文不受影响）
+    normalized = drug_name.strip()
+    if not normalized:
+        return None
+
+    # 创建规范化版本：去除所有空白和标点符号
+    cleaned = re.sub(r'[\s\W_]+', '', normalized)
+
+    conn = get_db()
+    try:
+        # 1. 精确匹配
+        cur = conn.execute(
+            'SELECT drug_id FROM inventory WHERE name = ?',
+            (normalized,)
+        )
+        row = cur.fetchone()
+        if row:
+            return row['drug_id']
+
+        # 2. 规范化匹配（如果cleaned与原值不同且非空）
+        if cleaned and cleaned != normalized:
+            # 先获取所有药品名称进行客户端规范化匹配
+            cur = conn.execute('SELECT drug_id, name FROM inventory')
+            rows = cur.fetchall()
+            for r in rows:
+                db_name = r['name']
+                db_cleaned = re.sub(r'[\s\W_]+', '', db_name)
+                if cleaned == db_cleaned:
+                    return r['drug_id']
+
+        # 3. 模糊匹配（保持原逻辑作为后备）
+        cur = conn.execute(
+            'SELECT drug_id FROM inventory WHERE name LIKE ?',
+            (f'%{normalized}%',)
+        )
+        row = cur.fetchone()
+        return row['drug_id'] if row else None
+
+    finally:
+        conn.close()
 
 
 # Werkzeug 开启自动重载时，仅子进程会带 WERKZEUG_RUN_MAIN=true；在此启动可避免父进程再挂一套线程导致重复扣减。

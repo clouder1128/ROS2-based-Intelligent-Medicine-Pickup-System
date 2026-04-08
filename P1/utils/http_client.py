@@ -456,12 +456,15 @@ class PharmacyHTTPClient:
         result = await self._make_request('GET', '/api/health')
 
         if result and result.get('success'):
+            # 确保返回的字典包含backend_available字段供P1使用
+            result['backend_available'] = True
             return result
 
         return {
             'success': False,
             'error': '健康检查失败',
             'backend': 'pharmacy',
+            'backend_available': False,
             'ros2_connected': False
         }
 

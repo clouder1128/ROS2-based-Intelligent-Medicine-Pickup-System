@@ -10,11 +10,11 @@ if curl -s http://localhost:8001/api/health > /dev/null 2>&1; then
 fi
 
 # Start backend
-cd test/backend
 echo "Starting backend on port 8001..."
+cd backend
 python app.py &
 BACKEND_PID=$!
-cd ../..
+cd ..
 
 # Wait for backend to start with retries
 echo "Waiting for backend to start..."
@@ -46,7 +46,6 @@ fi
 export PHARMACY_BASE_URL=http://localhost:8001
 
 # Start P1 CLI
-cd P1
 echo ""
 echo "Starting P1 medical assistant..."
 echo "Backend PID: $BACKEND_PID"
@@ -54,6 +53,7 @@ echo "PHARMACY_BASE_URL: $PHARMACY_BASE_URL"
 echo ""
 echo "To stop: kill $BACKEND_PID or press Ctrl+C"
 echo ""
+cd P1
 python cli.py
 
 # Cleanup on exit

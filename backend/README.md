@@ -18,7 +18,7 @@ python3 init_db.py
 python3 app.py
 ```
 
-服务监听 `http://0.0.0.0:5000`。
+服务监听 `http://0.0.0.0:8001`（默认端口8001，可通过PORT环境变量修改）。
 
 ## 数据库说明
 
@@ -39,7 +39,7 @@ python3 app.py
 - **模块**：`ApprovalManager`，通过 **`get_approval_manager()`** 获取单例；默认与上文共用 **`pharmacy.db`**，也可设环境变量 **`APPROVAL_DB_PATH`** 指向其他 SQLite 文件。
 - **状态**：`pending` → `approve(doctor_id)` 后为 **`approved`**，或 `reject(doctor_id, reason)` 后为 **`rejected`**（仅 `pending` 可审批）。
 - **常用接口**：`create(patient_name, advice, …)` 返回主键 **`id`**（形如 `AP-YYYYMMDD-XXXXXXXX`）；`get`、`list_pending` 查询。
-- **与当前 Flask**：`app.py` **未**暴露审批相关 HTTP 路由；集成 AI 主后端（如 FastAPI）时在 `/chat`、`/approve` 等路由里调用上述方法即可。
+- **与当前 Flask**：`app.py` 现已暴露审批相关 HTTP 路由（`/api/approvals*`），供 P1 医疗助手系统直接调用。
 
 ## 过期清扫（后台线程）
 
@@ -52,10 +52,16 @@ python3 app.py
 | 方法 | 路径 | 说明 |
 |------|------|------|
 | GET | /api/health | 健康检查（含 `ros2` 是否已连接） |
-| GET | /api/drugs | 列出所有药品 |
+| GET | /api/drugs | 列出所有药品（支持名称过滤） |
+| GET | /api/drugs/{id} | 获取特定药品 |
 | GET | /api/orders | 查看取药记录（最近 50 条） |
 | POST | /api/order | 批量取药（前端常用） |
 | POST | /api/pickup | 单条取药（兼容旧接口） |
+| POST | /api/approvals | 创建医生审批单（P1集成） |
+| GET | /api/approvals/{id} | 查询审批单（P1集成） |
+| GET | /api/approvals/pending | 获取待审批列表（P1集成） |
+| POST | /api/approvals/{id}/approve | 批准审批单（P1集成） |
+| POST | /api/approvals/{id}/reject | 拒绝审批单（P1集成） |
 
 ### POST /api/order（批量）
 
@@ -124,7 +130,7 @@ python3 app.py
 
 ## 前端对接
 
-前端 `index.html` 可请求 `http://localhost:5000/api/order`。若前后端不同机，将前端中的 `API_BASE` 改为实际后端地址。
+前端 `index.html` 可请求 `http://localhost:8001/api/order`。若前后端不同机，将前端中的 `API_BASE` 改为实际后端地址。
 
 ## P1 Integration
 This backend is integrated with P1 medical assistant system.
@@ -147,3 +153,7 @@ PORT=8001 python app.py
 ```
 
 See [Integration Guide](../docs/integration-guide.md) for details.
+
+---
+
+**最后更新：2026年4月7日**

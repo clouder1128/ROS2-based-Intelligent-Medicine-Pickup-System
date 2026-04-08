@@ -38,7 +38,7 @@ TOOLS: List[Dict] = [
                 "drug_name": {"type": "string"},
                 "age": {"type": "integer"},
                 "weight_kg": {"type": "number"},
-                "condition_severity": {"type": "string", "enum": ["轻", "中", "重"]}
+                "condition_severity": {"type": "string", "enum": ["轻", "轻度", "中", "中度", "重", "重度"]}
             },
             "required": ["drug_name", "age", "weight_kg"]
         }
@@ -67,11 +67,12 @@ TOOLS: List[Dict] = [
                 "patient_age": {"type": "integer"},
                 "patient_weight": {"type": "number"},
                 "symptoms": {"type": "string"},
-                "advice_text": {"type": "string"},
+                "advice": {"type": "string"},
                 "drug_name": {"type": "string"},
-                "drug_type": {"type": "string", "enum": ["prescription", "otc"]}
+                "drug_type": {"type": "string", "enum": ["prescription", "otc"]},
+                "quantity": {"type": "integer"}
             },
-            "required": ["patient_name", "symptoms", "advice_text", "drug_name"]
+            "required": ["patient_name", "symptoms", "advice", "drug_name"]
         }
     },
     {

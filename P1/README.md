@@ -39,11 +39,15 @@ P1/
 │   ├── base.py            # 工具基类
 │   ├── executor.py        # 工具执行器
 │   ├── registry.py        # 工具注册表
+│   ├── inventory.py       # 库存管理工具
+│   ├── medical.py         # 医疗工具
+│   ├── report_generator.py # 报告生成工具
 │   └── __init__.py
 ├── session/               # 会话管理
 │   ├── manager.py         # 会话管理器
 │   └── __init__.py
 ├── utils/                 # 工具函数
+│   ├── http_client.py     # HTTP客户端工具
 │   ├── json_tools.py      # JSON处理工具
 │   ├── text_utils.py      # 文本处理工具
 │   ├── validation.py      # 验证工具
@@ -51,8 +55,16 @@ P1/
 │   └── __init__.py
 ├── tests/                 # 测试套件
 │   ├── conftest.py        # pytest配置
-│   ├── test_agent.py      # Agent测试
+│   ├── integration/       # 集成测试目录
+│   │   ├── test_backend_integration.py
+│   │   └── test_mocked_integration.py
+│   ├── test_core.py       # Agent核心测试（原test_agent.py）
+│   ├── test_drug_db_simple.py    # 药品数据库简单测试
+│   ├── test_drug_db_integration.py # 药品数据库集成测试
+│   ├── test_http_client.py        # HTTP客户端测试
+│   ├── test_inventory_integration.py # 库存集成测试
 │   ├── test_llm.py        # LLM测试
+│   ├── test_medical_integration.py # 医疗集成测试
 │   ├── test_memory.py     # 内存测试
 │   ├── test_session.py    # 会话管理测试
 │   ├── test_tools.py      # 工具测试
@@ -61,6 +73,8 @@ P1/
 ├── cli.py                # 功能完整的交互式命令行界面
 ├── interactive.py        # 简单交互式命令行界面
 ├── example_usage.py      # 使用示例脚本
+├── example_http_client.py # HTTP客户端示例
+├── drug_db.py           # 药品数据库接口（HTTP客户端）
 ├── config.py             # 全局配置
 ├── exceptions.py         # 异常定义
 ├── run_tests.py         # 测试运行器（解决pytest插件冲突）
@@ -249,14 +263,20 @@ response, steps = agent.run("患者头痛", patient_id="patient_123")
 ### 运行测试
 
 ```bash
-# 运行所有测试
+# 运行所有测试（单元测试）
 python run_tests.py
+
+# 运行集成测试（需要后端运行）
+python run_tests.py --integration
+
+# 仅运行单元测试
+python run_tests.py --unit
 
 # 或直接使用pytest
 pytest tests/ -v
 
 # 运行特定测试模块
-pytest tests/test_agent.py -v
+pytest tests/test_core.py -v  # Agent核心测试（原test_agent.py）
 ```
 
 ## 配置指南
@@ -1126,6 +1146,6 @@ See [Integration Guide](docs/integration-guide.md) for details.
 
 ---
 
-**最后更新：2026年4月5日**
+**最后更新：2026年4月7日**
 
 *注意：本系统为医疗辅助工具，不能替代专业医疗建议。所有用药建议都需要医生审批。*

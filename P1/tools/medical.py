@@ -212,6 +212,11 @@ def calc_dosage(drug_name: str, age: int, weight_kg: float, condition_severity: 
     Returns:
         剂量计算结果JSON字符串
     """
+    # 统一严重程度格式：将"轻度"转为"轻"，"重度"转为"重"
+    severity_mapping = {"轻度": "轻", "中度": "中", "重度": "重"}
+    if condition_severity in severity_mapping:
+        condition_severity = severity_mapping[condition_severity]
+
     logger.info(f"计算剂量: 药物={drug_name}, 年龄={age}, 体重={weight_kg}kg, 严重程度={condition_severity}")
 
     # 剂量计算规则（mock）
@@ -293,21 +298,39 @@ def calc_dosage(drug_name: str, age: int, weight_kg: float, condition_severity: 
     if severity_multiplier != 1.0:
         recommended_dose += f"（病情{condition_severity}，建议按{severity_multiplier}倍调整）"
 
+    # 生成简洁的剂量描述，供generate_advice使用
+    if is_child:
+        if "布洛芬" in drug_name or "ibuprofen" in drug_name.lower():
+            child_dose_mg = weight_kg * 7.5
+            dosage_for_advice = f"儿童剂量：约{child_dose_mg:.0f}mg/次，每6-8小时一次"
+        elif "对乙酰氨基酚" in drug_name or "paracetamol" in drug_name.lower():
+            child_dose_mg = weight_kg * 12.5
+            dosage_for_advice = f"儿童剂量：约{child_dose_mg:.0f}mg/次，每4-6小时一次"
+        else:
+            dosage_for_advice = f"儿童剂量：{drug_rules.get('child_dose_formula', '按体重计算')}"
+    else:
+        dosage_for_advice = f"成人剂量：{drug_rules.get('adult_dose', '按说明书服用')}"
+
+    # 根据严重程度估算药品数量
+    severity_to_quantity = {"轻": 1, "中": 2, "重": 3}
+    estimated_quantity = severity_to_quantity.get(condition_severity, 1)
+    # 如果是儿童，数量减半（向上取整）
+    if is_child:
+        estimated_quantity = max(1, (estimated_quantity + 1) // 2)  # 向上取整的减半
+
+    # 构建核心响应，仅包含必要字段
     response = {
         "drug_name": drug_name,
         "age": age,
         "weight_kg": weight_kg,
         "condition_severity": condition_severity,
-        "is_child": is_child,
-        "recommended_dose": recommended_dose,
-        "adult_dose": drug_rules.get("adult_dose", ""),
-        "child_dose_formula": drug_rules.get("child_dose_formula", ""),
-        "max_daily_dose": drug_rules.get("max_daily", ""),
-        "timestamp": datetime.now().isoformat(),
-        "warning": "此为计算参考，具体剂量需医生确认"
+        "dosage": dosage_for_advice,  # 关键字段：供generate_advice使用
+        "estimated_quantity": estimated_quantity,  # 关键字段：供submit_approval使用
+        "next_step": "调用 generate_advice 工具，使用上面的 dosage 字段",
+        "note": "请立即调用 generate_advice 工具，传递 drug_name 和 dosage 参数"
     }
 
-    return json.dumps(response, ensure_ascii=False, indent=2)
+    return json.dumps(response, ensure_ascii=False)
 
 # ==================== 建议生成工具 ====================
 def generate_advice(drug_name: str, dosage: str, duration: str = None, notes: str = None) -> str:
@@ -371,6 +394,7 @@ def submit_approval(
     symptoms: str = None,
     drug_name: str = None,
     drug_type: str = None,
+    quantity: int = 1,
     **kwargs
 ) -> str:
     """
@@ -384,11 +408,12 @@ def submit_approval(
         symptoms: 症状描述（可选）
         drug_name: 药品名称（可选）
         drug_type: 药品类型（可选）
+        quantity: 药品数量，默认为1
 
     Returns:
         审批单ID，格式如 "AP-20260407-ABCD1234"
     """
-    logger.info(f"提交审批: patient={patient_name}, drug={drug_name}")
+    logger.info(f"提交审批: patient={patient_name}, drug={drug_name}, quantity={quantity}")
 
     try:
         # Import HTTP client
@@ -402,23 +427,69 @@ def submit_approval(
             patient_weight=patient_weight,
             symptoms=symptoms,
             drug_name=drug_name,
-            drug_type=drug_type
+            drug_type=drug_type,
+            quantity=quantity
         )
 
         if approval_id:
             logger.info(f"审批提交成功: {approval_id}")
-            return approval_id
+            # 返回JSON格式，包含审批ID和状态信息
+            return json.dumps({
+                "status": "submitted",
+                "approval_id": approval_id,
+                "message": f"用药建议已提交审批，审批ID: {approval_id}",
+                "instructions": "请等待医生审批。批准后，系统将自动配药。您也可以手动检查状态：python approve_prescription.py",
+                "timestamp": datetime.now().isoformat(),
+                "quantity": quantity
+            }, ensure_ascii=False)
         else:
             logger.error("审批提交失败: 未返回审批ID")
             # Fallback to mock for compatibility
-            return f"AP-{datetime.now().strftime('%Y%m%d')}-MOCK{random.randint(1000, 9999)}"
+            mock_id = f"AP-{datetime.now().strftime('%Y%m%d')}-MOCK{random.randint(1000, 9999)}"
+            return json.dumps({
+                "status": "mock",
+                "approval_id": mock_id,
+                "message": f"审批提交失败，使用模拟审批ID: {mock_id}",
+                "instructions": "此为模拟审批，用于测试。实际使用时需要真实后端。",
+                "timestamp": datetime.now().isoformat(),
+                "quantity": quantity
+            }, ensure_ascii=False)
 
     except Exception as e:
         logger.error(f"审批提交失败: {str(e)}")
         # Fallback to mock for compatibility
-        return f"AP-{datetime.now().strftime('%Y%m%d')}-MOCK{random.randint(1000, 9999)}"
+        mock_id = f"AP-{datetime.now().strftime('%Y%m%d')}-MOCK{random.randint(1000, 9999)}"
+        return json.dumps({
+            "status": "error",
+            "approval_id": mock_id,
+            "message": f"审批提交过程中出错: {str(e)}",
+            "instructions": "使用模拟审批ID继续测试。",
+            "timestamp": datetime.now().isoformat(),
+            "quantity": quantity
+        }, ensure_ascii=False)
 
 # ==================== 处方配药工具 ====================
+async def _create_mock_response(prescription_id: str, patient_name: str, drugs: List[Dict]) -> Dict:
+    """创建mock响应（回退用）"""
+    import asyncio
+    await asyncio.sleep(0.5)  # 模拟网络延迟
+
+    # 生成取药码
+    pickup_code = f"PICKUP-{datetime.now().strftime('%Y%m%d')}-{random.randint(1000, 9999)}"
+
+    return {
+        "success": True,
+        "prescription_id": prescription_id,
+        "patient_name": patient_name,
+        "pickup_code": pickup_code,
+        "dispensed_at": datetime.now().isoformat(),
+        "drugs_dispensed": drugs,
+        "message": f"配药成功！取药码：{pickup_code}。请凭码到药房取药。",
+        "pharmacy_note": "请在24小时内取药，过期作废",
+        "mode": "mock"
+    }
+
+
 async def fill_prescription(prescription_id: str, patient_name: str, drugs: List[Dict]) -> str:
     """
     在医生审批通过后，调用此工具将处方发送给药房系统进行配药。
@@ -438,23 +509,35 @@ async def fill_prescription(prescription_id: str, patient_name: str, drugs: List
         pharmacy_url = Config.PHARMACY_BASE_URL
 
         if pharmacy_url == "http://localhost:8001":
-            # Mock模式：模拟药房系统响应
-            await asyncio.sleep(0.5)  # 模拟网络延迟
+            # 尝试调用真实API（本地开发环境）
+            try:
+                async with httpx.AsyncClient(timeout=30.0) as client:
+                    api_response = await client.post(
+                        f"{pharmacy_url}/api/dispense",
+                        json={
+                            "prescription_id": prescription_id,
+                            "patient_name": patient_name,
+                            "drugs": drugs
+                        }
+                    )
 
-            # 生成取药码
-            pickup_code = f"PICKUP-{datetime.now().strftime('%Y%m%d')}-{random.randint(1000, 9999)}"
-
-            response = {
-                "success": True,
-                "prescription_id": prescription_id,
-                "patient_name": patient_name,
-                "pickup_code": pickup_code,
-                "dispensed_at": datetime.now().isoformat(),
-                "drugs_dispensed": drugs,
-                "message": f"配药成功！取药码：{pickup_code}。请凭码到药房取药。",
-                "pharmacy_note": "请在24小时内取药，过期作废",
-                "mode": "mock"
-            }
+                    if api_response.status_code == 200:
+                        result = api_response.json()
+                        response = {
+                            "success": True,
+                            "prescription_id": prescription_id,
+                            "patient_name": patient_name,
+                            **result,
+                            "mode": "real_api"
+                        }
+                    else:
+                        # API调用失败，回退到mock模式
+                        logger.warning(f"API调用失败 {api_response.status_code}，使用mock模式")
+                        response = await _create_mock_response(prescription_id, patient_name, drugs)
+            except Exception as e:
+                # 网络错误，回退到mock模式
+                logger.warning(f"API调用异常: {str(e)}，使用mock模式")
+                response = await _create_mock_response(prescription_id, patient_name, drugs)
         else:
             # 真实模式：调用药房系统API
             try:
