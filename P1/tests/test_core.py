@@ -410,7 +410,7 @@ class TestConfigValidation:
 
     def test_config_to_dict(self):
         """测试配置转换为字典"""
-        from config import Config
+        from core.config import Config
 
         config_dict = Config.to_dict()
 
@@ -438,15 +438,15 @@ class TestConfigValidation:
 
     def test_config_validate_success(self):
         """测试配置验证成功"""
-        from config import Config
+        from core.config import Config
 
         # 使用conftest中设置的有效配置，应该通过验证
         Config.validate()
 
     def test_config_validate_invalid_provider(self, patch_config):
         """测试无效LLM提供商"""
-        from config import Config
-        from exceptions import ConfigurationError
+        from core.config import Config
+        from core.exceptions import ConfigurationError
 
         # 设置无效的LLM提供商
         Config.LLM_PROVIDER = "invalid_provider"
@@ -458,8 +458,8 @@ class TestConfigValidation:
 
     def test_config_validate_missing_api_key(self, patch_config):
         """测试缺少API密钥"""
-        from config import Config
-        from exceptions import ConfigurationError
+        from core.config import Config
+        from core.exceptions import ConfigurationError
 
         # 测试Claude提供商缺少API密钥
         Config.LLM_PROVIDER = "claude"
@@ -482,8 +482,8 @@ class TestConfigValidation:
 
     def test_config_validate_invalid_iterations(self, patch_config):
         """测试无效的MAX_ITERATIONS"""
-        from config import Config
-        from exceptions import ConfigurationError
+        from core.config import Config
+        from core.exceptions import ConfigurationError
 
         # 测试过小的值
         Config.MAX_ITERATIONS = 0
@@ -503,8 +503,8 @@ class TestConfigValidation:
 
     def test_config_validate_invalid_temperature(self, patch_config):
         """测试无效的LLM_TEMPERATURE"""
-        from config import Config
-        from exceptions import ConfigurationError
+        from core.config import Config
+        from core.exceptions import ConfigurationError
 
         # 测试过小的值
         Config.LLM_TEMPERATURE = -0.1
@@ -524,8 +524,8 @@ class TestConfigValidation:
 
     def test_config_validate_invalid_concurrent_sessions(self, patch_config):
         """测试无效的MAX_CONCURRENT_SESSIONS"""
-        from config import Config
-        from exceptions import ConfigurationError
+        from core.config import Config
+        from core.exceptions import ConfigurationError
 
         Config.MAX_CONCURRENT_SESSIONS = -1
 
@@ -536,8 +536,8 @@ class TestConfigValidation:
 
     def test_config_validate_invalid_request_timeout(self, patch_config):
         """测试无效的REQUEST_TIMEOUT"""
-        from config import Config
-        from exceptions import ConfigurationError
+        from core.config import Config
+        from core.exceptions import ConfigurationError
 
         Config.REQUEST_TIMEOUT = 0
 
@@ -548,7 +548,7 @@ class TestConfigValidation:
 
     def test_config_validate_session_dir_creation(self, temp_session_dir, patch_config):
         """测试会话目录创建"""
-        from config import Config
+        from core.config import Config
 
         # 设置临时目录
         Config.SESSION_STATE_DIR = temp_session_dir
@@ -564,7 +564,7 @@ class TestConfigValidation:
         # 重新导入config模块应该触发验证
         # 由于conftest中设置了有效的环境变量，应该不会抛出异常
         import importlib
-        import config as config_module
+        import core.config as config_module
 
         # 重新加载模块
         importlib.reload(config_module)

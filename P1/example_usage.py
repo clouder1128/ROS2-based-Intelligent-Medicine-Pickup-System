@@ -22,7 +22,7 @@ def demo_basic_usage() -> None:
     print("=" * 60)
 
     try:
-        from config import Config
+        from core.config import Config
         from core.agent import MedicalAgent
 
         # 显示配置
@@ -91,7 +91,7 @@ def demo_config_check() -> None:
     print("=" * 60)
 
     try:
-        from config import Config
+        from core.config import Config
 
         print("\n当前环境变量:")
         env_vars = [

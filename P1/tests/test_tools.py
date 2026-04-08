@@ -2,7 +2,7 @@ import json
 import pytest
 from unittest.mock import Mock, patch
 from tools.registry import register_tool_handler, execute_tool, is_tool_registered, get_executor
-from exceptions import ToolExecutionError
+from core.exceptions import ToolExecutionError
 
 
 def test_base_tool_creation():

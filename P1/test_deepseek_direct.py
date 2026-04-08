@@ -26,7 +26,7 @@ def test_direct_connection() -> Dict[str, Any]:
 
         # 显示配置
         print("\n配置检查:")
-        from config import Config
+        from core.config import Config
         config = Config.to_dict()
         for key, value in config.items():
             if "KEY" not in key and "TOKEN" not in key:

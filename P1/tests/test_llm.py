@@ -9,7 +9,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from llm.schemas import LLMMessage, ToolCall, LLMResponse
 from llm.client import LLMClient
-from exceptions import LLMError
+from core.exceptions import LLMError
 
 
 class TestLLMSchemas:

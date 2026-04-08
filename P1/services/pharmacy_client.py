@@ -9,8 +9,8 @@ import logging
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 
-from ..config import Config
-from ..utils.http_client import PharmacyHTTPClient
+from core.config import Config
+from utils.http_client import PharmacyHTTPClient
 
 logger = logging.getLogger(__name__)
 

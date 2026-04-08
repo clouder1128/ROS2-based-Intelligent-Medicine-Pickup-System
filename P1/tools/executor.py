@@ -1,7 +1,7 @@
 import asyncio
 import logging
 from typing import Any, Dict, Callable
-from exceptions import ToolExecutionError
+from core.exceptions import ToolExecutionError
 
 logger = logging.getLogger(__name__)
 

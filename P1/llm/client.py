@@ -2,8 +2,8 @@
 import logging
 from typing import List, Dict, Any, Optional, AsyncGenerator
 
-from config import Config
-from exceptions import LLMError
+from core.config import Config
+from core.exceptions import LLMError
 from utils.retry import retry_on_exception
 from .schemas import LLMMessage, ToolCall, LLMResponse
 from .providers.claude import ClaudeProvider

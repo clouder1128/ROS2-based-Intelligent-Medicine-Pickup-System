@@ -5,7 +5,7 @@ import logging
 import time
 from typing import Dict, Optional
 from core import MedicalAgent
-from config import Config
+from core.config import Config
 
 logger = logging.getLogger(__name__)
 

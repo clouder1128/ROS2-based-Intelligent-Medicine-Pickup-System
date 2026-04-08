@@ -18,7 +18,7 @@ from tenacity import (
     RetryError
 )
 
-from config import Config
+from core.config import Config
 
 logger = logging.getLogger(__name__)
 

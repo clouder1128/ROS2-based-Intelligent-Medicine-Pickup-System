@@ -11,7 +11,7 @@ from typing import Dict, List, Any, Optional
 from datetime import datetime, timedelta
 import httpx
 
-from config import Config
+from core.config import Config
 
 logger = logging.getLogger(__name__)
 

@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 def test_deepseek_configuration() -> Dict[str, Any]:
     """测试DeepSeek配置"""
     try:
-        from config import Config
+        from core.config import Config
 
         print("=" * 60)
         print("DeepSeek配置测试")

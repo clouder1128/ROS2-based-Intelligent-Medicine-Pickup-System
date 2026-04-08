@@ -3,7 +3,7 @@ import json
 import logging
 from typing import List, Dict, Any, Optional
 
-from exceptions import LLMError
+from core.exceptions import LLMError
 from llm.schemas import LLMMessage, ToolCall, LLMResponse
 
 logger = logging.getLogger(__name__)

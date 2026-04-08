@@ -2,7 +2,7 @@
 """消息管理器，管理对话历史，支持自动压缩和截断"""
 
 from typing import List, Dict, Optional
-from config import Config
+from core.config import Config
 from utils.text_utils import estimate_tokens
 from .compressor import smart_compress
 

@@ -151,7 +151,7 @@ def patch_config() -> Generator[None, None, None]:
         "ENABLE_ASYNC", "MAX_CONCURRENT_SESSIONS", "REQUEST_TIMEOUT"
     ]
 
-    from config import Config
+    from core.config import Config
 
     for attr in config_attrs:
         if hasattr(Config, attr):

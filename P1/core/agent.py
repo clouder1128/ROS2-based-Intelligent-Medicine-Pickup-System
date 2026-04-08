@@ -7,11 +7,11 @@ import os
 import time
 from typing import List, Dict, Any, Tuple, Optional
 
-from config import Config
+from core.config import Config
 from llm import LLMClient
 from memory import MessageManager
 from tools.registry import TOOLS, execute_tool
-from exceptions import AgentError, ToolExecutionError
+from core.exceptions import AgentError, ToolExecutionError
 from utils.json_tools import extract_json_from_text
 from utils.text_utils import log_duration
 from .workflows import WorkflowManager, WorkflowStep

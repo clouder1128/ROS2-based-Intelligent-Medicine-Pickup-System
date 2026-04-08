@@ -35,7 +35,7 @@ class Config:
         Raises:
             ConfigurationError: 当配置无效时抛出
         """
-        from exceptions import ConfigurationError
+        from core.exceptions import ConfigurationError
 
         # 验证LLM提供商和API密钥
         if cls.LLM_PROVIDER not in ["claude", "openai"]:
@@ -100,7 +100,7 @@ class Config:
 try:
     Config.validate()
 except Exception as e:
-    from exceptions import ConfigurationError
+    from core.exceptions import ConfigurationError
     if isinstance(e, ConfigurationError):
         logging.error(f"配置验证失败: {str(e)}")
         raise
