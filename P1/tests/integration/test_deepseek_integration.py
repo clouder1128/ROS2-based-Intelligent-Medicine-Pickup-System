@@ -18,13 +18,18 @@ from typing import Dict, Any
 
 # Add project root to Python path to allow imports
 script_dir = os.path.dirname(os.path.abspath(__file__))
-project_root = os.path.dirname(os.path.dirname(script_dir))  # Go up from tests/integration/ to P1/
+project_root = os.path.dirname(
+    os.path.dirname(script_dir)
+)  # Go up from tests/integration/ to P1/
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
 # 设置日志
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
 logger = logging.getLogger(__name__)
+
 
 def test_deepseek_configuration() -> Dict[str, Any]:
     """测试DeepSeek配置"""
@@ -48,7 +53,9 @@ def test_deepseek_configuration() -> Dict[str, Any]:
         if Config.LLM_PROVIDER == "claude":
             checks.append(("✓ LLM提供商", f"claude (兼容DeepSeek)"))
         else:
-            checks.append(("✗ LLM提供商", f"应为'claude'，当前为'{Config.LLM_PROVIDER}'"))
+            checks.append(
+                ("✗ LLM提供商", f"应为'claude'，当前为'{Config.LLM_PROVIDER}'")
+            )
 
         if Config.ANTHROPIC_BASE_URL:
             checks.append(("✓ DeepSeek API端点", Config.ANTHROPIC_BASE_URL))
@@ -73,12 +80,13 @@ def test_deepseek_configuration() -> Dict[str, Any]:
         return {
             "config": config_dict,
             "checks": checks,
-            "all_passed": all(check.startswith("✓") for check, _ in checks)
+            "all_passed": all(check.startswith("✓") for check, _ in checks),
         }
 
     except Exception as e:
         logger.error(f"配置测试失败: {e}")
         return {"error": str(e), "all_passed": False}
+
 
 def test_deepseek_api_connection() -> Dict[str, Any]:
     """测试DeepSeek API连接"""
@@ -114,9 +122,7 @@ def test_deepseek_api_connection() -> Dict[str, Any]:
             signal.alarm(30)  # 30秒超时
 
             response = client.chat(
-                messages=test_messages,
-                temperature=0.1,
-                max_tokens=100
+                messages=test_messages, temperature=0.1, max_tokens=100
             )
 
             signal.alarm(0)  # 取消超时
@@ -128,7 +134,11 @@ def test_deepseek_api_connection() -> Dict[str, Any]:
             tool_calls = response.get("tool_calls", [])
             usage = response.get("usage", {})
 
-            print(f"\n响应内容: {content[:100]}..." if len(content) > 100 else f"响应内容: {content}")
+            print(
+                f"\n响应内容: {content[:100]}..."
+                if len(content) > 100
+                else f"响应内容: {content}"
+            )
             print(f"工具调用: {len(tool_calls)} 个")
 
             if usage:
@@ -144,7 +154,7 @@ def test_deepseek_api_connection() -> Dict[str, Any]:
                 "tool_calls": tool_calls,
                 "usage": usage,
                 "stats": stats,
-                "error": None
+                "error": None,
             }
 
         except TimeoutError as e:
@@ -157,6 +167,7 @@ def test_deepseek_api_connection() -> Dict[str, Any]:
     except Exception as e:
         logger.error(f"API连接测试失败: {e}")
         return {"success": False, "error": str(e)}
+
 
 def test_medical_agent_integration() -> Dict[str, Any]:
     """测试MedicalAgent与DeepSeek的集成"""
@@ -174,18 +185,15 @@ def test_medical_agent_integration() -> Dict[str, Any]:
         print("✓ MedicalAgent初始化成功")
 
         # 检查agent的LLM客户端配置
-        if hasattr(agent, 'llm_client'):
+        if hasattr(agent, "llm_client"):
             print(f"✓ Agent包含LLM客户端，提供商: {agent.llm_client.provider}")
 
-        return {
-            "success": True,
-            "agent_initialized": True,
-            "error": None
-        }
+        return {"success": True, "agent_initialized": True, "error": None}
 
     except Exception as e:
         logger.error(f"MedicalAgent集成测试失败: {e}")
         return {"success": False, "error": str(e)}
+
 
 def main():
     """主测试函数"""
@@ -200,7 +208,7 @@ def main():
         "ANTHROPIC_AUTH_TOKEN",
         "ANTHROPIC_API_KEY",
         "ANTHROPIC_MODEL",
-        "LLM_PROVIDER"
+        "LLM_PROVIDER",
     ]
 
     for var in env_vars:
@@ -227,15 +235,17 @@ def main():
     print("\n" + "-" * 60)
     api_test = input("是否进行实际的API连接测试？(y/n): ").strip().lower()
 
-    if api_test == 'y':
+    if api_test == "y":
         api_result = test_deepseek_api_connection()
 
         if api_result.get("success", False):
             print("\n✓ DeepSeek API连接测试通过")
 
             # 询问是否进行Agent集成测试
-            agent_test = input("\n是否进行MedicalAgent集成测试？(y/n): ").strip().lower()
-            if agent_test == 'y':
+            agent_test = (
+                input("\n是否进行MedicalAgent集成测试？(y/n): ").strip().lower()
+            )
+            if agent_test == "y":
                 agent_result = test_medical_agent_integration()
                 if agent_result.get("success", False):
                     print("\n✓ 所有测试通过！DeepSeek配置成功。")
@@ -263,6 +273,7 @@ def main():
         print("✓ 配置验证完成")
         return 0
 
+
 if __name__ == "__main__":
     try:
         sys.exit(main())
@@ -272,5 +283,6 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"\n测试发生意外错误: {e}")
         import traceback
+
         traceback.print_exc()
         sys.exit(1)

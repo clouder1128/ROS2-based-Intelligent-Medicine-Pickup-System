@@ -15,7 +15,7 @@ from tenacity import (
     stop_after_attempt,
     wait_exponential,
     retry_if_exception_type,
-    RetryError
+    RetryError,
 )
 
 from core.config import Config
@@ -36,7 +36,7 @@ class PharmacyHTTPClient:
         timeout: float = 30.0,
         max_retries: int = 3,
         retry_delay: float = 1.0,
-        retry_backoff: float = 2.0
+        retry_backoff: float = 2.0,
     ):
         """初始化HTTP客户端
 
@@ -52,7 +52,9 @@ class PharmacyHTTPClient:
         # Validate URL format
         parsed = urlparse(self.base_url)
         if not parsed.scheme or not parsed.netloc:
-            raise ValueError(f"Invalid base_url format: {self.base_url}. Must include scheme (http/https) and hostname.")
+            raise ValueError(
+                f"Invalid base_url format: {self.base_url}. Must include scheme (http/https) and hostname."
+            )
 
         self.timeout = timeout
         self.max_retries = max_retries
@@ -66,7 +68,7 @@ class PharmacyHTTPClient:
             retry=retry_if_exception_type(
                 (httpx.ConnectError, httpx.TimeoutException, httpx.NetworkError)
             ),
-            reraise=True
+            reraise=True,
         )
 
         logger.debug(f"初始化PharmacyHTTPClient，base_url={self.base_url}")
@@ -112,10 +114,7 @@ class PharmacyHTTPClient:
         return asyncio.run(coro)
 
     async def _make_request(
-        self,
-        method: str,
-        endpoint: str,
-        **kwargs
+        self, method: str, endpoint: str, **kwargs
     ) -> Optional[Dict[str, Any]]:
         """发送HTTP请求（内部方法）
 
@@ -130,8 +129,8 @@ class PharmacyHTTPClient:
         url = f"{self.base_url.rstrip('/')}/{endpoint.lstrip('/')}"
 
         # 添加默认超时
-        if 'timeout' not in kwargs:
-            kwargs['timeout'] = self.timeout
+        if "timeout" not in kwargs:
+            kwargs["timeout"] = self.timeout
 
         logger.debug(f"发送请求: {method} {url}")
 
@@ -174,7 +173,9 @@ class PharmacyHTTPClient:
 
     # ========== 药物管理API ==========
 
-    async def get_drugs_async(self, name_filter: Optional[str] = None) -> List[Dict[str, Any]]:
+    async def get_drugs_async(
+        self, name_filter: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
         """获取药物列表（异步）
 
         Args:
@@ -185,12 +186,12 @@ class PharmacyHTTPClient:
         """
         params = {}
         if name_filter:
-            params['name'] = name_filter
+            params["name"] = name_filter
 
-        result = await self._make_request('GET', '/api/drugs', params=params)
+        result = await self._make_request("GET", "/api/drugs", params=params)
 
-        if result and result.get('success') and 'drugs' in result:
-            return result['drugs']
+        if result and result.get("success") and "drugs" in result:
+            return result["drugs"]
         return []
 
     def get_drugs(self, name_filter: Optional[str] = None) -> List[Dict[str, Any]]:
@@ -213,10 +214,10 @@ class PharmacyHTTPClient:
         Returns:
             药物信息字典，未找到时返回None
         """
-        result = await self._make_request('GET', f'/api/drugs/{drug_id}')
+        result = await self._make_request("GET", f"/api/drugs/{drug_id}")
 
-        if result and result.get('success') and 'drug' in result:
-            return result['drug']
+        if result and result.get("success") and "drug" in result:
+            return result["drug"]
         return None
 
     def get_drug_by_id(self, drug_id: int) -> Optional[Dict[str, Any]]:
@@ -233,10 +234,7 @@ class PharmacyHTTPClient:
     # ========== 审批管理API ==========
 
     async def create_approval_async(
-        self,
-        patient_name: str,
-        advice: str,
-        **kwargs
+        self, patient_name: str, advice: str, **kwargs
     ) -> Optional[str]:
         """创建审批（异步）
 
@@ -248,19 +246,17 @@ class PharmacyHTTPClient:
         Returns:
             审批ID，失败时返回None
         """
-        data = {
-            'patient_name': patient_name,
-            'advice': advice,
-            **kwargs
-        }
+        data = {"patient_name": patient_name, "advice": advice, **kwargs}
 
-        result = await self._make_request('POST', '/api/approvals', json=data)
+        result = await self._make_request("POST", "/api/approvals", json=data)
 
-        if result and result.get('success') and 'approval_id' in result:
-            return result['approval_id']
+        if result and result.get("success") and "approval_id" in result:
+            return result["approval_id"]
         return None
 
-    def create_approval(self, patient_name: str, advice: str, **kwargs) -> Optional[str]:
+    def create_approval(
+        self, patient_name: str, advice: str, **kwargs
+    ) -> Optional[str]:
         """创建审批（同步）
 
         Args:
@@ -271,7 +267,9 @@ class PharmacyHTTPClient:
         Returns:
             审批ID，失败时返回None
         """
-        return self._run_async(self.create_approval_async(patient_name, advice, **kwargs))
+        return self._run_async(
+            self.create_approval_async(patient_name, advice, **kwargs)
+        )
 
     async def get_approval_async(self, approval_id: str) -> Optional[Dict[str, Any]]:
         """获取审批信息（异步）
@@ -282,9 +280,9 @@ class PharmacyHTTPClient:
         Returns:
             审批信息字典，未找到时返回None
         """
-        result = await self._make_request('GET', f'/api/approvals/{approval_id}')
+        result = await self._make_request("GET", f"/api/approvals/{approval_id}")
 
-        if result and result.get('success'):
+        if result and result.get("success"):
             return result
         return None
 
@@ -299,7 +297,9 @@ class PharmacyHTTPClient:
         """
         return self._run_async(self.get_approval_async(approval_id))
 
-    async def get_pending_approvals_async(self, limit: int = 100) -> List[Dict[str, Any]]:
+    async def get_pending_approvals_async(
+        self, limit: int = 100
+    ) -> List[Dict[str, Any]]:
         """获取待处理审批列表（异步）
 
         Args:
@@ -308,12 +308,14 @@ class PharmacyHTTPClient:
         Returns:
             待处理审批列表，失败时返回空列表
         """
-        params = {'limit': limit} if limit != 100 else {}
+        params = {"limit": limit} if limit != 100 else {}
 
-        result = await self._make_request('GET', '/api/approvals/pending', params=params)
+        result = await self._make_request(
+            "GET", "/api/approvals/pending", params=params
+        )
 
-        if result and result.get('success') and 'approvals' in result:
-            return result['approvals']
+        if result and result.get("success") and "approvals" in result:
+            return result["approvals"]
         return []
 
     def get_pending_approvals(self, limit: int = 100) -> List[Dict[str, Any]]:
@@ -328,9 +330,7 @@ class PharmacyHTTPClient:
         return self._run_async(self.get_pending_approvals_async(limit))
 
     async def approve_approval_async(
-        self,
-        approval_id: str,
-        doctor_id: str
+        self, approval_id: str, doctor_id: str
     ) -> Optional[Dict[str, Any]]:
         """批准审批（异步）
 
@@ -341,19 +341,19 @@ class PharmacyHTTPClient:
         Returns:
             批准结果字典，失败时返回None
         """
-        data = {'doctor_id': doctor_id}
+        data = {"doctor_id": doctor_id}
 
         result = await self._make_request(
-            'POST',
-            f'/api/approvals/{approval_id}/approve',
-            json=data
+            "POST", f"/api/approvals/{approval_id}/approve", json=data
         )
 
-        if result and result.get('success'):
+        if result and result.get("success"):
             return result
         return None
 
-    def approve_approval(self, approval_id: str, doctor_id: str) -> Optional[Dict[str, Any]]:
+    def approve_approval(
+        self, approval_id: str, doctor_id: str
+    ) -> Optional[Dict[str, Any]]:
         """批准审批（同步）
 
         Args:
@@ -366,10 +366,7 @@ class PharmacyHTTPClient:
         return self._run_async(self.approve_approval_async(approval_id, doctor_id))
 
     async def reject_approval_async(
-        self,
-        approval_id: str,
-        doctor_id: str,
-        reason: str
+        self, approval_id: str, doctor_id: str, reason: str
     ) -> Optional[Dict[str, Any]]:
         """拒绝审批（异步）
 
@@ -381,26 +378,18 @@ class PharmacyHTTPClient:
         Returns:
             拒绝结果字典，失败时返回None
         """
-        data = {
-            'doctor_id': doctor_id,
-            'reason': reason
-        }
+        data = {"doctor_id": doctor_id, "reason": reason}
 
         result = await self._make_request(
-            'POST',
-            f'/api/approvals/{approval_id}/reject',
-            json=data
+            "POST", f"/api/approvals/{approval_id}/reject", json=data
         )
 
-        if result and result.get('success'):
+        if result and result.get("success"):
             return result
         return None
 
     def reject_approval(
-        self,
-        approval_id: str,
-        doctor_id: str,
-        reason: str
+        self, approval_id: str, doctor_id: str, reason: str
     ) -> Optional[Dict[str, Any]]:
         """拒绝审批（同步）
 
@@ -412,11 +401,15 @@ class PharmacyHTTPClient:
         Returns:
             拒绝结果字典，失败时返回None
         """
-        return self._run_async(self.reject_approval_async(approval_id, doctor_id, reason))
+        return self._run_async(
+            self.reject_approval_async(approval_id, doctor_id, reason)
+        )
 
     # ========== 订单管理API ==========
 
-    async def create_order_async(self, items: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    async def create_order_async(
+        self, items: List[Dict[str, Any]]
+    ) -> Optional[Dict[str, Any]]:
         """创建订单（异步）
 
         Args:
@@ -425,12 +418,12 @@ class PharmacyHTTPClient:
         Returns:
             订单结果字典，失败时返回None
         """
-        result = await self._make_request('POST', '/api/order', json=items)
+        result = await self._make_request("POST", "/api/order", json=items)
 
-        if result and (result.get('success') or result.get('ok')):
+        if result and (result.get("success") or result.get("ok")):
             # Normalize response to always have 'success' field
-            if 'ok' in result and 'success' not in result:
-                result['success'] = result['ok']
+            if "ok" in result and "success" not in result:
+                result["success"] = result["ok"]
             return result
         return None
 
@@ -453,19 +446,19 @@ class PharmacyHTTPClient:
         Returns:
             健康状态字典，失败时返回{"success": False, "error": "检查失败"}
         """
-        result = await self._make_request('GET', '/api/health')
+        result = await self._make_request("GET", "/api/health")
 
-        if result and result.get('success'):
+        if result and result.get("success"):
             # 确保返回的字典包含backend_available字段供P1使用
-            result['backend_available'] = True
+            result["backend_available"] = True
             return result
 
         return {
-            'success': False,
-            'error': '健康检查失败',
-            'backend': 'pharmacy',
-            'backend_available': False,
-            'ros2_connected': False
+            "success": False,
+            "error": "健康检查失败",
+            "backend": "pharmacy",
+            "backend_available": False,
+            "ros2_connected": False,
         }
 
     def health_check(self) -> Dict[str, Any]:

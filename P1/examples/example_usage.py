@@ -12,8 +12,11 @@ import logging
 from typing import Dict, Any
 
 # 设置日志
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
 logger = logging.getLogger(__name__)
+
 
 def demo_basic_usage() -> None:
     """演示基本使用"""
@@ -43,22 +46,28 @@ def demo_basic_usage() -> None:
         test_cases = [
             "患者头痛，需要用药建议",
             "我感冒了，流鼻涕、打喷嚏",
-            "孩子发烧38度，应该怎么办"
+            "孩子发烧38度，应该怎么办",
         ]
 
         for i, query in enumerate(test_cases[:1]):  # 只运行第一个测试，避免过多API调用
             print(f"\n   咨询 {i+1}: {query}")
             try:
                 response, steps = agent.run(query, patient_id=f"demo_patient_{i}")
-                print(f"   响应: {response[:100]}..." if len(response) > 100 else f"   响应: {response}")
+                print(
+                    f"   响应: {response[:100]}..."
+                    if len(response) > 100
+                    else f"   响应: {response}"
+                )
                 print(f"   执行步骤: {len(steps)}步")
 
                 # 显示工具调用详情
-                tool_steps = [s for s in steps if s.get('type') == 'tool_call']
+                tool_steps = [s for s in steps if s.get("type") == "tool_call"]
                 if tool_steps:
                     print(f"   工具调用: {len(tool_steps)}次")
                     for ts in tool_steps:
-                        print(f"     - {ts.get('tool')}: {str(ts.get('input', {}))[:50]}...")
+                        print(
+                            f"     - {ts.get('tool')}: {str(ts.get('input', {}))[:50]}..."
+                        )
 
                 # 查看工作流状态
                 workflow = agent.get_workflow_state(f"demo_patient_{i}")
@@ -84,6 +93,7 @@ def demo_basic_usage() -> None:
         logger.exception("详细错误信息")
         sys.exit(1)
 
+
 def demo_config_check() -> None:
     """演示配置检查"""
     print("\n" + "=" * 60)
@@ -100,14 +110,16 @@ def demo_config_check() -> None:
             "ANTHROPIC_MODEL",
             "ANTHROPIC_AUTH_TOKEN",
             "ANTHROPIC_API_KEY",
-            "OPENAI_API_KEY"
+            "OPENAI_API_KEY",
         ]
 
         for var in env_vars:
             value = os.getenv(var)
             if value:
                 if "KEY" in var or "TOKEN" in var:
-                    masked = value[:8] + "..." + value[-4:] if len(value) > 12 else "***"
+                    masked = (
+                        value[:8] + "..." + value[-4:] if len(value) > 12 else "***"
+                    )
                     print(f"  {var}: {masked}")
                 else:
                     print(f"  {var}: {value}")
@@ -131,6 +143,7 @@ def demo_config_check() -> None:
     except ImportError as e:
         print(f"导入失败: {e}")
 
+
 def demo_llm_client() -> None:
     """演示LLM客户端使用"""
     print("\n" + "=" * 60)
@@ -145,18 +158,14 @@ def demo_llm_client() -> None:
         print(f"   ✓ 客户端创建成功，提供商: {client.provider}")
 
         print("\n2. 发送测试消息...")
-        test_messages = [
-            {"role": "user", "content": "请用中文回复'测试成功'"}
-        ]
+        test_messages = [{"role": "user", "content": "请用中文回复'测试成功'"}]
 
         # 注意：这会产生实际的API调用
         run_api_test = input("\n是否进行实际API测试？(y/n): ").strip().lower()
-        if run_api_test == 'y':
+        if run_api_test == "y":
             try:
                 response = client.chat(
-                    messages=test_messages,
-                    temperature=0.1,
-                    max_tokens=50
+                    messages=test_messages, temperature=0.1, max_tokens=50
                 )
 
                 content = response.get("content", "")
@@ -176,6 +185,7 @@ def demo_llm_client() -> None:
 
     except ImportError as e:
         print(f"导入失败: {e}")
+
 
 def main() -> None:
     """主函数"""
@@ -212,6 +222,7 @@ def main() -> None:
     print("更多信息请参考 README.md")
     print("=" * 60)
 
+
 if __name__ == "__main__":
     try:
         main()
@@ -221,5 +232,6 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"\n演示发生错误: {e}")
         import traceback
+
         traceback.print_exc()
         sys.exit(1)

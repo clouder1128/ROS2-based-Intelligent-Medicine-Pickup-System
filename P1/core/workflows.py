@@ -10,6 +10,7 @@ from datetime import datetime
 
 class WorkflowStep(Enum):
     """工作流步骤枚举"""
+
     COLLECT_INFO = "collect_info"  # 收集患者信息
     QUERY_DRUG = "query_drug"  # 查询药物
     CHECK_ALLERGY = "check_allergy"  # 检查过敏
@@ -22,6 +23,7 @@ class WorkflowStep(Enum):
 @dataclass
 class WorkflowState:
     """工作流状态数据类"""
+
     patient_id: str
     current_step: WorkflowStep = WorkflowStep.COLLECT_INFO
     completed_steps: List[WorkflowStep] = field(default_factory=list)
@@ -31,7 +33,9 @@ class WorkflowState:
     is_completed: bool = False
     approval_id: Optional[str] = None
 
-    def mark_step_completed(self, step: WorkflowStep, data: Optional[Dict[str, Any]] = None) -> None:
+    def mark_step_completed(
+        self, step: WorkflowStep, data: Optional[Dict[str, Any]] = None
+    ) -> None:
         """标记步骤完成"""
         if step not in self.completed_steps:
             self.completed_steps.append(step)
@@ -68,9 +72,9 @@ class WorkflowState:
 
     def get_step_duration(self, step: WorkflowStep) -> Optional[float]:
         """获取特定步骤的持续时间（如果有记录）"""
-        if step in self.step_data and 'start_time' in self.step_data[step]:
-            step_start = self.step_data[step]['start_time']
-            step_end = self.step_data[step].get('end_time', time.time())
+        if step in self.step_data and "start_time" in self.step_data[step]:
+            step_start = self.step_data[step]["start_time"]
+            step_end = self.step_data[step].get("end_time", time.time())
             return step_end - step_start
         return None
 
@@ -86,7 +90,7 @@ class WorkflowState:
             "is_completed": self.is_completed,
             "approval_id": self.approval_id,
             "progress": self.get_progress(),
-            "duration": self.get_duration()
+            "duration": self.get_duration(),
         }
 
 
@@ -109,8 +113,9 @@ class WorkflowManager:
         """获取患者的工作流状态"""
         return self.workflows.get(patient_id)
 
-    def update_workflow_step(self, patient_id: str, step: WorkflowStep,
-                           data: Optional[Dict[str, Any]] = None) -> bool:
+    def update_workflow_step(
+        self, patient_id: str, step: WorkflowStep, data: Optional[Dict[str, Any]] = None
+    ) -> bool:
         """更新工作流步骤"""
         workflow = self.get_workflow(patient_id)
         if not workflow:
@@ -119,11 +124,11 @@ class WorkflowManager:
         # 记录步骤开始时间（如果这是第一次进入该步骤）
         if step not in workflow.step_data:
             step_data = data or {}
-            step_data['start_time'] = time.time()
+            step_data["start_time"] = time.time()
             data = step_data
         elif data:
             # 记录步骤结束时间
-            data['end_time'] = time.time()
+            data["end_time"] = time.time()
 
         workflow.mark_step_completed(step, data)
         return True
@@ -173,7 +178,9 @@ class WorkflowManager:
 
         # 计算平均进度
         if total > 0:
-            avg_progress = sum(wf.get_progress() for wf in self.workflows.values()) / total
+            avg_progress = (
+                sum(wf.get_progress() for wf in self.workflows.values()) / total
+            )
         else:
             avg_progress = 0.0
 
@@ -182,7 +189,7 @@ class WorkflowManager:
             "completed": completed,
             "in_progress": in_progress,
             "average_progress": avg_progress,
-            "oldest_workflow_hours": self._get_oldest_workflow_age_hours()
+            "oldest_workflow_hours": self._get_oldest_workflow_age_hours(),
         }
 
     def _get_oldest_workflow_age_hours(self) -> float:

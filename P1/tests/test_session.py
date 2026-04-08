@@ -20,6 +20,7 @@ class TestSessionManager:
         """每个测试方法后的清理"""
         # 删除临时目录
         import shutil
+
         if os.path.exists(self.temp_dir):
             shutil.rmtree(self.temp_dir)
 
@@ -78,7 +79,7 @@ class TestSessionManager:
         agent = self.manager.create_agent(patient_id)
 
         # 模拟save_state方法
-        with patch.object(agent, 'save_state') as mock_save:
+        with patch.object(agent, "save_state") as mock_save:
             mock_save.return_value = True
 
             # 保存会话
@@ -108,7 +109,7 @@ class TestSessionManager:
 
         # 创建一个假的会话文件
         state_file = os.path.join(self.temp_dir, f"{patient_id}.pkl")
-        with open(state_file, 'w') as f:
+        with open(state_file, "w") as f:
             f.write("dummy content")
 
         # 删除会话
@@ -203,11 +204,11 @@ class TestSessionManager:
 
         # 创建一个假的会话文件
         dummy_data = {"test": "data"}
-        with open(state_file, 'wb') as f:
+        with open(state_file, "wb") as f:
             pickle.dump(dummy_data, f)
 
         # 模拟MedicalAgent的load_state方法
-        with patch('session.manager.MedicalAgent') as MockAgent:
+        with patch("session.manager.MedicalAgent") as MockAgent:
             mock_agent_instance = Mock()
             mock_agent_instance.load_state.return_value = True
             MockAgent.return_value = mock_agent_instance
@@ -226,11 +227,11 @@ class TestSessionManager:
         state_file = os.path.join(self.temp_dir, f"{patient_id}.pkl")
 
         # 创建一个损坏的文件
-        with open(state_file, 'w') as f:
+        with open(state_file, "w") as f:
             f.write("corrupted data")
 
         # 模拟MedicalAgent的load_state方法返回False
-        with patch('session.manager.MedicalAgent') as MockAgent:
+        with patch("session.manager.MedicalAgent") as MockAgent:
             mock_agent_instance = Mock()
             mock_agent_instance.load_state.return_value = False
             MockAgent.return_value = mock_agent_instance

@@ -14,7 +14,7 @@ def truncate_text(text: str, max_len: int = 500) -> str:
     """截断过长的文本"""
     if len(text) <= max_len:
         return text
-    return text[:max_len-3] + "..."
+    return text[: max_len - 3] + "..."
 
 
 def estimate_tokens(text: str) -> int:
@@ -51,7 +51,7 @@ def now_iso() -> str:
 
 def safe_get(data: Dict[str, Any], path: str, default: Any = None) -> Any:
     """通过点分隔路径安全获取嵌套字典值"""
-    keys = path.split('.')
+    keys = path.split(".")
     current = data
     for key in keys:
         if isinstance(current, dict):
@@ -112,7 +112,9 @@ def summarize_conversation(messages: List[Dict], max_summary_tokens: int = 200) 
     if not user_messages:
         return "无对话记录"
 
-    summary = "患者诉求: " + "; ".join([truncate_text(um, 50) for um in user_messages[-3:]])
+    summary = "患者诉求: " + "; ".join(
+        [truncate_text(um, 50) for um in user_messages[-3:]]
+    )
     return truncate_text(summary, max_summary_tokens)
 
 
@@ -122,15 +124,23 @@ def estimate_cost(tokens: int, model: str = "claude-3-sonnet") -> float:
         "claude-3-sonnet": 0.003,
         "claude-3-opus": 0.015,
         "gpt-4": 0.03,
-        "gpt-3.5-turbo": 0.001
+        "gpt-3.5-turbo": 0.001,
     }
     price_per_1k = pricing.get(model, 0.003)
     return (tokens / 1000) * price_per_1k
 
 
 __all__ = [
-    'truncate_text', 'estimate_tokens', 'log_duration',
-    'generate_id', 'hash_string', 'now_iso', 'safe_get', 'merge_dicts',
-    'validate_patient_input', 'extract_mentions_of_allergy',
-    'summarize_conversation', 'estimate_cost'
+    "truncate_text",
+    "estimate_tokens",
+    "log_duration",
+    "generate_id",
+    "hash_string",
+    "now_iso",
+    "safe_get",
+    "merge_dicts",
+    "validate_patient_input",
+    "extract_mentions_of_allergy",
+    "summarize_conversation",
+    "estimate_cost",
 ]

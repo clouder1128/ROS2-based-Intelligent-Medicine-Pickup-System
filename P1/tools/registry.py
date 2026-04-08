@@ -14,8 +14,8 @@ TOOLS: List[Dict] = [
             "properties": {
                 "query": {"type": "string", "description": "症状关键词或药品名称"}
             },
-            "required": ["query"]
-        }
+            "required": ["query"],
+        },
     },
     {
         "name": "check_allergy",
@@ -23,11 +23,14 @@ TOOLS: List[Dict] = [
         "input_schema": {
             "type": "object",
             "properties": {
-                "patient_allergies": {"type": "string", "description": "患者已知过敏史，如'青霉素, 头孢'"},
-                "drug_name": {"type": "string", "description": "要检查的药物名称"}
+                "patient_allergies": {
+                    "type": "string",
+                    "description": "患者已知过敏史，如'青霉素, 头孢'",
+                },
+                "drug_name": {"type": "string", "description": "要检查的药物名称"},
             },
-            "required": ["patient_allergies", "drug_name"]
-        }
+            "required": ["patient_allergies", "drug_name"],
+        },
     },
     {
         "name": "calc_dosage",
@@ -38,10 +41,13 @@ TOOLS: List[Dict] = [
                 "drug_name": {"type": "string"},
                 "age": {"type": "integer"},
                 "weight_kg": {"type": "number"},
-                "condition_severity": {"type": "string", "enum": ["轻", "轻度", "中", "中度", "重", "重度"]}
+                "condition_severity": {
+                    "type": "string",
+                    "enum": ["轻", "轻度", "中", "中度", "重", "重度"],
+                },
             },
-            "required": ["drug_name", "age", "weight_kg"]
-        }
+            "required": ["drug_name", "age", "weight_kg"],
+        },
     },
     {
         "name": "generate_advice",
@@ -52,10 +58,10 @@ TOOLS: List[Dict] = [
                 "drug_name": {"type": "string"},
                 "dosage": {"type": "string"},
                 "duration": {"type": "string"},
-                "notes": {"type": "string"}
+                "notes": {"type": "string"},
             },
-            "required": ["drug_name", "dosage"]
-        }
+            "required": ["drug_name", "dosage"],
+        },
     },
     {
         "name": "submit_approval",
@@ -70,10 +76,10 @@ TOOLS: List[Dict] = [
                 "advice": {"type": "string"},
                 "drug_name": {"type": "string"},
                 "drug_type": {"type": "string", "enum": ["prescription", "otc"]},
-                "quantity": {"type": "integer"}
+                "quantity": {"type": "integer"},
             },
-            "required": ["patient_name", "symptoms", "advice", "drug_name"]
-        }
+            "required": ["patient_name", "symptoms", "advice", "drug_name"],
+        },
     },
     {
         "name": "fill_prescription",
@@ -90,14 +96,14 @@ TOOLS: List[Dict] = [
                         "properties": {
                             "name": {"type": "string"},
                             "dosage": {"type": "string"},
-                            "quantity": {"type": "integer"}
-                        }
-                    }
-                }
+                            "quantity": {"type": "integer"},
+                        },
+                    },
+                },
             },
-            "required": ["prescription_id", "patient_name", "drugs"]
-        }
-    }
+            "required": ["prescription_id", "patient_name", "drugs"],
+        },
+    },
 ]
 
 
@@ -129,6 +135,7 @@ def get_executor() -> ToolExecutor:
 # 自动注册医疗工具
 try:
     from .medical import register_tools
+
     register_tools(_executor)
 except ImportError:
     pass

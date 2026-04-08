@@ -15,7 +15,9 @@ import logging
 from typing import Optional
 
 # 设置日志
-logging.basicConfig(level=logging.WARNING, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logging.basicConfig(
+    level=logging.WARNING, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
 logger = logging.getLogger(__name__)
 
 
@@ -48,21 +50,21 @@ def simple_interactive_mode(patient_id: Optional[str] = None):
                     continue
 
                 # 处理特殊命令
-                if user_input.lower() == '/exit':
+                if user_input.lower() == "/exit":
                     print("\n退出程序...")
                     break
-                elif user_input.lower() == '/reset':
+                elif user_input.lower() == "/reset":
                     agent.reset()
                     print("对话已重置")
                     continue
-                elif user_input.lower() == '/help':
+                elif user_input.lower() == "/help":
                     print("\n可用命令:")
                     print("  /reset  - 重置对话")
                     print("  /exit   - 退出程序")
                     print("  /help   - 显示帮助")
                     print("\n直接输入您的症状或问题进行咨询")
                     continue
-                elif user_input.startswith('/'):
+                elif user_input.startswith("/"):
                     print(f"未知命令: {user_input}")
                     print("输入 '/help' 查看可用命令")
                     continue
@@ -71,13 +73,15 @@ def simple_interactive_mode(patient_id: Optional[str] = None):
                 print("\n[处理中...]", end="", flush=True)
 
                 try:
-                    response, steps = agent.run(user_input, patient_id=current_patient_id)
+                    response, steps = agent.run(
+                        user_input, patient_id=current_patient_id
+                    )
 
                     # 显示响应
                     print("\n助手:", response)
 
                     # 显示统计信息
-                    tool_calls = len([s for s in steps if s.get('type') == 'tool_call'])
+                    tool_calls = len([s for s in steps if s.get("type") == "tool_call"])
                     if tool_calls > 0:
                         print(f"[本次使用了 {tool_calls} 个工具调用]")
 
@@ -109,9 +113,9 @@ def main():
     """主函数"""
     import argparse
 
-    parser = argparse.ArgumentParser(description='P1医疗用药助手 - 简单交互模式')
-    parser.add_argument('patient_id', nargs='?', help='患者ID（可选）')
-    parser.add_argument('--verbose', '-v', action='store_true', help='详细输出模式')
+    parser = argparse.ArgumentParser(description="P1医疗用药助手 - 简单交互模式")
+    parser.add_argument("patient_id", nargs="?", help="患者ID（可选）")
+    parser.add_argument("--verbose", "-v", action="store_true", help="详细输出模式")
 
     args = parser.parse_args()
 

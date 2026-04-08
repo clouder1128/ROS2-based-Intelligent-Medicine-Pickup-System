@@ -33,5 +33,5 @@ class BaseTool(ABC):
         return {
             "name": self.name,
             "description": self.description,
-            "input_schema": self.input_schema
+            "input_schema": self.input_schema,
         }

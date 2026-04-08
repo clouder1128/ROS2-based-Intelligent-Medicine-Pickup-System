@@ -6,6 +6,7 @@ from typing import Dict, Any, Optional, List
 @dataclass
 class LLMMessage:
     """LLM消息数据类"""
+
     role: str  # "system", "user", "assistant"
     content: str
     tool_call_id: Optional[str] = None
@@ -23,35 +24,31 @@ class LLMMessage:
         return cls(
             role=data["role"],
             content=data["content"],
-            tool_call_id=data.get("tool_call_id")
+            tool_call_id=data.get("tool_call_id"),
         )
 
 
 @dataclass
 class ToolCall:
     """工具调用数据类"""
+
     name: str
     input: Dict[str, Any]
 
     def to_dict(self) -> Dict[str, Any]:
         """转换为字典格式"""
-        return {
-            "name": self.name,
-            "input": self.input
-        }
+        return {"name": self.name, "input": self.input}
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "ToolCall":
         """从字典创建ToolCall"""
-        return cls(
-            name=data["name"],
-            input=data["input"]
-        )
+        return cls(name=data["name"], input=data["input"])
 
 
 @dataclass
 class LLMResponse:
     """LLM响应数据类"""
+
     content: Optional[str] = None
     tool_calls: List[ToolCall] = field(default_factory=list)
     usage: Optional[Dict[str, int]] = None
@@ -75,7 +72,5 @@ class LLMResponse:
             tool_calls = [ToolCall.from_dict(tc) for tc in data["tool_calls"]]
 
         return cls(
-            content=data.get("content"),
-            tool_calls=tool_calls,
-            usage=data.get("usage")
+            content=data.get("content"), tool_calls=tool_calls, usage=data.get("usage")
         )

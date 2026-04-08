@@ -20,7 +20,9 @@ from typing import Optional, List, Dict, Any
 from datetime import datetime
 
 # 设置日志
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
 logger = logging.getLogger(__name__)
 
 
@@ -120,8 +122,8 @@ class InteractiveCLI:
         # 确定文件名
         if args and len(args) > 0:
             filename = args[0]
-            if not filename.endswith('.session'):
-                filename += '.session'
+            if not filename.endswith(".session"):
+                filename += ".session"
         else:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             filename = f"{self.patient_id}_{timestamp}.session"
@@ -145,15 +147,15 @@ class InteractiveCLI:
             return False
 
         filename = args[0]
-        if not filename.endswith('.session'):
-            filename += '.session'
+        if not filename.endswith(".session"):
+            filename += ".session"
 
         filepath = os.path.join(self.save_dir, filename)
 
         if not os.path.exists(filepath):
             print(f"! 文件不存在: {filepath}")
             # 显示可用文件
-            files = [f for f in os.listdir(self.save_dir) if f.endswith('.session')]
+            files = [f for f in os.listdir(self.save_dir) if f.endswith(".session")]
             if files:
                 print("可用会话文件:")
                 for f in files[:10]:  # 最多显示10个
@@ -163,6 +165,7 @@ class InteractiveCLI:
         try:
             if not self.agent:
                 from core.agent import MedicalAgent
+
                 self.agent = MedicalAgent()
 
             success = self.agent.load_state(filepath)
@@ -246,28 +249,28 @@ class InteractiveCLI:
             return False
 
         # 显示状态信息
-        status = status_info.get('status', 'unknown')
+        status = status_info.get("status", "unknown")
         status_display = {
-            'pending': '🟡 待审批',
-            'approved': '✅ 已批准',
-            'rejected': '❌ 已拒绝',
-            'unknown': '❓ 未知'
-        }.get(status, f'❓ {status}')
+            "pending": "🟡 待审批",
+            "approved": "✅ 已批准",
+            "rejected": "❌ 已拒绝",
+            "unknown": "❓ 未知",
+        }.get(status, f"❓ {status}")
 
         print(f"状态: {status_display}")
 
-        approval_data = status_info.get('approval_data', {})
+        approval_data = status_info.get("approval_data", {})
         if approval_data:
             print(f"患者: {approval_data.get('patient_name', '未知')}")
             print(f"症状: {approval_data.get('symptoms', '未指定')[:50]}...")
             print(f"创建时间: {approval_data.get('created_at', '未知')}")
             print(f"批准时间: {approval_data.get('approved_at', '未批准')}")
             print(f"批准医生: {approval_data.get('doctor_id', '未批准')}")
-            quantity = approval_data.get('quantity', 1)
+            quantity = approval_data.get("quantity", 1)
             print(f"药品数量: {quantity}")
 
         # 显示订单信息（如果已批准）
-        order_info = status_info.get('order_info')
+        order_info = status_info.get("order_info")
         if order_info:
             print(f"\n📦 订单信息:")
             print(f"   订单ID: {order_info.get('task_id', '未知')}")
@@ -277,7 +280,7 @@ class InteractiveCLI:
             print(f"   创建时间: {order_info.get('created_at', '未知')}")
 
         # 显示操作指引
-        instructions = status_info.get('instructions', '')
+        instructions = status_info.get("instructions", "")
         if instructions:
             print(f"\n📋 下一步: {instructions}")
 
@@ -314,7 +317,7 @@ class InteractiveCLI:
         print(f"创建时间: {workflow.get('created_at')}")
         print(f"更新时间: {workflow.get('updated_at')}")
 
-        data = workflow.get('data', {})
+        data = workflow.get("data", {})
         if data:
             print("\n工作流数据:")
             for step, step_data in data.items():
@@ -355,7 +358,9 @@ class InteractiveCLI:
 
         # 会话统计
         if os.path.exists(self.save_dir):
-            session_files = [f for f in os.listdir(self.save_dir) if f.endswith('.session')]
+            session_files = [
+                f for f in os.listdir(self.save_dir) if f.endswith(".session")
+            ]
             print(f"\n会话文件: {len(session_files)}个")
 
         print("=" * 60)
@@ -368,7 +373,7 @@ class InteractiveCLI:
         # 询问是否保存
         if self.agent and self.agent.get_last_steps():
             save = input("\n退出前是否保存当前会话？(y/n): ").strip().lower()
-            if save == 'y':
+            if save == "y":
                 self._cmd_save()
 
         print("再见！")
@@ -376,7 +381,7 @@ class InteractiveCLI:
 
     def _cmd_clear(self, args: List[str] = None) -> bool:
         """清空屏幕"""
-        os.system('clear' if os.name == 'posix' else 'cls')
+        os.system("clear" if os.name == "posix" else "cls")
         self._print_banner()
         return False
 
@@ -396,7 +401,7 @@ class InteractiveCLI:
             # 询问是否保存当前会话
             if self.agent and self.agent.get_last_steps():
                 save = input("是否保存当前会话状态？(y/n): ").strip().lower()
-                if save == 'y':
+                if save == "y":
                     self._cmd_save()
         else:
             print(f"当前患者ID: {self.patient_id}")
@@ -411,7 +416,7 @@ class InteractiveCLI:
         self.command_history.append(user_input)
 
         # 检查是否是特殊命令
-        if user_input.startswith('/'):
+        if user_input.startswith("/"):
             parts = user_input.split()
             cmd = parts[0].lower()
             args = parts[1:] if len(parts) > 1 else []
@@ -433,6 +438,7 @@ class InteractiveCLI:
         if not self.agent:
             try:
                 from core.agent import MedicalAgent
+
                 print("正在初始化MedicalAgent...")
                 self.agent = MedicalAgent()
                 print("✓ Agent初始化完成")
@@ -448,13 +454,13 @@ class InteractiveCLI:
             print(f"\n[助手] {response}")
 
             # 显示工具调用详情（如果有）
-            tool_steps = [s for s in steps if s.get('type') == 'tool_call']
+            tool_steps = [s for s in steps if s.get("type") == "tool_call"]
             if tool_steps:
                 print(f"\n[工具调用] {len(tool_steps)}次调用:")
                 for ts in tool_steps:
-                    tool_name = ts.get('tool', '未知')
-                    duration = ts.get('duration_ms', 0)
-                    result = str(ts.get('result', '无结果'))
+                    tool_name = ts.get("tool", "未知")
+                    duration = ts.get("duration_ms", 0)
+                    result = str(ts.get("result", "无结果"))
 
                     if len(result) > 100:
                         result = result[:100] + "..."
@@ -477,6 +483,7 @@ class InteractiveCLI:
         # 尝试初始化Agent
         try:
             from core.agent import MedicalAgent
+
             self.agent = MedicalAgent()
             print("✓ MedicalAgent初始化成功")
         except Exception as e:
@@ -508,19 +515,18 @@ class InteractiveCLI:
 
 def main():
     """主函数"""
-    parser = argparse.ArgumentParser(description='P1医疗用药助手 - 交互式命令行界面')
-    parser.add_argument('patient_id', nargs='?', help='患者ID（可选）')
-    parser.add_argument('--save-dir', default='./sessions', help='会话保存目录（默认: ./sessions）')
-    parser.add_argument('--version', action='version', version='P1医疗助手CLI v1.0')
+    parser = argparse.ArgumentParser(description="P1医疗用药助手 - 交互式命令行界面")
+    parser.add_argument("patient_id", nargs="?", help="患者ID（可选）")
+    parser.add_argument(
+        "--save-dir", default="./sessions", help="会话保存目录（默认: ./sessions）"
+    )
+    parser.add_argument("--version", action="version", version="P1医疗助手CLI v1.0")
 
     args = parser.parse_args()
 
     # 创建并运行CLI
     try:
-        cli = InteractiveCLI(
-            patient_id=args.patient_id,
-            save_dir=args.save_dir
-        )
+        cli = InteractiveCLI(patient_id=args.patient_id, save_dir=args.save_dir)
         cli.run()
     except KeyboardInterrupt:
         print("\n\n程序被用户中断")
@@ -528,6 +534,7 @@ def main():
     except Exception as e:
         print(f"\n程序运行失败: {e}")
         import traceback
+
         traceback.print_exc()
         sys.exit(1)
 

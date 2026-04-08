@@ -32,7 +32,7 @@ async def example_async_usage():
         if drugs:
             # 3. 获取单个药物信息
             print("3. 获取单个药物信息...")
-            drug_id = drugs[0]['id']
+            drug_id = drugs[0]["id"]
             drug = await client.get_drug_by_id_async(drug_id)
             print(f"   药物详情: {drug.get('name', '未知') if drug else '未找到'}")
 
@@ -42,7 +42,7 @@ async def example_async_usage():
             patient_name="张三",
             advice="建议使用布洛芬缓解头痛",
             symptoms="头痛、发热",
-            age=35
+            age=35,
         )
         print(f"   创建的审批ID: {approval_id}")
 
@@ -50,7 +50,9 @@ async def example_async_usage():
             # 5. 获取审批详情
             print("5. 获取审批详情...")
             approval = await client.get_approval_async(approval_id)
-            print(f"   审批状态: {approval.get('status', '未知') if approval else '未找到'}")
+            print(
+                f"   审批状态: {approval.get('status', '未知') if approval else '未找到'}"
+            )
 
             # 6. 获取待处理审批
             print("6. 获取待处理审批列表...")
@@ -61,7 +63,9 @@ async def example_async_usage():
         print("7. 创建药品订单...")
         order_items = [{"id": 1, "num": 2}, {"id": 2, "num": 1}]
         order_result = await client.create_order_async(order_items)
-        print(f"   订单创建结果: {order_result.get('message', '未知') if order_result else '失败'}")
+        print(
+            f"   订单创建结果: {order_result.get('message', '未知') if order_result else '失败'}"
+        )
 
     except Exception as e:
         print(f"示例执行出错: {e}")

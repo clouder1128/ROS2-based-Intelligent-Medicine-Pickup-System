@@ -7,7 +7,13 @@ import os
 from unittest.mock import Mock, patch, MagicMock
 
 from core import MedicalAgent, WorkflowManager, WorkflowStep
-from core import run_agent, reset_agent, get_agent_status, save_current_session, load_session
+from core import (
+    run_agent,
+    reset_agent,
+    get_agent_status,
+    save_current_session,
+    load_session,
+)
 from llm import LLMClient
 from memory import MessageManager
 
@@ -43,7 +49,9 @@ class TestWorkflowManager:
         manager.create_workflow("patient_123")
 
         # 更新第一个步骤
-        result = manager.update_workflow_step("patient_123", WorkflowStep.QUERY_DRUG, {"drug": "aspirin"})
+        result = manager.update_workflow_step(
+            "patient_123", WorkflowStep.QUERY_DRUG, {"drug": "aspirin"}
+        )
         assert result is True
 
         workflow = manager.get_workflow("patient_123")
@@ -134,8 +142,7 @@ class TestMedicalAgent:
         """测试Agent创建"""
         # 测试依赖注入
         agent = MedicalAgent(
-            llm_client=mock_llm_client,
-            message_manager=mock_message_manager
+            llm_client=mock_llm_client, message_manager=mock_message_manager
         )
 
         assert agent.llm_client == mock_llm_client
@@ -152,16 +159,21 @@ class TestMedicalAgent:
         assert isinstance(agent.message_manager, MessageManager)
         assert agent.workflow_manager is not None
 
-    @patch('core.agent.execute_tool')
-    @patch('core.agent.extract_symptoms')
-    def test_agent_run_basic(self, mock_extract_symptoms, mock_execute_tool, mock_llm_client, mock_message_manager):
+    @patch("core.agent.execute_tool")
+    @patch("core.agent.extract_symptoms")
+    def test_agent_run_basic(
+        self,
+        mock_extract_symptoms,
+        mock_execute_tool,
+        mock_llm_client,
+        mock_message_manager,
+    ):
         """测试Agent基本运行"""
         mock_extract_symptoms.return_value = {"symptoms": "头痛"}
         mock_llm_client.chat.return_value = {"content": "请提供更多症状信息"}
 
         agent = MedicalAgent(
-            llm_client=mock_llm_client,
-            message_manager=mock_message_manager
+            llm_client=mock_llm_client, message_manager=mock_message_manager
         )
 
         reply, steps = agent.run("我头痛", "patient_123")
@@ -176,31 +188,27 @@ class TestMedicalAgent:
         assert workflow_state is not None
         assert workflow_state["patient_id"] == "patient_123"
 
-    @patch('core.agent.execute_tool')
-    @patch('core.agent.extract_symptoms')
-    def test_agent_run_with_tool_call(self, mock_extract_symptoms, mock_execute_tool, mock_llm_client, mock_message_manager):
+    @patch("core.agent.execute_tool")
+    @patch("core.agent.extract_symptoms")
+    def test_agent_run_with_tool_call(
+        self,
+        mock_extract_symptoms,
+        mock_execute_tool,
+        mock_llm_client,
+        mock_message_manager,
+    ):
         """测试Agent运行包含工具调用"""
         mock_extract_symptoms.return_value = {"symptoms": "头痛"}
         mock_execute_tool.return_value = {"drugs": ["布洛芬"]}
 
         # 模拟LLM响应序列：第一次返回工具调用，第二次返回普通回复
         mock_llm_client.chat.side_effect = [
-            {
-                "tool_calls": [
-                    {
-                        "name": "query_drug",
-                        "input": {"symptoms": "头痛"}
-                    }
-                ]
-            },
-            {
-                "content": "根据查询结果，建议使用布洛芬"
-            }
+            {"tool_calls": [{"name": "query_drug", "input": {"symptoms": "头痛"}}]},
+            {"content": "根据查询结果，建议使用布洛芬"},
         ]
 
         agent = MedicalAgent(
-            llm_client=mock_llm_client,
-            message_manager=mock_message_manager
+            llm_client=mock_llm_client, message_manager=mock_message_manager
         )
 
         reply, steps = agent.run("我头痛", "patient_123")
@@ -221,8 +229,7 @@ class TestMedicalAgent:
     def test_agent_reset(self, mock_llm_client, mock_message_manager):
         """测试Agent重置"""
         agent = MedicalAgent(
-            llm_client=mock_llm_client,
-            message_manager=mock_message_manager
+            llm_client=mock_llm_client, message_manager=mock_message_manager
         )
 
         # 设置一些状态
@@ -240,8 +247,7 @@ class TestMedicalAgent:
     def test_agent_save_load_state(self, mock_llm_client, mock_message_manager):
         """测试Agent状态保存和加载"""
         agent = MedicalAgent(
-            llm_client=mock_llm_client,
-            message_manager=mock_message_manager
+            llm_client=mock_llm_client, message_manager=mock_message_manager
         )
 
         # 设置一些状态
@@ -251,11 +257,11 @@ class TestMedicalAgent:
         # 模拟消息历史
         mock_message_manager.get_full_messages.return_value = [
             {"role": "user", "content": "我头痛"},
-            {"role": "assistant", "content": "请提供更多信息"}
+            {"role": "assistant", "content": "请提供更多信息"},
         ]
 
         # 保存状态
-        with tempfile.NamedTemporaryFile(suffix='.pkl', delete=False) as tmp:
+        with tempfile.NamedTemporaryFile(suffix=".pkl", delete=False) as tmp:
             tmp_path = tmp.name
 
         try:
@@ -264,8 +270,7 @@ class TestMedicalAgent:
 
             # 创建新Agent并加载状态
             new_agent = MedicalAgent(
-                llm_client=mock_llm_client,
-                message_manager=Mock(spec=MessageManager)
+                llm_client=mock_llm_client, message_manager=Mock(spec=MessageManager)
             )
 
             result = new_agent.load_state(tmp_path)
@@ -280,8 +285,7 @@ class TestMedicalAgent:
     def test_agent_get_workflow_state(self, mock_llm_client, mock_message_manager):
         """测试获取工作流状态"""
         agent = MedicalAgent(
-            llm_client=mock_llm_client,
-            message_manager=mock_message_manager
+            llm_client=mock_llm_client, message_manager=mock_message_manager
         )
 
         # 没有患者ID时返回None
@@ -292,8 +296,10 @@ class TestMedicalAgent:
         assert agent.get_workflow_state() is None
 
         # 运行一次以创建工作流
-        with patch('core.agent.extract_symptoms'):
-            with patch.object(mock_llm_client, 'chat', return_value={"content": "测试"}):
+        with patch("core.agent.extract_symptoms"):
+            with patch.object(
+                mock_llm_client, "chat", return_value={"content": "测试"}
+            ):
                 agent.run("测试", "patient_123")
 
         workflow_state = agent.get_workflow_state("patient_123")
@@ -303,13 +309,14 @@ class TestMedicalAgent:
     def test_agent_get_all_workflows(self, mock_llm_client, mock_message_manager):
         """测试获取所有工作流"""
         agent = MedicalAgent(
-            llm_client=mock_llm_client,
-            message_manager=mock_message_manager
+            llm_client=mock_llm_client, message_manager=mock_message_manager
         )
 
         # 创建多个工作流
-        with patch('core.agent.extract_symptoms'):
-            with patch.object(mock_llm_client, 'chat', return_value={"content": "测试"}):
+        with patch("core.agent.extract_symptoms"):
+            with patch.object(
+                mock_llm_client, "chat", return_value={"content": "测试"}
+            ):
                 agent.run("测试1", "patient_123")
                 agent.run("测试2", "patient_456")
 
@@ -322,7 +329,7 @@ class TestMedicalAgent:
 class TestGlobalFunctions:
     """测试全局便捷函数"""
 
-    @patch('core.MedicalAgent')
+    @patch("core.MedicalAgent")
     def test_run_agent(self, mock_medical_agent_class):
         """测试run_agent函数"""
         mock_agent = Mock()
@@ -332,6 +339,7 @@ class TestGlobalFunctions:
 
         # 重置全局Agent以使用模拟
         import core
+
         core._global_agent = mock_agent
 
         result = run_agent("我头痛", "patient_123")
@@ -341,20 +349,21 @@ class TestGlobalFunctions:
         assert result["approval_id"] == "approval_123"
         mock_agent.run.assert_called_once_with("我头痛", "patient_123")
 
-    @patch('core.MedicalAgent')
+    @patch("core.MedicalAgent")
     def test_reset_agent(self, mock_medical_agent_class):
         """测试reset_agent函数"""
         mock_agent = Mock()
         mock_medical_agent_class.return_value = mock_agent
 
         import core
+
         core._global_agent = mock_agent
 
         reset_agent()
         mock_agent.reset.assert_called_once()
 
-    @patch('core.MedicalAgent')
-    @patch('llm.LLMClient.get_stats')
+    @patch("core.MedicalAgent")
+    @patch("llm.LLMClient.get_stats")
     def test_get_agent_status(self, mock_get_stats, mock_medical_agent_class):
         """测试get_agent_status函数"""
         mock_agent = Mock()
@@ -367,6 +376,7 @@ class TestGlobalFunctions:
         mock_medical_agent_class.return_value = mock_agent
 
         import core
+
         core._global_agent = mock_agent
 
         status = get_agent_status()
@@ -378,19 +388,20 @@ class TestGlobalFunctions:
         assert status["llm_stats"] == {"calls": 10}
         assert status["workflow_stats"] == {"total_workflows": 2}
 
-    @patch('core.MedicalAgent')
+    @patch("core.MedicalAgent")
     def test_save_current_session(self, mock_medical_agent_class):
         """测试save_current_session函数"""
         mock_agent = Mock()
         mock_medical_agent_class.return_value = mock_agent
 
         import core
+
         core._global_agent = mock_agent
 
         save_current_session("/tmp/test.pkl")
         mock_agent.save_state.assert_called_once_with("/tmp/test.pkl")
 
-    @patch('core.MedicalAgent')
+    @patch("core.MedicalAgent")
     def test_load_session(self, mock_medical_agent_class):
         """测试load_session函数"""
         mock_agent = Mock()
@@ -398,6 +409,7 @@ class TestGlobalFunctions:
         mock_medical_agent_class.return_value = mock_agent
 
         import core
+
         core._global_agent = mock_agent
 
         result = load_session("/tmp/test.pkl")
@@ -419,10 +431,19 @@ class TestConfigValidation:
 
         # 验证包含必要的配置项
         expected_keys = [
-            "LLM_PROVIDER", "LLM_MODEL", "LLM_MAX_TOKENS", "LLM_TEMPERATURE",
-            "PHARMACY_BASE_URL", "DATABASE_URL", "LOG_LEVEL", "MAX_HISTORY_LEN",
-            "MAX_ITERATIONS", "SESSION_STATE_DIR", "ENABLE_ASYNC",
-            "MAX_CONCURRENT_SESSIONS", "REQUEST_TIMEOUT"
+            "LLM_PROVIDER",
+            "LLM_MODEL",
+            "LLM_MAX_TOKENS",
+            "LLM_TEMPERATURE",
+            "PHARMACY_BASE_URL",
+            "DATABASE_URL",
+            "LOG_LEVEL",
+            "MAX_HISTORY_LEN",
+            "MAX_ITERATIONS",
+            "SESSION_STATE_DIR",
+            "ENABLE_ASYNC",
+            "MAX_CONCURRENT_SESSIONS",
+            "REQUEST_TIMEOUT",
         ]
 
         for key in expected_keys:
@@ -584,8 +605,20 @@ class TestAgentCoreFunctions:
     def setup_method(self):
         """每个测试方法前的设置"""
         # 导入必要的模块
-        from core import run_agent, reset_agent, save_current_session, load_session, get_agent_status
-        from tools.registry import register_tool_handler, execute_tool, is_tool_registered, get_executor
+        from core import (
+            run_agent,
+            reset_agent,
+            save_current_session,
+            load_session,
+            get_agent_status,
+        )
+        from tools.registry import (
+            register_tool_handler,
+            execute_tool,
+            is_tool_registered,
+            get_executor,
+        )
+
         self.run_agent = run_agent
         self.reset_agent = reset_agent
         self.save_current_session = save_current_session
@@ -601,13 +634,16 @@ class TestAgentCoreFunctions:
         assert callable(self.run_agent)
         assert callable(self.reset_agent)
 
-    @patch('core._get_global_agent')
-    @patch('llm.LLMClient.chat')
+    @patch("core._get_global_agent")
+    @patch("llm.LLMClient.chat")
     def test_session_persistence(self, mock_llm_chat, mock_get_global_agent):
         """测试会话保存和加载"""
         # 创建模拟的agent
         mock_agent = Mock()
-        mock_agent.run.return_value = ("模拟回复", [{"step": 0, "type": "assistant", "content": "模拟回复"}])
+        mock_agent.run.return_value = (
+            "模拟回复",
+            [{"step": 0, "type": "assistant", "content": "模拟回复"}],
+        )
         mock_agent.get_approval_id.return_value = None
         mock_agent.patient_id = "test_patient"
         mock_agent.approval_id = None
@@ -623,8 +659,10 @@ class TestAgentCoreFunctions:
 
         # Mock LLM响应（虽然agent被模拟，但保持原有mock）
         mock_llm_chat.return_value = {
-            "content": [{"type": "text", "text": "建议使用布洛芬，剂量200mg，每日3次。"}],
-            "usage": {"input_tokens": 100, "output_tokens": 50}
+            "content": [
+                {"type": "text", "text": "建议使用布洛芬，剂量200mg，每日3次。"}
+            ],
+            "usage": {"input_tokens": 100, "output_tokens": 50},
         }
 
         self.reset_agent()

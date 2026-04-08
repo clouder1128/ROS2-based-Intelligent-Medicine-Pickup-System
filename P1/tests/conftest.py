@@ -57,10 +57,7 @@ def mock_llm_response() -> Dict[str, Any]:
         "content": "这是一个测试回复",
         "role": "assistant",
         "model": "claude-3-sonnet-20240229",
-        "usage": {
-            "input_tokens": 100,
-            "output_tokens": 50
-        }
+        "usage": {"input_tokens": 100, "output_tokens": 50},
     }
 
 
@@ -72,18 +69,10 @@ def mock_llm_response_with_tools() -> Dict[str, Any]:
         Dict[str, Any]: 包含工具调用的模拟LLM响应
     """
     return {
-        "tool_calls": [
-            {
-                "name": "query_drug",
-                "input": {"symptoms": "头痛"}
-            }
-        ],
+        "tool_calls": [{"name": "query_drug", "input": {"symptoms": "头痛"}}],
         "role": "assistant",
         "model": "claude-3-sonnet-20240229",
-        "usage": {
-            "input_tokens": 120,
-            "output_tokens": 80
-        }
+        "usage": {"input_tokens": 120, "output_tokens": 80},
     }
 
 
@@ -98,14 +87,12 @@ def mock_tool_executor() -> Mock:
     mock_executor.execute_tool.return_value = {
         "success": True,
         "result": {"drugs": ["布洛芬"]},
-        "message": "工具执行成功"
+        "message": "工具执行成功",
     }
     mock_executor.get_tool_info.return_value = {
         "name": "query_drug",
         "description": "查询药物信息",
-        "parameters": {
-            "symptoms": {"type": "string", "description": "症状描述"}
-        }
+        "parameters": {"symptoms": {"type": "string", "description": "症状描述"}},
     }
     return mock_executor
 
@@ -130,7 +117,7 @@ def mock_config() -> Dict[str, Any]:
         "SESSION_STATE_DIR": "./test_sessions",
         "ENABLE_ASYNC": False,
         "MAX_CONCURRENT_SESSIONS": 100,
-        "REQUEST_TIMEOUT": 30
+        "REQUEST_TIMEOUT": 30,
     }
 
 
@@ -144,11 +131,21 @@ def patch_config() -> Generator[None, None, None]:
     # 保存原始配置值
     original_values = {}
     config_attrs = [
-        "LLM_PROVIDER", "ANTHROPIC_API_KEY", "OPENAI_API_KEY",
-        "LLM_MODEL", "LLM_MAX_TOKENS", "LLM_TEMPERATURE",
-        "PHARMACY_BASE_URL", "DATABASE_URL", "LOG_LEVEL",
-        "MAX_HISTORY_LEN", "MAX_ITERATIONS", "SESSION_STATE_DIR",
-        "ENABLE_ASYNC", "MAX_CONCURRENT_SESSIONS", "REQUEST_TIMEOUT"
+        "LLM_PROVIDER",
+        "ANTHROPIC_API_KEY",
+        "OPENAI_API_KEY",
+        "LLM_MODEL",
+        "LLM_MAX_TOKENS",
+        "LLM_TEMPERATURE",
+        "PHARMACY_BASE_URL",
+        "DATABASE_URL",
+        "LOG_LEVEL",
+        "MAX_HISTORY_LEN",
+        "MAX_ITERATIONS",
+        "SESSION_STATE_DIR",
+        "ENABLE_ASYNC",
+        "MAX_CONCURRENT_SESSIONS",
+        "REQUEST_TIMEOUT",
     ]
 
     from core.config import Config
@@ -176,5 +173,5 @@ def invalid_config_values() -> Dict[str, Any]:
         "MAX_ITERATIONS": 0,
         "LLM_TEMPERATURE": 3.0,
         "MAX_CONCURRENT_SESSIONS": -1,
-        "REQUEST_TIMEOUT": 0
+        "REQUEST_TIMEOUT": 0,
     }

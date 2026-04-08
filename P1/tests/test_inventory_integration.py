@@ -6,20 +6,17 @@ import json
 
 def test_record_transaction_integrated():
     """Test record_transaction uses HTTP client for out transactions"""
-    with patch('tools.inventory.PharmacyHTTPClient') as mock_client_class:
+    with patch("tools.inventory.PharmacyHTTPClient") as mock_client_class:
         mock_client = Mock()
         mock_client.create_order.return_value = {
             "success": True,
             "task_ids": [1],
-            "message": "Order created"
+            "message": "Order created",
         }
         mock_client_class.return_value = mock_client
 
         result_json = inventory.record_transaction(
-            drug_id=1,
-            quantity=2,
-            transaction_type="out",
-            reason="医生处方"
+            drug_id=1, quantity=2, transaction_type="out", reason="医生处方"
         )
 
         result = json.loads(result_json)
@@ -37,31 +34,30 @@ def test_get_stock_report_integrated():
             "name": "阿莫西林",
             "quantity": 100,
             "expiry_date": 30,
-            "shelve_id": 1
+            "shelve_id": 1,
         },
         {
             "drug_id": 2,
             "name": "头孢克肟",
             "quantity": 50,
             "expiry_date": 15,
-            "shelve_id": 2
+            "shelve_id": 2,
         },
         {
             "drug_id": 3,
             "name": "布洛芬",
             "quantity": 200,
             "expiry_date": 0,  # Expired
-            "shelve_id": 3
-        }
+            "shelve_id": 3,
+        },
     ]
 
-    with patch('tools.inventory.get_all_drugs') as mock_get_all_drugs:
+    with patch("tools.inventory.get_all_drugs") as mock_get_all_drugs:
         mock_get_all_drugs.return_value = mock_drugs
 
         # Test with default limit
         result_json = inventory.get_stock_report(
-            start_date="2025-01-01",
-            end_date="2025-01-31"
+            start_date="2025-01-01", end_date="2025-01-31"
         )
 
         result = json.loads(result_json)
@@ -82,7 +78,9 @@ def test_get_stock_report_integrated():
         assert result["total_drugs"] == 3
         assert result["current_stock_summary"]["total_items"] == 3
         assert result["current_stock_summary"]["total_quantity"] == 350  # 100+50+200
-        assert result["current_stock_summary"]["expired_count"] == 1  # drug_id 3 has expiry_date 0
+        assert (
+            result["current_stock_summary"]["expired_count"] == 1
+        )  # drug_id 3 has expiry_date 0
         assert result["current_stock_summary"]["low_stock_count"] == 0  # all above 50
 
         # Verify drugs list (should include all 3 with default limit 100)
@@ -114,19 +112,17 @@ def test_get_stock_report_with_limit():
             "name": f"Drug {i}",
             "quantity": 100,
             "expiry_date": 30,
-            "shelve_id": i
+            "shelve_id": i,
         }
         for i in range(1, 21)  # 20 drugs
     ]
 
-    with patch('tools.inventory.get_all_drugs') as mock_get_all_drugs:
+    with patch("tools.inventory.get_all_drugs") as mock_get_all_drugs:
         mock_get_all_drugs.return_value = mock_drugs
 
         # Test with limit=5
         result_json = inventory.get_stock_report(
-            start_date="2025-01-01",
-            end_date="2025-01-31",
-            limit=5
+            start_date="2025-01-01", end_date="2025-01-31", limit=5
         )
 
         result = json.loads(result_json)
@@ -143,9 +139,7 @@ def test_get_stock_report_with_limit():
 
         # Test with limit=0 (no limit)
         result_json = inventory.get_stock_report(
-            start_date="2025-01-01",
-            end_date="2025-01-31",
-            limit=0
+            start_date="2025-01-01", end_date="2025-01-31", limit=0
         )
 
         result = json.loads(result_json)
@@ -154,12 +148,11 @@ def test_get_stock_report_with_limit():
 
 def test_get_stock_report_fallback():
     """Test get_stock_report fallback to mock data when drug_db fails"""
-    with patch('tools.inventory.get_all_drugs') as mock_get_all_drugs:
+    with patch("tools.inventory.get_all_drugs") as mock_get_all_drugs:
         mock_get_all_drugs.side_effect = Exception("Database error")
 
         result_json = inventory.get_stock_report(
-            start_date="2025-01-01",
-            end_date="2025-01-31"
+            start_date="2025-01-01", end_date="2025-01-31"
         )
 
         result = json.loads(result_json)

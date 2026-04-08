@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """运行所有测试"""
+
 import sys
 import os
 import pytest
 import argparse
+
 
 def run_integration_tests():
     """Run integration tests (requires backend running)"""
@@ -12,39 +14,48 @@ def run_integration_tests():
     print()
 
     # Set environment variable to enable integration tests
-    os.environ['RUN_INTEGRATION_TESTS'] = '1'
+    os.environ["RUN_INTEGRATION_TESTS"] = "1"
 
     # Run integration tests
-    result = pytest.main([
-        'tests/integration/',
-        '-v',
-        '--tb=short'
-    ])
+    result = pytest.main(["tests/integration/", "-v", "--tb=short"])
 
     return result == 0
+
 
 def run_unit_tests():
     """Run unit tests only"""
     print("Running unit tests...")
 
     # Run unit tests (excluding integration tests)
-    result = pytest.main([
-        "tests/",
-        "-v",
-        "--tb=short",
-        "--disable-warnings",
-        "-p", "no:launch_testing_ros_pytest_entrypoint",
-        "-p", "no:launch_testing_ros",
-        "-p", "no:launch_testing",
-        "-p", "no:ament_pep257",
-        "-p", "no:ament_lint",
-        "-p", "no:ament_xmllint",
-        "-p", "no:ament_copyright",
-        "-p", "no:ament_flake8",
-        "-k", "not integration"
-    ])
+    result = pytest.main(
+        [
+            "tests/",
+            "-v",
+            "--tb=short",
+            "--disable-warnings",
+            "-p",
+            "no:launch_testing_ros_pytest_entrypoint",
+            "-p",
+            "no:launch_testing_ros",
+            "-p",
+            "no:launch_testing",
+            "-p",
+            "no:ament_pep257",
+            "-p",
+            "no:ament_lint",
+            "-p",
+            "no:ament_xmllint",
+            "-p",
+            "no:ament_copyright",
+            "-p",
+            "no:ament_flake8",
+            "-k",
+            "not integration",
+        ]
+    )
 
     return result == 0
+
 
 def run_all_tests():
     """Run all tests (unit tests only by default)"""
@@ -53,23 +64,35 @@ def run_all_tests():
     print()
 
     # Run all tests except integration tests
-    result = pytest.main([
-        "tests/",
-        "-v",
-        "--tb=short",
-        "--disable-warnings",
-        "-p", "no:launch_testing_ros_pytest_entrypoint",
-        "-p", "no:launch_testing_ros",
-        "-p", "no:launch_testing",
-        "-p", "no:ament_pep257",
-        "-p", "no:ament_lint",
-        "-p", "no:ament_xmllint",
-        "-p", "no:ament_copyright",
-        "-p", "no:ament_flake8",
-        "-k", "not integration"
-    ])
+    result = pytest.main(
+        [
+            "tests/",
+            "-v",
+            "--tb=short",
+            "--disable-warnings",
+            "-p",
+            "no:launch_testing_ros_pytest_entrypoint",
+            "-p",
+            "no:launch_testing_ros",
+            "-p",
+            "no:launch_testing",
+            "-p",
+            "no:ament_pep257",
+            "-p",
+            "no:ament_lint",
+            "-p",
+            "no:ament_xmllint",
+            "-p",
+            "no:ament_copyright",
+            "-p",
+            "no:ament_flake8",
+            "-k",
+            "not integration",
+        ]
+    )
 
     return result == 0
+
 
 def setup_environment():
     """Setup test environment variables"""
@@ -80,7 +103,7 @@ def setup_environment():
     sys.path.insert(0, project_root)
 
     # 尝试从sys.path中移除ROS路径（如果存在）
-    ros_paths = [p for p in sys.path if 'ros' in p.lower()]
+    ros_paths = [p for p in sys.path if "ros" in p.lower()]
     for ros_path in ros_paths:
         if ros_path in sys.path:
             sys.path.remove(ros_path)
@@ -105,14 +128,16 @@ def setup_environment():
     # 设置PYTEST_PLUGINS为空，防止加载ROS插件
     os.environ["PYTEST_PLUGINS"] = ""
 
+
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='Run tests for P1 project')
-    parser.add_argument('--integration', action='store_true',
-                       help='Run integration tests (requires backend running)')
-    parser.add_argument('--unit', action='store_true',
-                       help='Run unit tests only')
-    parser.add_argument('--all', action='store_true',
-                       help='Run all tests (default)')
+    parser = argparse.ArgumentParser(description="Run tests for P1 project")
+    parser.add_argument(
+        "--integration",
+        action="store_true",
+        help="Run integration tests (requires backend running)",
+    )
+    parser.add_argument("--unit", action="store_true", help="Run unit tests only")
+    parser.add_argument("--all", action="store_true", help="Run all tests (default)")
 
     args = parser.parse_args()
 

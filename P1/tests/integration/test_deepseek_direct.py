@@ -13,15 +13,21 @@ from typing import Dict, Any
 
 # Add project root to Python path to allow imports
 script_dir = os.path.dirname(os.path.abspath(__file__))
-project_root = os.path.dirname(os.path.dirname(script_dir))  # Go up from tests/integration/ to P1/
+project_root = os.path.dirname(
+    os.path.dirname(script_dir)
+)  # Go up from tests/integration/ to P1/
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
 logger = logging.getLogger(__name__)
+
 
 def timeout_handler(signum, frame):
     raise TimeoutError("API请求超时（30秒）")
+
 
 def test_direct_connection() -> Dict[str, Any]:
     """直接测试API连接"""
@@ -33,6 +39,7 @@ def test_direct_connection() -> Dict[str, Any]:
         # 显示配置
         print("\n配置检查:")
         from core.config import Config
+
         config = Config.to_dict()
         for key, value in config.items():
             if "KEY" not in key and "TOKEN" not in key:
@@ -49,6 +56,7 @@ def test_direct_connection() -> Dict[str, Any]:
         # 初始化LLM客户端
         print("\n初始化LLM客户端...")
         from llm.client import LLMClient
+
         client = LLMClient()
         print(f"✓ 客户端初始化成功")
         print(f"  提供商: {client.provider}")
@@ -57,7 +65,10 @@ def test_direct_connection() -> Dict[str, Any]:
 
         # 准备测试消息
         test_messages = [
-            {"role": "user", "content": "请用中文回复：'DeepSeek连接测试成功。' 请只回复这句话，不要添加其他内容。"}
+            {
+                "role": "user",
+                "content": "请用中文回复：'DeepSeek连接测试成功。' 请只回复这句话，不要添加其他内容。",
+            }
         ]
 
         print(f"\n发送测试请求...")
@@ -70,9 +81,7 @@ def test_direct_connection() -> Dict[str, Any]:
         start_time = time.time()
         try:
             response = client.chat(
-                messages=test_messages,
-                temperature=0.1,
-                max_tokens=50
+                messages=test_messages, temperature=0.1, max_tokens=50
             )
             elapsed = time.time() - start_time
             signal.alarm(0)  # 取消超时
@@ -113,7 +122,7 @@ def test_direct_connection() -> Dict[str, Any]:
                 "elapsed_time": elapsed,
                 "usage": usage,
                 "stats": stats,
-                "error": None
+                "error": None,
             }
 
         except TimeoutError as e:
@@ -131,8 +140,10 @@ def test_direct_connection() -> Dict[str, Any]:
     except Exception as e:
         logger.error(f"测试失败: {e}")
         import traceback
+
         traceback.print_exc()
         return {"success": False, "error": str(e)}
+
 
 def main():
     print("\nP1医疗用药助手 - DeepSeek API直接测试")
@@ -181,6 +192,7 @@ def main():
         print("6. 检查是否有防火墙或代理限制")
         return 1
 
+
 if __name__ == "__main__":
     try:
         sys.exit(main())
@@ -190,5 +202,6 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"\n测试发生意外错误: {e}")
         import traceback
+
         traceback.print_exc()
         sys.exit(1)

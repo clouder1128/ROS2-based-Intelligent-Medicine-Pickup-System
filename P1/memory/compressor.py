@@ -6,9 +6,7 @@ from utils.text_utils import estimate_tokens
 
 
 def compress_messages_by_tokens(
-        messages: List[Dict],
-        max_tokens: int = 3000,
-        preserve_system: bool = True
+    messages: List[Dict], max_tokens: int = 3000, preserve_system: bool = True
 ) -> List[Dict]:
     """
     基于token限制压缩消息历史。
@@ -39,9 +37,7 @@ def compress_messages_by_tokens(
 
 
 def compress_messages_by_count(
-        messages: List[Dict],
-        max_messages: int = 20,
-        preserve_system: bool = True
+    messages: List[Dict], max_messages: int = 20, preserve_system: bool = True
 ) -> List[Dict]:
     """基于消息数量压缩历史"""
     if len(messages) <= max_messages:
@@ -50,16 +46,14 @@ def compress_messages_by_count(
     if preserve_system:
         system_msgs = [m for m in messages if m.get("role") == "system"]
         non_system = [m for m in messages if m.get("role") != "system"]
-        keep = non_system[-max_messages + len(system_msgs):]
+        keep = non_system[-max_messages + len(system_msgs) :]
         return system_msgs + keep
     else:
         return messages[-max_messages:]
 
 
 def smart_compress(
-        messages: List[Dict],
-        max_tokens: int = 3000,
-        max_messages: int = 20
+    messages: List[Dict], max_tokens: int = 3000, max_messages: int = 20
 ) -> List[Dict]:
     """智能压缩：优先按token限制，其次按数量"""
     compressed = compress_messages_by_tokens(messages, max_tokens)
@@ -68,7 +62,7 @@ def smart_compress(
 
 
 __all__ = [
-    'compress_messages_by_tokens',
-    'compress_messages_by_count',
-    'smart_compress'
+    "compress_messages_by_tokens",
+    "compress_messages_by_count",
+    "smart_compress",
 ]

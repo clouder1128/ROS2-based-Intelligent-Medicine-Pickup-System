@@ -1,7 +1,12 @@
 import json
 import pytest
 from unittest.mock import Mock, patch
-from tools.registry import register_tool_handler, execute_tool, is_tool_registered, get_executor
+from tools.registry import (
+    register_tool_handler,
+    execute_tool,
+    is_tool_registered,
+    get_executor,
+)
 from core.exceptions import ToolExecutionError
 
 
@@ -19,8 +24,8 @@ def test_base_tool_creation():
         input_schema={
             "type": "object",
             "properties": {"query": {"type": "string"}},
-            "required": ["query"]
-        }
+            "required": ["query"],
+        },
     )
 
     assert tool.name == "test_tool"
@@ -30,19 +35,35 @@ def test_base_tool_creation():
 
 # ==================== Mock工具（模拟P2/P4的实现） ====================
 def mock_query_drug(query: str) -> str:
-    return json.dumps([
-        {"name": "阿莫西林", "specification": "500mg/粒", "stock": 100, "is_prescription": True},
-        {"name": "布洛芬", "specification": "200mg/粒", "stock": 50, "is_prescription": False}
-    ])
+    return json.dumps(
+        [
+            {
+                "name": "阿莫西林",
+                "specification": "500mg/粒",
+                "stock": 100,
+                "is_prescription": True,
+            },
+            {
+                "name": "布洛芬",
+                "specification": "200mg/粒",
+                "stock": 50,
+                "is_prescription": False,
+            },
+        ]
+    )
 
 
 def mock_check_allergy(patient_allergies: str, drug_name: str) -> str:
     if "青霉素" in patient_allergies and drug_name == "阿莫西林":
-        return json.dumps({"allergic": True, "message": "患者对青霉素类过敏，禁止使用阿莫西林"})
+        return json.dumps(
+            {"allergic": True, "message": "患者对青霉素类过敏，禁止使用阿莫西林"}
+        )
     return json.dumps({"allergic": False, "message": "无已知过敏"})
 
 
-def mock_calc_dosage(drug_name: str, age: int, weight_kg: float, condition_severity: str = "中") -> str:
+def mock_calc_dosage(
+    drug_name: str, age: int, weight_kg: float, condition_severity: str = "中"
+) -> str:
     if drug_name == "阿莫西林":
         dosage = f"{500 * (weight_kg / 70):.0f}mg，每日2次"
     else:
@@ -50,21 +71,24 @@ def mock_calc_dosage(drug_name: str, age: int, weight_kg: float, condition_sever
     return json.dumps({"dosage": dosage, "unit": "mg"})
 
 
-def mock_generate_advice(drug_name: str, dosage: str, duration: str = "3天", notes: str = "") -> str:
+def mock_generate_advice(
+    drug_name: str, dosage: str, duration: str = "3天", notes: str = ""
+) -> str:
     advice = f"建议使用{drug_name}，剂量{dosage}，疗程{duration}。{notes}"
     return json.dumps({"advice_text": advice})
 
 
 def mock_submit_approval(
-        patient_name: str,
-        symptoms: str,
-        advice_text: str,
-        drug_name: str,
-        patient_age: int = None,
-        patient_weight: float = None,
-        drug_type: str = "prescription"
+    patient_name: str,
+    symptoms: str,
+    advice_text: str,
+    drug_name: str,
+    patient_age: int = None,
+    patient_weight: float = None,
+    drug_type: str = "prescription",
 ) -> str:
     from utils.text_utils import generate_id
+
     approval_id = generate_id("AP")
     return json.dumps({"approval_id": approval_id, "status": "pending"})
 
@@ -94,6 +118,7 @@ class TestToolRegistry:
 
     def test_tool_registration(self):
         """测试工具注册机制"""
+
         def dummy_handler(x: str) -> str:
             return x
 
@@ -110,6 +135,7 @@ class TestToolRegistry:
 
     def test_exception_handling(self):
         """测试异常处理"""
+
         def bad_tool() -> None:
             raise ValueError("模拟错误")
 

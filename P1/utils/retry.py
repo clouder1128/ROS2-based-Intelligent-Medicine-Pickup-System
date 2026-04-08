@@ -11,9 +11,10 @@ def retry_on_exception(
     exceptions: Union[Type[Exception], Tuple[Type[Exception], ...]],
     max_retries: int = 3,
     delay: float = 1.0,
-    backoff: float = 2.0
+    backoff: float = 2.0,
 ):
     """重试装饰器，用于LLM调用等可能失败的操作"""
+
     def decorator(func):
         @wraps(func)
         def wrapper(*args, **kwargs):
@@ -28,5 +29,7 @@ def retry_on_exception(
                     time.sleep(current_delay)
                     current_delay *= backoff
             return None  # pragma: no cover
+
         return wrapper
+
     return decorator

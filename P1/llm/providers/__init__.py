@@ -5,4 +5,4 @@ except ImportError:
     ClaudeProvider = None
     OpenAIProvider = None
 
-__all__ = ['ClaudeProvider', 'OpenAIProvider']
+__all__ = ["ClaudeProvider", "OpenAIProvider"]

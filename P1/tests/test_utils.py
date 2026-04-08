@@ -3,6 +3,7 @@
 
 import sys
 import os
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import pytest
@@ -13,20 +14,24 @@ from unittest.mock import patch, MagicMock
 
 # 导入要测试的工具函数
 from utils.text_utils import (
-    truncate_text, estimate_tokens, log_duration,
-    generate_id, hash_string, now_iso, safe_get, merge_dicts,
-    validate_patient_input, extract_mentions_of_allergy,
-    summarize_conversation, estimate_cost
+    truncate_text,
+    estimate_tokens,
+    log_duration,
+    generate_id,
+    hash_string,
+    now_iso,
+    safe_get,
+    merge_dicts,
+    validate_patient_input,
+    extract_mentions_of_allergy,
+    summarize_conversation,
+    estimate_cost,
 )
 
-from utils.json_tools import (
-    extract_json_from_text, safe_parse_json, format_tool_result
-)
+from utils.json_tools import extract_json_from_text, safe_parse_json, format_tool_result
 
 from utils.retry import retry_on_exception
-from utils.validation import (
-    create_error_response, create_success_response
-)
+from utils.validation import create_error_response, create_success_response
 
 
 class TestTextUtils:
@@ -55,11 +60,11 @@ class TestTextUtils:
         from datetime import datetime
         from unittest.mock import patch
 
-        with patch('utils.text_utils.datetime') as mock_datetime:
+        with patch("utils.text_utils.datetime") as mock_datetime:
             # 设置两次不同的返回值
             mock_datetime.now.side_effect = [
                 datetime(2024, 1, 1, 10, 30, 15),
-                datetime(2024, 1, 1, 10, 30, 16)
+                datetime(2024, 1, 1, 10, 30, 16),
             ]
 
             id1 = generate_id("TEST")
@@ -92,7 +97,8 @@ class TestTextUtils:
         assert "T" in iso_time
         # 尝试解析为datetime对象验证格式
         from datetime import datetime
-        parsed = datetime.fromisoformat(iso_time.replace('Z', '+00:00'))
+
+        parsed = datetime.fromisoformat(iso_time.replace("Z", "+00:00"))
         assert isinstance(parsed, datetime)
 
     def test_safe_get(self):
@@ -156,7 +162,7 @@ class TestTextUtils:
             {"role": "user", "content": "我头痛"},
             {"role": "assistant", "content": "建议休息"},
             {"role": "user", "content": "还发烧"},
-            {"role": "assistant", "content": "建议就医"}
+            {"role": "assistant", "content": "建议就医"},
         ]
 
         summary = summarize_conversation(messages)
@@ -187,7 +193,7 @@ class TestTextUtils:
         import logging
 
         logger = logging.getLogger(__name__)
-        with patch.object(logger, 'info') as mock_info:
+        with patch.object(logger, "info") as mock_info:
             with log_duration(logger, "测试操作"):
                 time.sleep(0.01)  # 短暂等待
 
@@ -224,11 +230,11 @@ class TestJsonTools:
         assert result == {"a": 1, "b": "test"}
 
         # 无效JSON
-        result = safe_parse_json('{invalid json}')
+        result = safe_parse_json("{invalid json}")
         assert result is None
 
         # 空字符串
-        result = safe_parse_json('')
+        result = safe_parse_json("")
         assert result is None
 
     def test_format_tool_result(self):

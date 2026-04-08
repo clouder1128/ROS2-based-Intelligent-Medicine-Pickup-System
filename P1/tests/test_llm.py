@@ -5,6 +5,7 @@ from typing import List, Dict, Any
 
 import sys
 import os
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from llm.schemas import LLMMessage, ToolCall, LLMResponse
@@ -39,9 +40,7 @@ class TestLLMSchemas:
         """测试LLMResponse的to_dict方法"""
         tool_calls = [ToolCall(name="search", input={"query": "test"})]
         response = LLMResponse(
-            content="Hello",
-            tool_calls=tool_calls,
-            usage={"total_tokens": 100}
+            content="Hello", tool_calls=tool_calls, usage={"total_tokens": 100}
         )
         result = response.to_dict()
         assert result["content"] == "Hello"
@@ -57,22 +56,28 @@ class TestLLMClient:
         """每个测试方法前的设置"""
         LLMClient.reset_stats()
 
-    @patch.dict('os.environ', {
-        'LLM_PROVIDER': 'claude',
-        'ANTHROPIC_API_KEY': 'test-key',
-        'OPENAI_API_KEY': 'test-key'
-    })
+    @patch.dict(
+        "os.environ",
+        {
+            "LLM_PROVIDER": "claude",
+            "ANTHROPIC_API_KEY": "test-key",
+            "OPENAI_API_KEY": "test-key",
+        },
+    )
     def test_client_initialization_claude(self):
         """测试Claude客户端初始化"""
         client = LLMClient(provider="claude")
         assert client.provider == "claude"
         assert client._provider_instance is not None
 
-    @patch.dict('os.environ', {
-        'LLM_PROVIDER': 'openai',
-        'ANTHROPIC_API_KEY': 'test-key',
-        'OPENAI_API_KEY': 'test-key'
-    })
+    @patch.dict(
+        "os.environ",
+        {
+            "LLM_PROVIDER": "openai",
+            "ANTHROPIC_API_KEY": "test-key",
+            "OPENAI_API_KEY": "test-key",
+        },
+    )
     def test_client_initialization_openai(self):
         """测试OpenAI客户端初始化"""
         client = LLMClient(provider="openai")
@@ -104,23 +109,24 @@ class TestLLMClient:
         assert stats["requests"] == 0
         assert stats["estimated_tokens"] == 0
 
-    @patch.dict('os.environ', {
-        'LLM_PROVIDER': 'claude',
-        'ANTHROPIC_API_KEY': 'test-key',
-        'OPENAI_API_KEY': 'test-key',
-        'LLM_MODEL': 'test-model',
-        'LLM_TEMPERATURE': '0.5',
-        'LLM_MAX_TOKENS': '100'
-    })
+    @patch.dict(
+        "os.environ",
+        {
+            "LLM_PROVIDER": "claude",
+            "ANTHROPIC_API_KEY": "test-key",
+            "OPENAI_API_KEY": "test-key",
+            "LLM_MODEL": "test-model",
+            "LLM_TEMPERATURE": "0.5",
+            "LLM_MAX_TOKENS": "100",
+        },
+    )
     def test_chat_backward_compatibility(self):
         """测试向后兼容的chat接口"""
         client = LLMClient()
 
         # Mock provider的chat方法
         mock_response = LLMResponse(
-            content="Test response",
-            tool_calls=[],
-            usage={"total_tokens": 50}
+            content="Test response", tool_calls=[], usage={"total_tokens": 50}
         )
         client._provider_instance.chat = Mock(return_value=mock_response)
 
@@ -132,23 +138,24 @@ class TestLLMClient:
         assert "tool_calls" in result
         assert "usage" in result
 
-    @patch.dict('os.environ', {
-        'LLM_PROVIDER': 'claude',
-        'ANTHROPIC_API_KEY': 'test-key',
-        'OPENAI_API_KEY': 'test-key',
-        'LLM_MODEL': 'test-model',
-        'LLM_TEMPERATURE': '0.5',
-        'LLM_MAX_TOKENS': '100'
-    })
+    @patch.dict(
+        "os.environ",
+        {
+            "LLM_PROVIDER": "claude",
+            "ANTHROPIC_API_KEY": "test-key",
+            "OPENAI_API_KEY": "test-key",
+            "LLM_MODEL": "test-model",
+            "LLM_TEMPERATURE": "0.5",
+            "LLM_MAX_TOKENS": "100",
+        },
+    )
     def test_chat_structured(self):
         """测试结构化chat接口"""
         client = LLMClient()
 
         # Mock provider的chat方法
         mock_response = LLMResponse(
-            content="Test response",
-            tool_calls=[],
-            usage={"total_tokens": 50}
+            content="Test response", tool_calls=[], usage={"total_tokens": 50}
         )
         client._provider_instance.chat = Mock(return_value=mock_response)
 
@@ -159,14 +166,17 @@ class TestLLMClient:
         assert result.content == "Test response"
         assert result.usage["total_tokens"] == 50
 
-    @patch.dict('os.environ', {
-        'LLM_PROVIDER': 'openai',
-        'ANTHROPIC_API_KEY': 'test-key',
-        'OPENAI_API_KEY': 'test-key',
-        'LLM_MODEL': 'test-model',
-        'LLM_TEMPERATURE': '0.5',
-        'LLM_MAX_TOKENS': '100'
-    })
+    @patch.dict(
+        "os.environ",
+        {
+            "LLM_PROVIDER": "openai",
+            "ANTHROPIC_API_KEY": "test-key",
+            "OPENAI_API_KEY": "test-key",
+            "LLM_MODEL": "test-model",
+            "LLM_TEMPERATURE": "0.5",
+            "LLM_MAX_TOKENS": "100",
+        },
+    )
     @pytest.mark.asyncio
     async def test_chat_stream_openai(self):
         """测试OpenAI流式响应"""
@@ -179,7 +189,9 @@ class TestLLMClient:
         mock_chunk.choices[0].delta.content = "streaming "
 
         mock_stream = [mock_chunk, mock_chunk]
-        client._provider_instance.client.chat.completions.create = Mock(return_value=mock_stream)
+        client._provider_instance.client.chat.completions.create = Mock(
+            return_value=mock_stream
+        )
 
         messages = [{"role": "user", "content": "Hello"}]
 
@@ -191,14 +203,17 @@ class TestLLMClient:
         assert len(responses) == 2
         assert all(r == "streaming " for r in responses)
 
-    @patch.dict('os.environ', {
-        'LLM_PROVIDER': 'claude',
-        'ANTHROPIC_API_KEY': 'test-key',
-        'OPENAI_API_KEY': 'test-key',
-        'LLM_MODEL': 'test-model',
-        'LLM_TEMPERATURE': '0.5',
-        'LLM_MAX_TOKENS': '100'
-    })
+    @patch.dict(
+        "os.environ",
+        {
+            "LLM_PROVIDER": "claude",
+            "ANTHROPIC_API_KEY": "test-key",
+            "OPENAI_API_KEY": "test-key",
+            "LLM_MODEL": "test-model",
+            "LLM_TEMPERATURE": "0.5",
+            "LLM_MAX_TOKENS": "100",
+        },
+    )
     @pytest.mark.asyncio
     async def test_chat_stream_claude_fallback(self):
         """测试Claude流式响应回退"""

@@ -9,7 +9,7 @@ def test_submit_approval_integrated():
     # Test with new function signature
     # Need to patch the import inside the function
     # The function imports: from utils.http_client import PharmacyHTTPClient
-    with patch('utils.http_client.PharmacyHTTPClient') as mock_client_class:
+    with patch("utils.http_client.PharmacyHTTPClient") as mock_client_class:
         mock_client = Mock()
         mock_client.create_approval.return_value = "AP-20260407-ABCD1234"
         mock_client_class.return_value = mock_client
@@ -21,7 +21,7 @@ def test_submit_approval_integrated():
             patient_weight=70.5,
             symptoms="Headache, fever",
             drug_name="Ibuprofen",
-            drug_type="NSAID"
+            drug_type="NSAID",
         )
 
         assert approval_id == "AP-20260407-ABCD1234"
@@ -32,15 +32,18 @@ def test_submit_approval_integrated():
             patient_weight=70.5,
             symptoms="Headache, fever",
             drug_name="Ibuprofen",
-            drug_type="NSAID"
+            drug_type="NSAID",
         )
 
 
 def test_query_drug_integrated():
     """Test query_drug uses drug_db module"""
     # Mock drug_db module functions
-    with patch('services.pharmacy_client.query_drug_by_name') as mock_query_by_name, \
-         patch('services.pharmacy_client.query_drugs_by_symptom') as mock_query_by_symptom:
+    with patch(
+        "services.pharmacy_client.query_drug_by_name"
+    ) as mock_query_by_name, patch(
+        "services.pharmacy_client.query_drugs_by_symptom"
+    ) as mock_query_by_symptom:
 
         # Test name query
         mock_drug = {
@@ -49,7 +52,7 @@ def test_query_drug_integrated():
             "expiry_date": 365,
             "shelve_id": 1,
             "shelf_x": 2,
-            "shelf_y": 3
+            "shelf_y": 3,
         }
         mock_query_by_name.return_value = mock_drug
         mock_query_by_symptom.return_value = []
@@ -65,8 +68,11 @@ def test_query_drug_integrated():
         mock_query_by_name.assert_called_once_with("Ibuprofen")
 
     # Test symptom query
-    with patch('services.pharmacy_client.query_drug_by_name') as mock_query_by_name, \
-         patch('services.pharmacy_client.query_drugs_by_symptom') as mock_query_by_symptom:
+    with patch(
+        "services.pharmacy_client.query_drug_by_name"
+    ) as mock_query_by_name, patch(
+        "services.pharmacy_client.query_drugs_by_symptom"
+    ) as mock_query_by_symptom:
 
         mock_drugs = [
             {
@@ -75,7 +81,7 @@ def test_query_drug_integrated():
                 "expiry_date": 365,
                 "shelve_id": 1,
                 "shelf_x": 2,
-                "shelf_y": 3
+                "shelf_y": 3,
             }
         ]
         mock_query_by_symptom.return_value = mock_drugs

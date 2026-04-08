@@ -24,13 +24,10 @@ def run_agent(user_message: str, patient_id: str = None) -> dict:
     返回: {"reply": str, "steps": List[Dict], "approval_id": str | None}
     """
     from .agent import MedicalAgent  # 避免循环导入
+
     agent = _get_global_agent()
     reply, steps = agent.run(user_message, patient_id)
-    return {
-        "reply": reply,
-        "steps": steps,
-        "approval_id": agent.get_approval_id()
-    }
+    return {"reply": reply, "steps": steps, "approval_id": agent.get_approval_id()}
 
 
 def reset_agent() -> None:
@@ -42,6 +39,7 @@ def reset_agent() -> None:
 def get_agent_status() -> dict:
     """获取Agent当前状态（用于调试）"""
     from llm import LLMClient
+
     agent = _get_global_agent()
     return {
         "patient_id": agent.patient_id,
@@ -49,7 +47,7 @@ def get_agent_status() -> dict:
         "message_count": agent.message_manager.get_conversation_length(),
         "estimated_tokens": agent.message_manager.estimate_total_tokens(),
         "llm_stats": LLMClient.get_stats(),
-        "workflow_stats": agent.get_workflow_stats()
+        "workflow_stats": agent.get_workflow_stats(),
     }
 
 
@@ -66,12 +64,12 @@ def load_session(filepath: str) -> bool:
 
 
 __all__ = [
-    'MedicalAgent',
-    'WorkflowManager',
-    'WorkflowStep',
-    'run_agent',
-    'reset_agent',
-    'get_agent_status',
-    'save_current_session',
-    'load_session'
+    "MedicalAgent",
+    "WorkflowManager",
+    "WorkflowStep",
+    "run_agent",
+    "reset_agent",
+    "get_agent_status",
+    "save_current_session",
+    "load_session",
 ]

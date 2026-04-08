@@ -14,8 +14,11 @@ from services.pharmacy_client import get_all_drugs
 
 logger = logging.getLogger(__name__)
 
+
 # ==================== 库存记录工具 ====================
-def record_transaction(drug_id: int, quantity: int, transaction_type: str, reason: str = None) -> str:
+def record_transaction(
+    drug_id: int, quantity: int, transaction_type: str, reason: str = None
+) -> str:
     """
     记录药品出入库流水
 
@@ -28,7 +31,9 @@ def record_transaction(drug_id: int, quantity: int, transaction_type: str, reaso
     Returns:
         操作结果JSON字符串
     """
-    logger.info(f"记录库存流水: drug_id={drug_id}, quantity={quantity}, type={transaction_type}, reason={reason}")
+    logger.info(
+        f"记录库存流水: drug_id={drug_id}, quantity={quantity}, type={transaction_type}, reason={reason}"
+    )
 
     try:
         if transaction_type == "out":
@@ -36,7 +41,7 @@ def record_transaction(drug_id: int, quantity: int, transaction_type: str, reaso
             client = PharmacyHTTPClient()
             order_result = client.create_order([{"id": drug_id, "num": quantity}])
 
-            if order_result and order_result.get('success', False):
+            if order_result and order_result.get("success", False):
                 response = {
                     "success": True,
                     "transaction_id": f"TX-{datetime.now().strftime('%Y%m%d%H%M%S')}",
@@ -45,8 +50,8 @@ def record_transaction(drug_id: int, quantity: int, transaction_type: str, reaso
                     "type": transaction_type,
                     "reason": reason or "医生处方",
                     "timestamp": datetime.now().isoformat(),
-                    "backend_order_id": order_result.get('task_ids', [None])[0],
-                    "message": "通过backend订单API处理"
+                    "backend_order_id": order_result.get("task_ids", [None])[0],
+                    "message": "通过backend订单API处理",
                 }
             else:
                 response = {
@@ -58,7 +63,7 @@ def record_transaction(drug_id: int, quantity: int, transaction_type: str, reaso
                     "reason": reason or "医生处方",
                     "timestamp": datetime.now().isoformat(),
                     "error": "Backend订单创建失败",
-                    "backend_response": order_result
+                    "backend_response": order_result,
                 }
         else:
             # In transactions not supported by backend yet
@@ -70,7 +75,7 @@ def record_transaction(drug_id: int, quantity: int, transaction_type: str, reaso
                 "type": transaction_type,
                 "reason": reason or "管理员补货",
                 "timestamp": datetime.now().isoformat(),
-                "note": "入库操作暂由本地记录，backend暂不支持"
+                "note": "入库操作暂由本地记录，backend暂不支持",
             }
 
         return json.dumps(response, ensure_ascii=False, indent=2)
@@ -86,12 +91,15 @@ def record_transaction(drug_id: int, quantity: int, transaction_type: str, reaso
             "reason": reason or "未指定",
             "timestamp": datetime.now().isoformat(),
             "error": str(e),
-            "note": "记录失败，backend连接异常"
+            "note": "记录失败，backend连接异常",
         }
         return json.dumps(response, ensure_ascii=False, indent=2)
 
+
 # ==================== 库存报告工具 ====================
-def get_stock_report(start_date: str = None, end_date: str = None, limit: int = 100) -> str:
+def get_stock_report(
+    start_date: str = None, end_date: str = None, limit: int = 100
+) -> str:
     """
     获取库存报告
 
@@ -117,30 +125,35 @@ def get_stock_report(start_date: str = None, end_date: str = None, limit: int = 
         drugs_to_process = all_drugs[:limit] if limit > 0 else all_drugs
         for drug in drugs_to_process:
             report_drug = {
-                "drug_name": drug.get('name', '未知'),
-                "drug_id": drug.get('drug_id'),
-                "current_stock": drug.get('quantity', 0),
-                "expiry_days": drug.get('expiry_date', 0),
+                "drug_name": drug.get("name", "未知"),
+                "drug_id": drug.get("drug_id"),
+                "current_stock": drug.get("quantity", 0),
+                "expiry_days": drug.get("expiry_date", 0),
                 "location": f"货架{drug.get('shelve_id', 0)}",
-                "status": "正常" if drug.get('expiry_date', 0) > 0 else "已过期"
+                "status": "正常" if drug.get("expiry_date", 0) > 0 else "已过期",
             }
             report_drugs.append(report_drug)
 
         response = {
             "report_period": {
-                "start_date": start_date or (datetime.now() - timedelta(days=30)).strftime("%Y-%m-%d"),
-                "end_date": end_date or datetime.now().strftime("%Y-%m-%d")
+                "start_date": start_date
+                or (datetime.now() - timedelta(days=30)).strftime("%Y-%m-%d"),
+                "end_date": end_date or datetime.now().strftime("%Y-%m-%d"),
             },
             "generated_at": datetime.now().isoformat(),
             "total_drugs": len(all_drugs),
             "current_stock_summary": {
                 "total_items": len(all_drugs),
-                "total_quantity": sum(d.get('quantity', 0) for d in all_drugs),
-                "expired_count": len([d for d in all_drugs if d.get('expiry_date', 0) <= 0]),
-                "low_stock_count": len([d for d in all_drugs if d.get('quantity', 0) < 50])
+                "total_quantity": sum(d.get("quantity", 0) for d in all_drugs),
+                "expired_count": len(
+                    [d for d in all_drugs if d.get("expiry_date", 0) <= 0]
+                ),
+                "low_stock_count": len(
+                    [d for d in all_drugs if d.get("quantity", 0) < 50]
+                ),
             },
             "drugs": report_drugs,
-            "note": "基于backend当前库存数据，交易历史功能待实现"
+            "note": "基于backend当前库存数据，交易历史功能待实现",
         }
 
         return json.dumps(response, ensure_ascii=False, indent=2)
@@ -157,7 +170,7 @@ def get_stock_report(start_date: str = None, end_date: str = None, limit: int = 
                 "in": 50,
                 "out": 70,
                 "end_stock": 100,
-                "transactions": 5
+                "transactions": 5,
             },
             {
                 "drug_name": "头孢克肟",
@@ -166,8 +179,8 @@ def get_stock_report(start_date: str = None, end_date: str = None, limit: int = 
                 "in": 30,
                 "out": 40,
                 "end_stock": 80,
-                "transactions": 3
-            }
+                "transactions": 3,
+            },
         ]
 
         # Apply limit if specified (limit > 0)
@@ -175,19 +188,23 @@ def get_stock_report(start_date: str = None, end_date: str = None, limit: int = 
 
         response = {
             "report_period": {
-                "start_date": start_date or (datetime.now() - timedelta(days=30)).strftime("%Y-%m-%d"),
-                "end_date": end_date or datetime.now().strftime("%Y-%m-%d")
+                "start_date": start_date
+                or (datetime.now() - timedelta(days=30)).strftime("%Y-%m-%d"),
+                "end_date": end_date or datetime.now().strftime("%Y-%m-%d"),
             },
             "generated_at": datetime.now().isoformat(),
             "total_drugs": len(limited_mock_report),
-            "total_transactions": sum(item["transactions"] for item in limited_mock_report),
+            "total_transactions": sum(
+                item["transactions"] for item in limited_mock_report
+            ),
             "total_in": sum(item["in"] for item in limited_mock_report),
             "total_out": sum(item["out"] for item in limited_mock_report),
             "stock_changes": limited_mock_report,
-            "note": f"获取真实库存数据失败，使用mock数据: {str(e)}"
+            "note": f"获取真实库存数据失败，使用mock数据: {str(e)}",
         }
 
         return json.dumps(response, ensure_ascii=False, indent=2)
+
 
 # ==================== 采购建议工具 ====================
 def generate_purchase_suggestions() -> str:
@@ -212,7 +229,7 @@ def generate_purchase_suggestions() -> str:
             "days_until_stockout": 3.8,
             "suggested_purchase_quantity": 100,
             "urgency": "高",
-            "reason": "库存低于阈值且消耗速度较快"
+            "reason": "库存低于阈值且消耗速度较快",
         },
         {
             "drug_name": "头孢克肟",
@@ -223,7 +240,7 @@ def generate_purchase_suggestions() -> str:
             "days_until_stockout": 21.4,
             "suggested_purchase_quantity": 60,
             "urgency": "中",
-            "reason": "库存接近阈值"
+            "reason": "库存接近阈值",
         },
         {
             "drug_name": "蒙脱石散",
@@ -234,28 +251,33 @@ def generate_purchase_suggestions() -> str:
             "days_until_stockout": 20.0,
             "suggested_purchase_quantity": 50,
             "urgency": "中",
-            "reason": "库存低于阈值"
-        }
+            "reason": "库存低于阈值",
+        },
     ]
 
     response = {
         "generated_at": datetime.now().isoformat(),
         "total_suggestions": len(mock_suggestions),
-        "total_suggested_quantity": sum(item["suggested_purchase_quantity"] for item in mock_suggestions),
-        "urgent_count": len([item for item in mock_suggestions if item["urgency"] == "高"]),
+        "total_suggested_quantity": sum(
+            item["suggested_purchase_quantity"] for item in mock_suggestions
+        ),
+        "urgent_count": len(
+            [item for item in mock_suggestions if item["urgency"] == "高"]
+        ),
         "suggestions": mock_suggestions,
         "algorithm": {
             "name": "基于库存阈值和消耗速度",
             "parameters": {
                 "min_stock_threshold_source": "药品表min_stock_threshold字段",
                 "daily_avg_calculation_period": "最近30天",
-                "safety_stock_days": 7
-            }
+                "safety_stock_days": 7,
+            },
         },
-        "note": "此为占位实现，实际需要基于真实数据计算"
+        "note": "此为占位实现，实际需要基于真实数据计算",
     }
 
     return json.dumps(response, ensure_ascii=False, indent=2)
+
 
 # ==================== 库存健康检查 ====================
 def inventory_health_check() -> Dict[str, Any]:
@@ -265,8 +287,13 @@ def inventory_health_check() -> Dict[str, Any]:
         "module": "inventory",
         "message": "库存管理模块为占位实现，需由P2完成实际实现",
         "timestamp": datetime.now().isoformat(),
-        "available_functions": ["record_transaction", "get_stock_report", "generate_purchase_suggestions"]
+        "available_functions": [
+            "record_transaction",
+            "get_stock_report",
+            "generate_purchase_suggestions",
+        ],
     }
+
 
 # ==================== 测试函数 ====================
 if __name__ == "__main__":

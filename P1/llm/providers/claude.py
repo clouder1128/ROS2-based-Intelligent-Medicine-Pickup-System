@@ -15,6 +15,7 @@ class ClaudeProvider:
         """初始化Claude客户端"""
         try:
             import anthropic
+
             # 支持自定义base_url以兼容DeepSeek等第三方API
             kwargs = {"api_key": api_key}
             if base_url:
@@ -29,7 +30,7 @@ class ClaudeProvider:
         messages: List[LLMMessage],
         tools: Optional[List[Dict]] = None,
         temperature: Optional[float] = None,
-        max_tokens: Optional[int] = None
+        max_tokens: Optional[int] = None,
     ) -> LLMResponse:
         """发送对话请求到Claude API"""
         # 分离系统消息
@@ -46,11 +47,13 @@ class ClaudeProvider:
         if tools:
             claude_tools = []
             for tool in tools:
-                claude_tools.append({
-                    "name": tool["name"],
-                    "description": tool["description"],
-                    "input_schema": tool["input_schema"]
-                })
+                claude_tools.append(
+                    {
+                        "name": tool["name"],
+                        "description": tool["description"],
+                        "input_schema": tool["input_schema"],
+                    }
+                )
 
         try:
             response = self.client.messages.create(
@@ -59,7 +62,7 @@ class ClaudeProvider:
                 messages=claude_messages,
                 tools=claude_tools,
                 temperature=temperature,
-                max_tokens=max_tokens
+                max_tokens=max_tokens,
             )
         except Exception as e:
             raise LLMError(f"Claude API error: {str(e)}")
@@ -71,22 +74,16 @@ class ClaudeProvider:
             if block.type == "text":
                 content = block.text
             elif block.type == "tool_use":
-                tool_calls.append(ToolCall(
-                    name=block.name,
-                    input=block.input
-                ))
+                tool_calls.append(ToolCall(name=block.name, input=block.input))
 
         # 构建使用量统计
         usage = None
-        if hasattr(response, 'usage'):
+        if hasattr(response, "usage"):
             usage = {
                 "input_tokens": response.usage.input_tokens,
                 "output_tokens": response.usage.output_tokens,
-                "total_tokens": response.usage.input_tokens + response.usage.output_tokens
+                "total_tokens": response.usage.input_tokens
+                + response.usage.output_tokens,
             }
 
-        return LLMResponse(
-            content=content,
-            tool_calls=tool_calls,
-            usage=usage
-        )
+        return LLMResponse(content=content, tool_calls=tool_calls, usage=usage)

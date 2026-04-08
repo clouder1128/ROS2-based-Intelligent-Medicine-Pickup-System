@@ -10,7 +10,9 @@ from .compressor import smart_compress
 class MessageManager:
     """管理对话历史，支持自动压缩和截断，基于token估算"""
 
-    def __init__(self, system_prompt: Optional[str] = None, max_history: Optional[int] = None) -> None:
+    def __init__(
+        self, system_prompt: Optional[str] = None, max_history: Optional[int] = None
+    ) -> None:
         self.system_prompt = system_prompt
         self.max_history = max_history or Config.MAX_HISTORY_LEN
         self.max_tokens_limit = 3000  # 软限制，超过时压缩
@@ -25,7 +27,9 @@ class MessageManager:
 
     def add_tool_result(self, tool_call_id: str, content: str) -> None:
         """添加工具调用结果（Claude格式需要）"""
-        self.messages.append({"role": "tool", "tool_call_id": tool_call_id, "content": content})
+        self.messages.append(
+            {"role": "tool", "tool_call_id": tool_call_id, "content": content}
+        )
         self._compress_if_needed()
 
     def get_messages(self) -> List[Dict]:
@@ -71,7 +75,7 @@ class MessageManager:
             system_msg = None
             if self.messages[0].get("role") == "system":
                 system_msg = self.messages[0]
-            keep = self.messages[-self.max_history:]
+            keep = self.messages[-self.max_history :]
             if system_msg:
                 keep.insert(0, system_msg)
             self.messages = keep
@@ -81,7 +85,7 @@ class MessageManager:
             self.messages = smart_compress(
                 self.messages,
                 max_tokens=self.max_tokens_limit,
-                max_messages=self.max_history
+                max_messages=self.max_history,
             )
 
     def _maybe_compress_by_count(self) -> None:
@@ -93,4 +97,4 @@ class MessageManager:
         self._compress_if_needed()
 
 
-__all__ = ['MessageManager']
+__all__ = ["MessageManager"]

@@ -7,7 +7,7 @@ from memory.manager import MessageManager
 from memory.compressor import (
     compress_messages_by_tokens,
     compress_messages_by_count,
-    smart_compress
+    smart_compress,
 )
 
 
@@ -142,7 +142,9 @@ class TestCompressor(unittest.TestCase):
         for i in range(25):
             many_messages.append({"role": "user", "content": f"消息{i}"})
 
-        compressed = compress_messages_by_count(many_messages, max_messages=20, preserve_system=True)
+        compressed = compress_messages_by_count(
+            many_messages, max_messages=20, preserve_system=True
+        )
         self.assertEqual(len(compressed), 20)
         self.assertEqual(compressed[0]["role"], "system")
 
@@ -153,7 +155,9 @@ class TestCompressor(unittest.TestCase):
         for i in range(25):
             many_long_messages.append({"role": "user", "content": "x" * 1000})
 
-        compressed = smart_compress(many_long_messages, max_tokens=3000, max_messages=20)
+        compressed = smart_compress(
+            many_long_messages, max_tokens=3000, max_messages=20
+        )
         self.assertLessEqual(len(compressed), 20)
 
 

@@ -3,4 +3,4 @@ try:
 except ImportError:
     SessionManager = None
 
-__all__ = ['SessionManager']
+__all__ = ["SessionManager"]

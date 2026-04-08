@@ -77,7 +77,9 @@ class DoctorCLI:
         """列出所有待审批的审批单"""
         print("正在获取审批单列表...")
         try:
-            response = httpx.get("http://localhost:8001/api/approvals/pending", timeout=10)
+            response = httpx.get(
+                "http://localhost:8001/api/approvals/pending", timeout=10
+            )
             if response.status_code == 200:
                 data = response.json()
                 approvals = data.get("approvals", [])
@@ -87,16 +89,18 @@ class DoctorCLI:
 
                 print(f"\n待审批的审批单 ({len(approvals)}个):")
                 for i, approval in enumerate(approvals, 1):
-                    print(f"{i}. ID: {approval.get('approval_id', approval.get('id', '未知'))}")
+                    print(
+                        f"{i}. ID: {approval.get('approval_id', approval.get('id', '未知'))}"
+                    )
                     print(f"   患者: {approval.get('patient_name')}")
                     print(f"   症状: {approval.get('symptoms', '无')}")
                     print(f"   状态: {approval.get('status', '未知')}")
                     print(f"   创建时间: {approval.get('created_at', '未知')}")
                     # 显示药品信息（如果有）
-                    drug_name = approval.get('drug_name')
+                    drug_name = approval.get("drug_name")
                     if drug_name:
                         print(f"   药品: {drug_name}")
-                        quantity = approval.get('quantity', 1)
+                        quantity = approval.get("quantity", 1)
                         print(f"   数量: {quantity}")
                     print()
                 return False
@@ -124,7 +128,9 @@ class DoctorCLI:
                 return False
 
             try:
-                choice = input("\n请输入要批准的审批单编号 (1, 2, 3...) 或输入审批ID: ").strip()
+                choice = input(
+                    "\n请输入要批准的审批单编号 (1, 2, 3...) 或输入审批ID: "
+                ).strip()
                 if not choice:
                     print("操作取消")
                     return False
@@ -133,7 +139,9 @@ class DoctorCLI:
                 if choice.isdigit():
                     idx = int(choice) - 1
                     if 0 <= idx < len(approvals):
-                        approval_id = approvals[idx].get("approval_id", approvals[idx].get("id"))
+                        approval_id = approvals[idx].get(
+                            "approval_id", approvals[idx].get("id")
+                        )
                     else:
                         print("无效的编号")
                         return False
@@ -158,7 +166,9 @@ class DoctorCLI:
 
                 idx = int(arg) - 1
                 if 0 <= idx < len(approvals):
-                    approval_id = approvals[idx].get("approval_id", approvals[idx].get("id"))
+                    approval_id = approvals[idx].get(
+                        "approval_id", approvals[idx].get("id")
+                    )
                 else:
                     print(f"无效的编号: {arg}，有效范围: 1-{len(approvals)}")
                     return False
@@ -183,9 +193,7 @@ class DoctorCLI:
             print("\n跳过医生建议输入")
 
         # 批准请求数据
-        payload = {
-            "doctor_id": self.doctor_id
-        }
+        payload = {"doctor_id": self.doctor_id}
         if doctor_notes:
             payload["notes"] = doctor_notes
 
@@ -204,9 +212,9 @@ class DoctorCLI:
                     print(f"   医生建议: {doctor_notes[:100]}...")
 
                 # 显示订单创建状态
-                if result.get('order_created'):
+                if result.get("order_created"):
                     print(f"   📦 订单创建: {result.get('order_message', '成功')}")
-                    if result.get('task_id'):
+                    if result.get("task_id"):
                         print(f"   任务ID: {result.get('task_id')}")
                 else:
                     print(f"   ⚠ 订单创建: {result.get('order_message', '未创建')}")
@@ -239,7 +247,9 @@ class DoctorCLI:
                 return False
 
             try:
-                choice = input("\n请输入要拒绝的审批单编号 (1, 2, 3...) 或输入审批ID: ").strip()
+                choice = input(
+                    "\n请输入要拒绝的审批单编号 (1, 2, 3...) 或输入审批ID: "
+                ).strip()
                 if not choice:
                     print("操作取消")
                     return False
@@ -248,7 +258,9 @@ class DoctorCLI:
                 if choice.isdigit():
                     idx = int(choice) - 1
                     if 0 <= idx < len(approvals):
-                        approval_id = approvals[idx].get("approval_id", approvals[idx].get("id"))
+                        approval_id = approvals[idx].get(
+                            "approval_id", approvals[idx].get("id")
+                        )
                     else:
                         print("无效的编号")
                         return False
@@ -273,7 +285,9 @@ class DoctorCLI:
 
                 idx = int(arg) - 1
                 if 0 <= idx < len(approvals):
-                    approval_id = approvals[idx].get("approval_id", approvals[idx].get("id"))
+                    approval_id = approvals[idx].get(
+                        "approval_id", approvals[idx].get("id")
+                    )
                 else:
                     print(f"无效的编号: {arg}，有效范围: 1-{len(approvals)}")
                     return False
@@ -301,10 +315,7 @@ class DoctorCLI:
             return False
 
         # 拒绝请求数据
-        payload = {
-            "doctor_id": self.doctor_id,
-            "reason": reject_reason
-        }
+        payload = {"doctor_id": self.doctor_id, "reason": reject_reason}
 
         try:
             url = f"http://localhost:8001/api/approvals/{approval_id}/reject"
@@ -344,7 +355,9 @@ class DoctorCLI:
                 return False
 
             try:
-                choice = input("\n请输入要查看的审批单编号 (1, 2, 3...) 或输入审批ID: ").strip()
+                choice = input(
+                    "\n请输入要查看的审批单编号 (1, 2, 3...) 或输入审批ID: "
+                ).strip()
                 if not choice:
                     print("操作取消")
                     return False
@@ -353,7 +366,9 @@ class DoctorCLI:
                 if choice.isdigit():
                     idx = int(choice) - 1
                     if 0 <= idx < len(approvals):
-                        approval_id = approvals[idx].get("approval_id", approvals[idx].get("id"))
+                        approval_id = approvals[idx].get(
+                            "approval_id", approvals[idx].get("id")
+                        )
                     else:
                         print("无效的编号")
                         return False
@@ -378,7 +393,9 @@ class DoctorCLI:
 
                 idx = int(arg) - 1
                 if 0 <= idx < len(approvals):
-                    approval_id = approvals[idx].get("approval_id", approvals[idx].get("id"))
+                    approval_id = approvals[idx].get(
+                        "approval_id", approvals[idx].get("id")
+                    )
                 else:
                     print(f"无效的编号: {arg}，有效范围: 1-{len(approvals)}")
                     return False
@@ -418,7 +435,7 @@ class DoctorCLI:
 
     def _cmd_clear(self, args: List[str] = None) -> bool:
         """清空屏幕"""
-        os.system('clear' if os.name == 'posix' else 'cls')
+        os.system("clear" if os.name == "posix" else "cls")
         self._print_banner()
         return False
 
@@ -436,7 +453,9 @@ class DoctorCLI:
     def _get_pending_approvals(self) -> List[Dict[str, Any]]:
         """获取待审批的审批单列表"""
         try:
-            response = httpx.get("http://localhost:8001/api/approvals/pending", timeout=10)
+            response = httpx.get(
+                "http://localhost:8001/api/approvals/pending", timeout=10
+            )
             if response.status_code == 200:
                 data = response.json()
                 return data.get("approvals", [])
@@ -447,7 +466,9 @@ class DoctorCLI:
             print(f"获取审批单出错: {e}")
             return []
 
-    def _check_approval_status(self, approval_id: str, show_details: bool = False) -> bool:
+    def _check_approval_status(
+        self, approval_id: str, show_details: bool = False
+    ) -> bool:
         """检查审批单状态"""
         try:
             url = f"http://localhost:8001/api/approvals/{approval_id}"
@@ -464,22 +485,22 @@ class DoctorCLI:
                     print(f"   体重: {approval.get('patient_weight', '未知')}kg")
                     print(f"   症状: {approval.get('symptoms', '无')}")
 
-                    drug_name = approval.get('drug_name')
+                    drug_name = approval.get("drug_name")
                     if drug_name:
                         print(f"   药品: {drug_name}")
-                        quantity = approval.get('quantity', 1)
+                        quantity = approval.get("quantity", 1)
                         print(f"   数量: {quantity}")
 
-                    status = approval.get('status', 'unknown')
+                    status = approval.get("status", "unknown")
                     status_display = {
-                        'pending': '🟡 待审批',
-                        'approved': '✅ 已批准',
-                        'rejected': '❌ 已拒绝',
-                        'unknown': '❓ 未知'
-                    }.get(status, f'❓ {status}')
+                        "pending": "🟡 待审批",
+                        "approved": "✅ 已批准",
+                        "rejected": "❌ 已拒绝",
+                        "unknown": "❓ 未知",
+                    }.get(status, f"❓ {status}")
                     print(f"   状态: {status_display}")
 
-                    advice = approval.get('advice', '无')
+                    advice = approval.get("advice", "无")
                     print(f"\n💊 用药建议:")
                     # 显示前200个字符，保留换行
                     advice_preview = advice[:300]
@@ -489,21 +510,21 @@ class DoctorCLI:
 
                     print(f"\n📅 时间信息:")
                     print(f"   创建时间: {approval.get('created_at', '未知')}")
-                    if status == 'approved':
+                    if status == "approved":
                         print(f"   批准时间: {approval.get('approved_at', '未批准')}")
                         print(f"   批准医生: {approval.get('doctor_id', '未指定')}")
-                    elif status == 'rejected':
+                    elif status == "rejected":
                         print(f"   拒绝时间: {approval.get('approved_at', '未拒绝')}")
                         print(f"   拒绝医生: {approval.get('doctor_id', '未指定')}")
                         print(f"   拒绝理由: {approval.get('reject_reason', '无')}")
                 else:
-                    status = approval.get('status', 'unknown')
+                    status = approval.get("status", "unknown")
                     status_display = {
-                        'pending': '🟡 待审批',
-                        'approved': '✅ 已批准',
-                        'rejected': '❌ 已拒绝',
-                        'unknown': '❓ 未知'
-                    }.get(status, f'❓ {status}')
+                        "pending": "🟡 待审批",
+                        "approved": "✅ 已批准",
+                        "rejected": "❌ 已拒绝",
+                        "unknown": "❓ 未知",
+                    }.get(status, f"❓ {status}")
                     print(f"\n审批单状态: {status_display}")
                     print(f"患者: {approval.get('patient_name')}")
                     print(f"症状: {approval.get('symptoms', '无')}")
@@ -555,7 +576,7 @@ class DoctorCLI:
         self.command_history.append(user_input)
 
         # 检查是否是特殊命令
-        if user_input.startswith('/'):
+        if user_input.startswith("/"):
             parts = user_input.split()
             cmd = parts[0].lower()
             args = parts[1:] if len(parts) > 1 else []
@@ -572,7 +593,7 @@ class DoctorCLI:
             return False
 
         # 检查是否看起来像审批ID（以AP-开头）
-        if user_input.upper().startswith('AP-'):
+        if user_input.upper().startswith("AP-"):
             print(f"检测到审批ID: {user_input}")
             print("您可以使用以下命令:")
             print(f"  /approve {user_input}  - 批准此审批单")
@@ -635,11 +656,13 @@ def main():
     """主函数 - 兼容旧版命令行参数"""
     import argparse
 
-    parser = argparse.ArgumentParser(description='医生审批系统 - 交互式命令行界面')
-    parser.add_argument('approval_id', nargs='?', help='审批单ID（直接批准模式）')
-    parser.add_argument('--doctor-id', default='doctor_test_001', help='医生ID（默认: doctor_test_001）')
-    parser.add_argument('--notes', help='医生建议（仅限直接批准模式）')
-    parser.add_argument('--version', action='version', version='医生审批系统 v2.0')
+    parser = argparse.ArgumentParser(description="医生审批系统 - 交互式命令行界面")
+    parser.add_argument("approval_id", nargs="?", help="审批单ID（直接批准模式）")
+    parser.add_argument(
+        "--doctor-id", default="doctor_test_001", help="医生ID（默认: doctor_test_001）"
+    )
+    parser.add_argument("--notes", help="医生建议（仅限直接批准模式）")
+    parser.add_argument("--version", action="version", version="医生审批系统 v2.0")
 
     args = parser.parse_args()
 
@@ -651,9 +674,7 @@ def main():
         # 使用旧版直接批准逻辑
         import httpx
 
-        payload = {
-            "doctor_id": args.doctor_id
-        }
+        payload = {"doctor_id": args.doctor_id}
         if args.notes:
             payload["notes"] = args.notes
 
@@ -672,7 +693,7 @@ def main():
                     print(f"   医生建议: {args.notes[:100]}...")
 
                 # 显示订单创建状态
-                if result.get('order_created'):
+                if result.get("order_created"):
                     print(f"   📦 订单创建: {result.get('order_message', '成功')}")
                 else:
                     print(f"   ⚠ 订单创建: {result.get('order_message', '未创建')}")
@@ -697,6 +718,7 @@ def main():
     except Exception as e:
         print(f"\n程序运行失败: {e}")
         import traceback
+
         traceback.print_exc()
         sys.exit(1)
 
@@ -707,11 +729,15 @@ if __name__ == "__main__":
         print("用法:")
         print("  1. 交互式模式: python approve_prescription.py")
         print("  2. 直接批准: python approve_prescription.py AP-20260408-ABCD1234")
-        print("  3. 带医生建议的直接批准: python approve_prescription.py AP-20260408-ABCD1234 --notes '医生建议内容'")
+        print(
+            "  3. 带医生建议的直接批准: python approve_prescription.py AP-20260408-ABCD1234 --notes '医生建议内容'"
+        )
         print("\n示例:")
         print("  python approve_prescription.py")
         print("  python approve_prescription.py AP-20260408-ABCD1234")
-        print("  python approve_prescription.py AP-20260408-ABCD1234 --doctor-id 'doctor_001' --notes '饭后服用'")
+        print(
+            "  python approve_prescription.py AP-20260408-ABCD1234 --doctor-id 'doctor_001' --notes '饭后服用'"
+        )
         sys.exit(0)
 
     main()

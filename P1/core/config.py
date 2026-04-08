@@ -6,14 +6,22 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+
 class Config:
     """全局配置，从环境变量读取"""
+
     LLM_PROVIDER = os.getenv("LLM_PROVIDER", "claude")
-    ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY") or os.getenv("ANTHROPIC_AUTH_TOKEN")  # 支持DeepSeek的ANTHROPIC_AUTH_TOKEN
+    ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY") or os.getenv(
+        "ANTHROPIC_AUTH_TOKEN"
+    )  # 支持DeepSeek的ANTHROPIC_AUTH_TOKEN
     OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-    LLM_MODEL = os.getenv("ANTHROPIC_MODEL") or os.getenv("LLM_MODEL", "claude-3-sonnet-20240229")  # ANTHROPIC_MODEL优先
+    LLM_MODEL = os.getenv("ANTHROPIC_MODEL") or os.getenv(
+        "LLM_MODEL", "claude-3-sonnet-20240229"
+    )  # ANTHROPIC_MODEL优先
     ANTHROPIC_BASE_URL = os.getenv("ANTHROPIC_BASE_URL")  # 支持自定义base_url
-    ANTHROPIC_SMALL_FAST_MODEL = os.getenv("ANTHROPIC_SMALL_FAST_MODEL")  # 快速模型（可选）
+    ANTHROPIC_SMALL_FAST_MODEL = os.getenv(
+        "ANTHROPIC_SMALL_FAST_MODEL"
+    )  # 快速模型（可选）
     LLM_MAX_TOKENS = int(os.getenv("LLM_MAX_TOKENS", "4096"))
     LLM_TEMPERATURE = float(os.getenv("LLM_TEMPERATURE", "0.3"))
     PHARMACY_BASE_URL = os.getenv("PHARMACY_BASE_URL", "http://localhost:8001")
@@ -39,36 +47,50 @@ class Config:
 
         # 验证LLM提供商和API密钥
         if cls.LLM_PROVIDER not in ["claude", "openai"]:
-            raise ConfigurationError(f"无效的LLM提供商: {cls.LLM_PROVIDER}，必须是 'claude' 或 'openai'")
+            raise ConfigurationError(
+                f"无效的LLM提供商: {cls.LLM_PROVIDER}，必须是 'claude' 或 'openai'"
+            )
 
         if cls.LLM_PROVIDER == "claude" and not cls.ANTHROPIC_API_KEY:
-            raise ConfigurationError("使用Claude提供商时需要设置ANTHROPIC_API_KEY或ANTHROPIC_AUTH_TOKEN环境变量")
+            raise ConfigurationError(
+                "使用Claude提供商时需要设置ANTHROPIC_API_KEY或ANTHROPIC_AUTH_TOKEN环境变量"
+            )
 
         if cls.LLM_PROVIDER == "openai" and not cls.OPENAI_API_KEY:
             raise ConfigurationError("使用OpenAI提供商时需要设置OPENAI_API_KEY环境变量")
 
         # 验证MAX_ITERATIONS范围
         if not (1 <= cls.MAX_ITERATIONS <= 50):
-            raise ConfigurationError(f"MAX_ITERATIONS必须在1-50之间，当前值: {cls.MAX_ITERATIONS}")
+            raise ConfigurationError(
+                f"MAX_ITERATIONS必须在1-50之间，当前值: {cls.MAX_ITERATIONS}"
+            )
 
         # 验证LLM_TEMPERATURE范围
         if not (0.0 <= cls.LLM_TEMPERATURE <= 2.0):
-            raise ConfigurationError(f"LLM_TEMPERATURE必须在0-2之间，当前值: {cls.LLM_TEMPERATURE}")
+            raise ConfigurationError(
+                f"LLM_TEMPERATURE必须在0-2之间，当前值: {cls.LLM_TEMPERATURE}"
+            )
 
         # 验证MAX_CONCURRENT_SESSIONS范围
         if cls.MAX_CONCURRENT_SESSIONS <= 0:
-            raise ConfigurationError(f"MAX_CONCURRENT_SESSIONS必须大于0，当前值: {cls.MAX_CONCURRENT_SESSIONS}")
+            raise ConfigurationError(
+                f"MAX_CONCURRENT_SESSIONS必须大于0，当前值: {cls.MAX_CONCURRENT_SESSIONS}"
+            )
 
         # 验证REQUEST_TIMEOUT范围
         if cls.REQUEST_TIMEOUT <= 0:
-            raise ConfigurationError(f"REQUEST_TIMEOUT必须大于0，当前值: {cls.REQUEST_TIMEOUT}")
+            raise ConfigurationError(
+                f"REQUEST_TIMEOUT必须大于0，当前值: {cls.REQUEST_TIMEOUT}"
+            )
 
         # 验证SESSION_STATE_DIR目录
         if cls.SESSION_STATE_DIR:
             try:
                 os.makedirs(cls.SESSION_STATE_DIR, exist_ok=True)
             except Exception as e:
-                raise ConfigurationError(f"无法创建会话目录 {cls.SESSION_STATE_DIR}: {str(e)}")
+                raise ConfigurationError(
+                    f"无法创建会话目录 {cls.SESSION_STATE_DIR}: {str(e)}"
+                )
 
         logging.debug("配置验证通过")
 
@@ -85,14 +107,18 @@ class Config:
             "LLM_MAX_TOKENS": cls.LLM_MAX_TOKENS,
             "LLM_TEMPERATURE": cls.LLM_TEMPERATURE,
             "PHARMACY_BASE_URL": cls.PHARMACY_BASE_URL,
-            "DATABASE_URL": cls.DATABASE_URL[:20] + "..." if cls.DATABASE_URL and len(cls.DATABASE_URL) > 20 else cls.DATABASE_URL,
+            "DATABASE_URL": (
+                cls.DATABASE_URL[:20] + "..."
+                if cls.DATABASE_URL and len(cls.DATABASE_URL) > 20
+                else cls.DATABASE_URL
+            ),
             "LOG_LEVEL": cls.LOG_LEVEL,
             "MAX_HISTORY_LEN": cls.MAX_HISTORY_LEN,
             "MAX_ITERATIONS": cls.MAX_ITERATIONS,
             "SESSION_STATE_DIR": cls.SESSION_STATE_DIR,
             "ENABLE_ASYNC": cls.ENABLE_ASYNC,
             "MAX_CONCURRENT_SESSIONS": cls.MAX_CONCURRENT_SESSIONS,
-            "REQUEST_TIMEOUT": cls.REQUEST_TIMEOUT
+            "REQUEST_TIMEOUT": cls.REQUEST_TIMEOUT,
         }
 
 
@@ -101,6 +127,7 @@ try:
     Config.validate()
 except Exception as e:
     from core.exceptions import ConfigurationError
+
     if isinstance(e, ConfigurationError):
         logging.error(f"配置验证失败: {str(e)}")
         raise

@@ -8,11 +8,7 @@ from typing import Any, Dict, Optional
 
 def extract_json_from_text(text: str) -> Optional[Dict[str, Any]]:
     """从LLM回复中提取JSON对象"""
-    patterns = [
-        r'```json\s*(\{.*?\})\s*```',
-        r'```\s*(\{.*?\})\s*```',
-        r'(\{.*\})'
-    ]
+    patterns = [r"```json\s*(\{.*?\})\s*```", r"```\s*(\{.*?\})\s*```", r"(\{.*\})"]
     for pattern in patterns:
         match = re.search(pattern, text, re.DOTALL)
         if match:
@@ -38,4 +34,4 @@ def format_tool_result(result: Any) -> str:
     return str(result)
 
 
-__all__ = ['extract_json_from_text', 'safe_parse_json', 'format_tool_result']
+__all__ = ["extract_json_from_text", "safe_parse_json", "format_tool_result"]
