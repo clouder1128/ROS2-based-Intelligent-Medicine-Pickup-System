@@ -19,6 +19,9 @@ from utils.database import get_db_connection, init_database, json_serializer, DB
 from utils.ros2_bridge import init_ros2, publish_task, publish_expiry_removal, check_ros2_status, ros2_available, task_publisher
 from utils.logger import setup_logger
 
+# Configuration
+from config.settings import Config
+
 # ROS2 可选：若环境未配置则跳过发布
 # ros2_available and task_publisher are now imported from utils.ros2_bridge
 
@@ -35,47 +38,7 @@ app = Flask(__name__)
 # Port configuration for P1 compatibility
 # Using port 8001 to avoid conflicts with common services (5000 for Flask dev, 8000 for Python HTTP server)
 # and to ensure compatibility with P1 medical assistant system requirements
-DEFAULT_PORT = 8001  # Changed from 5000 for P1 compatibility
-
-
-def get_server_port(default_port: int = DEFAULT_PORT) -> int:
-    """
-    Get the server port from environment variable with proper error handling.
-
-    Args:
-        default_port: Default port to use if PORT environment variable is not set or invalid
-
-    Returns:
-        Valid port number between 1 and 65535
-
-    Raises:
-        ValueError: If PORT environment variable contains a value that cannot be converted to int
-                   or is outside valid port range (1-65535)
-    """
-    port_str = os.environ.get('PORT')
-
-    if port_str is None:
-        # No PORT environment variable, use default
-        print(f"[Config] Using default port: {default_port}")
-        return default_port
-
-    try:
-        port = int(port_str)
-    except ValueError:
-        raise ValueError(
-            f"Invalid PORT environment variable value: '{port_str}'. "
-            f"Must be an integer. Using default port {default_port} instead."
-        ) from None
-
-    # Validate port range
-    if port < 1 or port > 65535:
-        raise ValueError(
-            f"Invalid port number: {port}. Port must be between 1 and 65535. "
-            f"Using default port {default_port} instead."
-        )
-
-    print(f"[Config] Using port from environment variable: {port}")
-    return port
+# Note: Port configuration is now handled by Config class in config.settings
 
 
 # CORS：允许前端跨域访问
@@ -960,10 +923,4 @@ if __name__ == '__main__':
     if not (_debug and _use_reloader):
         _boot_expiry_worker_once()
 
-    try:
-        port = get_server_port()
-        app.run(host='0.0.0.0', port=port, debug=_debug, use_reloader=_use_reloader)
-    except ValueError as e:
-        print(f"[Error] {e}")
-        print(f"[Config] Falling back to default port: {DEFAULT_PORT}")
-        app.run(host='0.0.0.0', port=DEFAULT_PORT, debug=_debug, use_reloader=_use_reloader)
+    app.run(host=Config.HOST, port=Config.PORT, debug=_debug, use_reloader=_use_reloader)
