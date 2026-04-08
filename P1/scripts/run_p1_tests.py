@@ -74,7 +74,10 @@ def run_all_tests():
 def setup_environment():
     """Setup test environment variables"""
     # 添加项目根目录到Python路径
-    sys.path.insert(0, os.path.dirname(__file__))
+    # Since this file is now in scripts/, we need to go up one level to get P1 root
+    script_dir = os.path.dirname(__file__)
+    project_root = os.path.dirname(script_dir)  # Go up from scripts/ to P1/
+    sys.path.insert(0, project_root)
 
     # 尝试从sys.path中移除ROS路径（如果存在）
     ros_paths = [p for p in sys.path if 'ros' in p.lower()]

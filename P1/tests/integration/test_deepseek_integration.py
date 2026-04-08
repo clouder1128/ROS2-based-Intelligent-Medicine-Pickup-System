@@ -16,6 +16,12 @@ import sys
 import logging
 from typing import Dict, Any
 
+# Add project root to Python path to allow imports
+script_dir = os.path.dirname(os.path.abspath(__file__))
+project_root = os.path.dirname(os.path.dirname(script_dir))  # Go up from tests/integration/ to P1/
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
 # 设置日志
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
