@@ -30,7 +30,7 @@ class TestMockedIntegration:
 
         # Reload drug_db module to use the mocked client
         import importlib
-        import drug_db
+        import services.pharmacy_client as drug_db
         importlib.reload(drug_db)
 
         drugs = drug_db.get_all_drugs()
@@ -62,7 +62,7 @@ class TestMockedIntegration:
 
         # Reload drug_db module to use the mocked client
         import importlib
-        import drug_db
+        import services.pharmacy_client as drug_db
         importlib.reload(drug_db)
 
         import tools.inventory
@@ -79,8 +79,8 @@ class TestMockedIntegration:
     def test_complete_medical_consultation_flow(self):
         """Test complete medical consultation flow with mocks"""
         # Mock drug_db functions
-        with patch('drug_db.query_drug_by_name') as mock_query_by_name, \
-             patch('drug_db.query_drugs_by_symptom') as mock_query_by_symptom, \
+        with patch('services.pharmacy_client.query_drug_by_name') as mock_query_by_name, \
+             patch('services.pharmacy_client.query_drugs_by_symptom') as mock_query_by_symptom, \
              patch('utils.http_client.PharmacyHTTPClient') as mock_client_class:
 
             mock_client = Mock()

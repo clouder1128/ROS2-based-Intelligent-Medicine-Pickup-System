@@ -9,7 +9,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 @pytest.fixture
 def mock_pharmacy_client():
     """Fixture to mock PharmacyHTTPClient"""
-    with patch('drug_db.PharmacyHTTPClient') as mock_client_class:
+    with patch('services.pharmacy_client.PharmacyHTTPClient') as mock_client_class:
         mock_client = Mock()
         mock_client_class.return_value = mock_client
         yield mock_client
@@ -18,7 +18,7 @@ def test_query_drugs_by_symptom_integrated(mock_pharmacy_client):
     """Test query_drugs_by_symptom uses HTTP client"""
     # Reload drug_db module to use the mocked client
     import importlib
-    import drug_db
+    import services.pharmacy_client as drug_db
     importlib.reload(drug_db)
 
     mock_pharmacy_client.get_drugs.return_value = [
@@ -27,7 +27,7 @@ def test_query_drugs_by_symptom_integrated(mock_pharmacy_client):
     ]
 
     # Mock the symptom filtering logic
-    with patch('drug_db._filter_drugs_by_symptom') as mock_filter:
+    with patch('services.pharmacy_client._filter_drugs_by_symptom') as mock_filter:
         mock_filter.return_value = [
             {"drug_id": 1, "name": "Ibuprofen", "quantity": 50, "expiry_date": 100}
         ]
@@ -41,7 +41,7 @@ def test_query_drugs_by_symptom_integrated(mock_pharmacy_client):
 def test_query_drug_by_name_integrated(mock_pharmacy_client):
     """Test query_drug_by_name uses HTTP client"""
     import importlib
-    import drug_db
+    import services.pharmacy_client as drug_db
     importlib.reload(drug_db)
 
     mock_pharmacy_client.get_drugs.return_value = [
@@ -57,7 +57,7 @@ def test_query_drug_by_name_integrated(mock_pharmacy_client):
 def test_get_all_drugs_integrated(mock_pharmacy_client):
     """Test get_all_drugs uses HTTP client"""
     import importlib
-    import drug_db
+    import services.pharmacy_client as drug_db
     importlib.reload(drug_db)
 
     mock_pharmacy_client.get_drugs.return_value = [
@@ -73,7 +73,7 @@ def test_get_all_drugs_integrated(mock_pharmacy_client):
 def test_search_drugs_integrated(mock_pharmacy_client):
     """Test search_drugs uses HTTP client"""
     import importlib
-    import drug_db
+    import services.pharmacy_client as drug_db
     importlib.reload(drug_db)
 
     mock_pharmacy_client.get_drugs.return_value = [
@@ -89,7 +89,7 @@ def test_search_drugs_integrated(mock_pharmacy_client):
 def test_get_low_stock_drugs_integrated(mock_pharmacy_client):
     """Test get_low_stock_drugs uses HTTP client"""
     import importlib
-    import drug_db
+    import services.pharmacy_client as drug_db
     importlib.reload(drug_db)
 
     mock_pharmacy_client.get_drugs.return_value = [
@@ -111,7 +111,7 @@ def test_get_low_stock_drugs_integrated(mock_pharmacy_client):
 def test_update_stock_integrated(mock_pharmacy_client):
     """Test update_stock uses HTTP client for 'out' transactions"""
     import importlib
-    import drug_db
+    import services.pharmacy_client as drug_db
     importlib.reload(drug_db)
 
     mock_pharmacy_client.create_order.return_value = {"success": True, "order_id": "123"}
@@ -124,7 +124,7 @@ def test_update_stock_integrated(mock_pharmacy_client):
 def test_update_stock_integration_not_implemented(mock_pharmacy_client):
     """Test update_stock returns False for 'in' transactions (not implemented)"""
     import importlib
-    import drug_db
+    import services.pharmacy_client as drug_db
     importlib.reload(drug_db)
 
     result = drug_db.update_stock(drug_id=1, quantity=5, transaction_type='in')
@@ -136,7 +136,7 @@ def test_update_stock_integration_not_implemented(mock_pharmacy_client):
 def test_health_check_integrated(mock_pharmacy_client):
     """Test health_check uses HTTP client"""
     import importlib
-    import drug_db
+    import services.pharmacy_client as drug_db
     importlib.reload(drug_db)
 
     mock_pharmacy_client.health_check.return_value = {

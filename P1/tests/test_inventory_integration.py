@@ -29,7 +29,7 @@ def test_record_transaction_integrated():
 
 
 def test_get_stock_report_integrated():
-    """Test get_stock_report uses drug_db.get_all_drugs()"""
+    """Test get_stock_report uses get_all_drugs()"""
     # Mock drug data
     mock_drugs = [
         {
@@ -55,7 +55,7 @@ def test_get_stock_report_integrated():
         }
     ]
 
-    with patch('tools.inventory.drug_db.get_all_drugs') as mock_get_all_drugs:
+    with patch('tools.inventory.get_all_drugs') as mock_get_all_drugs:
         mock_get_all_drugs.return_value = mock_drugs
 
         # Test with default limit
@@ -119,7 +119,7 @@ def test_get_stock_report_with_limit():
         for i in range(1, 21)  # 20 drugs
     ]
 
-    with patch('tools.inventory.drug_db.get_all_drugs') as mock_get_all_drugs:
+    with patch('tools.inventory.get_all_drugs') as mock_get_all_drugs:
         mock_get_all_drugs.return_value = mock_drugs
 
         # Test with limit=5
@@ -154,7 +154,7 @@ def test_get_stock_report_with_limit():
 
 def test_get_stock_report_fallback():
     """Test get_stock_report fallback to mock data when drug_db fails"""
-    with patch('tools.inventory.drug_db.get_all_drugs') as mock_get_all_drugs:
+    with patch('tools.inventory.get_all_drugs') as mock_get_all_drugs:
         mock_get_all_drugs.side_effect = Exception("Database error")
 
         result_json = inventory.get_stock_report(

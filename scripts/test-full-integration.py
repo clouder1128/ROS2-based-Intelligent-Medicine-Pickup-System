@@ -59,7 +59,7 @@ def test_p1_modules():
     print("\nTesting P1 modules...")
 
     try:
-        import drug_db
+        import services.pharmacy_client as drug_db
     except ImportError as e:
         print(f"✗ Failed to import drug_db: {e}")
         return False
@@ -146,7 +146,7 @@ def test_complete_workflow():
 
     # 导入必要的P1模块
     try:
-        import drug_db
+        import services.pharmacy_client as drug_db
         from tools import medical
     except ImportError as e:
         print(f"✗ 无法导入P1模块: {e}")

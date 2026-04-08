@@ -10,7 +10,7 @@ from typing import Dict, List, Any, Optional
 from datetime import datetime, timedelta
 
 from utils.http_client import PharmacyHTTPClient
-import drug_db
+from services.pharmacy_client import get_all_drugs
 
 logger = logging.getLogger(__name__)
 
@@ -108,7 +108,7 @@ def get_stock_report(start_date: str = None, end_date: str = None, limit: int = 
     try:
         # Get current stock from backend
         client = PharmacyHTTPClient()
-        all_drugs = drug_db.get_all_drugs()
+        all_drugs = get_all_drugs()
 
         # For now, generate simple report from current stock
         # Backend doesn't have transaction history API yet

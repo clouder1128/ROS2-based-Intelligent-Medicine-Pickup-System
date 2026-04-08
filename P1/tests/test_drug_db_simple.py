@@ -8,7 +8,7 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from unittest.mock import Mock, patch
-import drug_db
+import services.pharmacy_client as drug_db
 
 def test_drug_db_structure():
     """Test that drug_db has the expected functions"""

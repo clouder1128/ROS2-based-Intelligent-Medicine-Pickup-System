@@ -39,8 +39,8 @@ def test_submit_approval_integrated():
 def test_query_drug_integrated():
     """Test query_drug uses drug_db module"""
     # Mock drug_db module functions
-    with patch('drug_db.query_drug_by_name') as mock_query_by_name, \
-         patch('drug_db.query_drugs_by_symptom') as mock_query_by_symptom:
+    with patch('services.pharmacy_client.query_drug_by_name') as mock_query_by_name, \
+         patch('services.pharmacy_client.query_drugs_by_symptom') as mock_query_by_symptom:
 
         # Test name query
         mock_drug = {
@@ -65,8 +65,8 @@ def test_query_drug_integrated():
         mock_query_by_name.assert_called_once_with("Ibuprofen")
 
     # Test symptom query
-    with patch('drug_db.query_drug_by_name') as mock_query_by_name, \
-         patch('drug_db.query_drugs_by_symptom') as mock_query_by_symptom:
+    with patch('services.pharmacy_client.query_drug_by_name') as mock_query_by_name, \
+         patch('services.pharmacy_client.query_drugs_by_symptom') as mock_query_by_symptom:
 
         mock_drugs = [
             {

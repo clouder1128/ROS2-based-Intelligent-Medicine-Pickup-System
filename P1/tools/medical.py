@@ -93,15 +93,15 @@ def query_drug(query: str) -> str:
     logger.info(f"查询药物: {query}")
 
     try:
-        # Use drug_db module for real queries
-        import drug_db
+        # Use pharmacy_client module for real queries
+        from services.pharmacy_client import query_drugs_by_symptom, query_drug_by_name
 
         if any(keyword in query.lower() for keyword in ['头痛', '发热', '咳嗽', '疼痛', 'fever', 'pain', 'cough']):
             # Symptom query
-            drugs = drug_db.query_drugs_by_symptom(query)
+            drugs = query_drugs_by_symptom(query)
         else:
             # Name query
-            drug = drug_db.query_drug_by_name(query)
+            drug = query_drug_by_name(query)
             drugs = [drug] if drug else []
 
         if not drugs:

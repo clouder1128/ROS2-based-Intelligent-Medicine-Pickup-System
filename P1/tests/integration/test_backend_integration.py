@@ -12,7 +12,7 @@ pytestmark = pytest.mark.integration
 @pytest.fixture(scope="module")
 def backend_available():
     """Check if backend is available before running tests"""
-    import drug_db
+    import services.pharmacy_client as drug_db
     health = drug_db.health_check()
     return health.get('backend_available', False)
 
@@ -25,7 +25,7 @@ class TestBackendIntegration:
 
     def test_backend_connection(self):
         """Test basic connection to backend"""
-        import drug_db
+        import services.pharmacy_client as drug_db
         health = drug_db.health_check()
         assert health['backend_available'] == True
         print(f"Backend health: {health}")
@@ -35,7 +35,7 @@ class TestBackendIntegration:
         if not backend_available:
             pytest.skip("Backend not available")
 
-        import drug_db
+        import services.pharmacy_client as drug_db
         import tools.medical
 
         # Test getting all drugs

@@ -74,7 +74,7 @@ P1/
 ├── interactive.py        # 简单交互式命令行界面
 ├── example_usage.py      # 使用示例脚本
 ├── example_http_client.py # HTTP客户端示例
-├── drug_db.py           # 药品数据库接口（HTTP客户端）
+├── services/pharmacy_client.py # 药品数据库接口（HTTP客户端）
 ├── config.py             # 全局配置
 ├── exceptions.py         # 异常定义
 ├── run_tests.py         # 测试运行器（解决pytest插件冲突）
@@ -1118,7 +1118,7 @@ export PHARMACY_BASE_URL=http://localhost:8001
 ```
 
 ### Integrated Modules
-- `drug_db.py` - Real drug queries from backend
+- `services/pharmacy_client.py` - Real drug queries from backend
 - `tools/medical.py` - Real approval submission
 - `tools/inventory.py` - Real inventory operations
 

@@ -9,8 +9,8 @@ import logging
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 
-from config import Config
-from utils.http_client import PharmacyHTTPClient
+from ..config import Config
+from ..utils.http_client import PharmacyHTTPClient
 
 logger = logging.getLogger(__name__)
 
@@ -228,7 +228,7 @@ def health_check() -> Dict[str, Any]:
             "backend_available": backend_health.get('backend_available', False),
             "backend_health": backend_health,
             "timestamp": datetime.now().isoformat(),
-            "module": "drug_db (HTTP client)"
+            "module": "pharmacy_client (HTTP client)"
         }
     except Exception as e:
         return {
