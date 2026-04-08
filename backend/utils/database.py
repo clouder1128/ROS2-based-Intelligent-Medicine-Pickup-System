@@ -2,21 +2,22 @@ import sqlite3
 import json
 import os
 from datetime import date, datetime
+from typing import Any, Dict, Optional, Union
 
-DB_PATH = os.path.join(os.path.dirname(__file__), '..', 'pharmacy.db')
+DB_PATH = os.environ.get('DB_PATH', os.path.join(os.path.dirname(__file__), '..', 'pharmacy.db'))
 
-def get_db_connection():
-    """获取数据库连接"""
+def get_db_connection() -> sqlite3.Connection:
+    """Get database connection"""
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     return conn
 
-def init_database():
-    """初始化数据库表"""
+def init_database() -> None:
+    """Initialize database tables"""
     conn = get_db_connection()
     cursor = conn.cursor()
 
-    # 创建药品库存表
+    # Create drug inventory table
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS inventory (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -28,7 +29,7 @@ def init_database():
         )
     ''')
 
-    # 创建取药记录表
+    # Create medication order records table
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS orders (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -41,7 +42,7 @@ def init_database():
         )
     ''')
 
-    # 创建审批记录表
+    # Create approval records table
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS approvals (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -56,7 +57,7 @@ def init_database():
         )
     ''')
 
-    # 插入示例数据（如果表为空）
+    # Insert sample data (if table is empty)
     cursor.execute("SELECT COUNT(*) FROM inventory")
     if cursor.fetchone()[0] == 0:
         sample_drugs = [
@@ -74,8 +75,8 @@ def init_database():
     conn.close()
     print("Database initialized successfully")
 
-def json_serializer(obj):
-    """JSON序列化辅助函数"""
+def json_serializer(obj: Any) -> str:
+    """JSON serialization helper function"""
     if isinstance(obj, (datetime, date)):
         return obj.isoformat()
     raise TypeError(f"Type {type(obj)} not serializable")

@@ -1,16 +1,17 @@
 import logging
 import sys
+from typing import Optional
 
-def setup_logger(name, level=logging.INFO):
-    """设置日志记录器"""
+def setup_logger(name: str, level: int = logging.INFO) -> logging.Logger:
+    """Setup logger"""
     logger = logging.getLogger(name)
     logger.setLevel(level)
 
-    # 避免重复添加handler
+    # Avoid adding duplicate handlers
     if not logger.handlers:
         formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
-        # 控制台handler
+        # Console handler
         console_handler = logging.StreamHandler(sys.stdout)
         console_handler.setFormatter(formatter)
         logger.addHandler(console_handler)

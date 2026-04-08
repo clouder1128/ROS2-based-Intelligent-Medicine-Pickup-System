@@ -1,12 +1,26 @@
 import threading
 import time
+import signal
+from typing import Dict, Any, Optional
 
+# Thread-safe global variables with locks
 ros2_available = False
 task_publisher = None
+ros2_lock = threading.Lock()
+shutdown_requested = False
 
-def init_ros2():
-    """在后台线程中初始化 ROS2 并持续 spin"""
-    global ros2_available, task_publisher
+def init_ros2() -> None:
+    """Initialize ROS2 in background thread and continuously spin"""
+    global ros2_available, task_publisher, shutdown_requested
+
+    # Set up signal handlers for graceful shutdown
+    def signal_handler(signum, frame):
+        global shutdown_requested
+        shutdown_requested = True
+
+    signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGTERM, signal_handler)
+
     try:
         import rclpy
         from rclpy.node import Node
@@ -19,22 +33,38 @@ def init_ros2():
 
         rclpy.init()
         node = TaskPublisher()
-        task_publisher = node
-        ros2_available = True
-        print('[ROS2] 已连接，任务将发布到 /task_request')
+
+        # Thread-safe update of global variables
+        with ros2_lock:
+            task_publisher = node
+            ros2_available = True
+
+        print('[ROS2] Connected, tasks will be published to /task_request')
 
         executor = rclpy.executors.SingleThreadedExecutor()
         executor.add_node(node)
-        while rclpy.ok():
-            executor.spin_once(timeout_sec=0.1)
-    except Exception as e:
-        print(f'[ROS2] 未启用: {e}，任务将仅记录到数据库')
 
-def publish_task(task_id: int, drug: dict, quantity: int):
-    """向 ROS2 /task_request 发布取药任务"""
+        # Add proper shutdown handling
+        while rclpy.ok() and not shutdown_requested:
+            executor.spin_once(timeout_sec=0.1)
+
+        # Cleanup on shutdown
+        if shutdown_requested:
+            print('[ROS2] Shutdown requested, cleaning up...')
+            node.destroy_node()
+            rclpy.shutdown()
+            with ros2_lock:
+                ros2_available = False
+                task_publisher = None
+    except Exception as e:
+        print(f'[ROS2] Not enabled: {e}, tasks will only be logged to database')
+
+def publish_task(task_id: int, drug: Dict[str, Any], quantity: int) -> None:
+    """Publish medication pickup task to ROS2 /task_request"""
     global task_publisher
-    if not ros2_available or task_publisher is None:
-        return
+    with ros2_lock:
+        if not ros2_available or task_publisher is None:
+            return
 
     try:
         from std_msgs.msg import String
@@ -51,16 +81,21 @@ def publish_task(task_id: int, drug: dict, quantity: int):
             'y': drug['shelf_y'],
             'quantity': quantity,
         })
-        task_publisher.pub.publish(msg)
-        print(f'[ROS2] 已发布任务 task_id={task_id} -> ({drug["shelf_x"]},{drug["shelf_y"]})')
-    except Exception as e:
-        print(f'[ROS2] 发布失败: {e}')
 
-def publish_expiry_removal(drug: dict, remove_quantity: int):
-    """向 ROS2 /task_request 发布过期药品清柜任务（定期清扫发现仍有库存的过期品时调用）"""
+        # Thread-safe access to publisher
+        with ros2_lock:
+            if task_publisher is not None:
+                task_publisher.pub.publish(msg)
+                print(f'[ROS2] Published task task_id={task_id} -> ({drug["shelf_x"]},{drug["shelf_y"]})')
+    except Exception as e:
+        print(f'[ROS2] Publish failed: {e}')
+
+def publish_expiry_removal(drug: Dict[str, Any], remove_quantity: int) -> None:
+    """Publish expired drug removal task to ROS2 /task_request (called when expired stock is found during periodic cleanup)"""
     global task_publisher
-    if not ros2_available or task_publisher is None:
-        return
+    with ros2_lock:
+        if not ros2_available or task_publisher is None:
+            return
 
     try:
         from std_msgs.msg import String
@@ -78,17 +113,22 @@ def publish_expiry_removal(drug: dict, remove_quantity: int):
             'quantity': remove_quantity,
             'reason': 'expired',
         }, ensure_ascii=False)
-        task_publisher.pub.publish(msg)
-        print(
-            f'[ROS2] 已发布过期清柜 type=expiry_removal drug_id={drug["drug_id"]} '
-            f'qty={remove_quantity} -> ({drug["shelf_x"]},{drug["shelf_y"]})'
-        )
-    except Exception as e:
-        print(f'[ROS2] 过期清柜发布失败: {e}')
 
-def check_ros2_status():
-    """检查ROS2状态"""
-    return {
-        'available': ros2_available,
-        'publisher_initialized': task_publisher is not None
-    }
+        # Thread-safe access to publisher
+        with ros2_lock:
+            if task_publisher is not None:
+                task_publisher.pub.publish(msg)
+                print(
+                    f'[ROS2] Published expiry removal type=expiry_removal drug_id={drug["drug_id"]} '
+                    f'qty={remove_quantity} -> ({drug["shelf_x"]},{drug["shelf_y"]})'
+                )
+    except Exception as e:
+        print(f'[ROS2] Expiry removal publish failed: {e}')
+
+def check_ros2_status() -> Dict[str, Any]:
+    """Check ROS2 status"""
+    with ros2_lock:
+        return {
+            'available': ros2_available,
+            'publisher_initialized': task_publisher is not None
+        }
