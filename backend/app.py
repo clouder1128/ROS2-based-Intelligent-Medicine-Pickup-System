@@ -9,6 +9,11 @@ import time
 from datetime import date, datetime
 from flask import Flask, request, jsonify
 
+# Model imports
+from models.drug import Drug
+from models.order import Order
+from models.approval import Approval
+
 # ROS2 可选：若环境未配置则跳过发布
 ros2_available = False
 task_publisher = None
