@@ -4,11 +4,11 @@ import os
 from datetime import date, datetime
 from typing import Any, Dict, Optional, Union
 
-DB_PATH = os.environ.get('DB_PATH', os.path.join(os.path.dirname(__file__), '..', 'pharmacy.db'))
+from config.settings import Config
 
 def get_db_connection() -> sqlite3.Connection:
     """Get database connection"""
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(Config.DATABASE_PATH)
     conn.row_factory = sqlite3.Row
     return conn
 

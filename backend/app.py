@@ -15,7 +15,7 @@ from models.order import Order
 from models.approval import Approval
 
 # Utility imports
-from utils.database import get_db_connection, init_database, json_serializer, DB_PATH
+from utils.database import get_db_connection, init_database, json_serializer
 from utils.ros2_bridge import init_ros2, publish_task, publish_expiry_removal, check_ros2_status, ros2_available, task_publisher
 from utils.logger import setup_logger
 
@@ -75,14 +75,14 @@ def run_expiry_sweep() -> dict:
     关机多日后再启动会按日期差一次性扣减，避免时间丢失。
     返回本次执行摘要（便于日志/调试）。
     """
-    if not os.path.exists(DB_PATH):
+    if not os.path.exists(Config.DATABASE_PATH):
         return {'skipped': True, 'reason': 'no database'}
 
     today = date.today()
     today_s = today.isoformat()
 
     with _expiry_sweep_lock:
-        conn = sqlite3.connect(DB_PATH)
+        conn = sqlite3.connect(Config.DATABASE_PATH)
         try:
             _ensure_app_meta(conn)
             row = conn.execute(
@@ -914,7 +914,7 @@ if os.environ.get('WERKZEUG_RUN_MAIN') == 'true':
 
 
 if __name__ == '__main__':
-    if not os.path.exists(DB_PATH):
+    if not os.path.exists(Config.DATABASE_PATH):
         print('请先运行: python3 init_db.py')
         exit(1)
     _debug = True
