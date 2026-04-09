@@ -44,11 +44,11 @@ app = Flask(__name__)
 # CORS：允许前端跨域访问
 try:
     from flask_cors import CORS
-    CORS(app, resources={r"/api/*": {"origins": "*", "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"], "allow_headers": ["Content-Type", "Authorization"]}})
+    CORS(app, resources={r"/api/*": {"origins": Config.CORS_ORIGINS, "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"], "allow_headers": ["Content-Type", "Authorization"]}})
 except ImportError:
     @app.after_request
     def add_cors(resp):
-        resp.headers['Access-Control-Allow-Origin'] = '*'
+        resp.headers['Access-Control-Allow-Origin'] = Config.CORS_ORIGINS
         resp.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
         resp.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
         return resp
