@@ -5,8 +5,9 @@
 import os
 import sqlite3
 from datetime import date
+from config.settings import Config
 
-DB_PATH = os.path.join(os.path.dirname(__file__), 'pharmacy.db')
+DB_PATH = Config.DATABASE_PATH
 
 
 def init_db():
