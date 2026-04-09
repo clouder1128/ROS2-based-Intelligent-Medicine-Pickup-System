@@ -113,7 +113,7 @@ curl http://localhost:8001/api/health
 
 # 检查P1连接
 cd P1
-python -c "import drug_db; print(drug_db.health_check())"
+python -c "import services.pharmacy_client; print(services.pharmacy_client.health_check())"
 
 # 运行基础测试
 make test
@@ -627,7 +627,7 @@ return response
 ```
 
 #### 步骤3：更新相关P1模块
-- 在`drug_db.py`中添加使用新端点的方法
+- 在`services/pharmacy_client.py`中添加使用新端点的方法
 - 在`tools/`相关工具中调用新功能
 - 更新类型定义和文档
 
@@ -1150,7 +1150,7 @@ python app.py
 # P1重置
 cd ../P1
 export PHARMACY_BASE_URL=http://localhost:8001
-python -c "import drug_db; drug_db.health_check()"
+python -c "import services.pharmacy_client; services.pharmacy_client.health_check()"
 
 # 运行完整测试
 make test-integration
@@ -1313,8 +1313,8 @@ check_process
 ### 6.4 获取帮助渠道
 
 #### 文档资源
-1. **本文档**：`docs/技术参考手册.md` - 综合技术参考
-2. **团队项目文档**：`docs/AI 开药助手 —— 团队项目说明文档 ver 4.0.md` - 项目概述和状态
+1. **本文档**：`docs/guides/reference-manual.md` - 综合技术参考
+2. **团队项目文档**：`docs/team/project-description-v4.md` - 项目概述和状态
 3. **README文件**：项目根目录和各模块目录中的README
 4. **代码注释**：关键函数和类的文档字符串
 

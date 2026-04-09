@@ -96,7 +96,7 @@ curl http://localhost:8001/api/health
 
 # 检查P1连接
 cd P1
-python -c "import drug_db; print(drug_db.health_check())"
+python -c "import services.pharmacy_client; print(services.pharmacy_client.health_check())"
 ```
 
 ## 📁 项目结构
@@ -115,7 +115,8 @@ agent/
 │
 ├── P1/                        # AI医疗助手系统
 │   ├── cli.py                 # 命令行界面
-│   ├── drug_db.py             # 药品数据库接口（HTTP客户端）
+│   ├── services/              # 服务模块
+│   │   └── pharmacy_client.py # 药品数据库接口（HTTP客户端）
 │   ├── example_usage.py       # 使用示例脚本
 │   ├── example_http_client.py # HTTP客户端示例
 │   ├── interactive.py         # 简单交互式命令行界面
@@ -167,9 +168,16 @@ agent/
 │   └── test-full-integration.py # 完整集成测试
 │
 ├── docs/                      # 文档
-│   ├── integration-guide.md   # 集成指南
-│   ├── troubleshooting.md     # 故障排除
-│   ├── api-reference.md       # API参考文档
+│   ├── guides/                # 使用指南和参考手册
+│   │   └── reference-manual.md # 综合技术参考手册
+│   ├── team/                  # 团队文档
+│   │   ├── project-description-v3.md # 团队项目说明文档 v3.0
+│   │   ├── project-description-v4.md # 团队项目说明文档 v4.0
+│   │   ├── team-notice.md     # 团队开发通知
+│   │   └── safety-guidelines.md # API密钥安全指南
+│   ├── analysis/              # 分析文档
+│   │   └── backend-p1-integration-analysis.md # 后端-P1集成分析
+│   ├── api/                   # API文档（预留）
 │   └── superpowers/           # 开发规划文档
 │
 ├── tests/                     # 根目录测试文件
@@ -181,10 +189,6 @@ agent/
 │   └── line_follower/        # 巡线算法ROS2包
 │
 ├── Makefile                   # 项目构建工具
-├── 团队通知.md                # 团队开发通知
-├── AI 开药助手 —— 团队项目说明文档 ver 3.0.md # 团队项目说明文档
-├── API密钥安全指南.md         # API密钥安全指南
-├── backend-to-p1-integration-analysis.md # 后端-P1集成分析
 └── README.md                  # 本文件
 ```
 
@@ -234,7 +238,7 @@ export LOG_LEVEL=DEBUG
 - `POST /api/approvals/{id}/approve` - 批准审批单
 - `POST /api/approvals/{id}/reject` - 拒绝审批单
 
-详细API文档见 [docs/integration-guide.md](docs/integration-guide.md)
+详细API文档见 [docs/guides/reference-manual.md](docs/guides/reference-manual.md)
 
 ## 🧪 测试
 
@@ -267,7 +271,7 @@ cd backend && python init_db.py
 3. **连接失败**：验证`PHARMACY_BASE_URL`环境变量
 4. **依赖问题**：运行`pip install -r requirements.txt`
 
-详细故障排除见 [docs/troubleshooting.md](docs/troubleshooting.md)
+详细故障排除见 [docs/guides/reference-manual.md](docs/guides/reference-manual.md)
 
 ### 数据库管理
 ```bash
@@ -283,7 +287,7 @@ sqlite3 backend/pharmacy.db "SELECT * FROM inventory;"
 
 ## 🤝 贡献指南
 
-1. **开发流程**：参考[团队通知.md](团队通知.md)中的角色分工
+1. **开发流程**：参考[团队通知](docs/team/team-notice.md)中的角色分工
 2. **代码规范**：遵循现有代码结构和命名约定
 3. **测试要求**：新功能需包含单元测试和集成测试
 4. **文档更新**：代码变更需同步更新相关文档
