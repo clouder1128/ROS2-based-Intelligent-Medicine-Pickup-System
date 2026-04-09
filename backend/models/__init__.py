@@ -8,4 +8,4 @@ from .drug import Drug
 from .order import Order
 from .approval import Approval
 
-__all__ = ['Drug', 'Order', 'Approval']
+__all__ = ["Drug", "Order", "Approval"]

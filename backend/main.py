@@ -36,14 +36,26 @@ app = Flask(__name__)
 # CORS: Allow frontend cross-origin access
 try:
     from flask_cors import CORS
-    CORS(app, resources={r"/api/*": {"origins": Config.CORS_ORIGINS, "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"], "allow_headers": ["Content-Type", "Authorization"]}})
+
+    CORS(
+        app,
+        resources={
+            r"/api/*": {
+                "origins": Config.CORS_ORIGINS,
+                "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+                "allow_headers": ["Content-Type", "Authorization"],
+            }
+        },
+    )
 except ImportError:
+
     @app.after_request
     def add_cors(resp):
-        resp.headers['Access-Control-Allow-Origin'] = Config.CORS_ORIGINS
-        resp.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
-        resp.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
+        resp.headers["Access-Control-Allow-Origin"] = Config.CORS_ORIGINS
+        resp.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
+        resp.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
         return resp
+
 
 # Register blueprints
 app.register_blueprint(health_bp)
@@ -55,16 +67,16 @@ app.register_blueprint(approval_bp)
 _expiry_sweep_lock = threading.Lock()
 _expiry_bg_started = False
 _expiry_bg_lock = threading.Lock()
-EXPIRY_SWEEP_INTERVAL_SEC = int(os.environ.get('EXPIRY_SWEEP_INTERVAL_SEC', '3600'))
+EXPIRY_SWEEP_INTERVAL_SEC = int(os.environ.get("EXPIRY_SWEEP_INTERVAL_SEC", "3600"))
 
 
 def _ensure_app_meta(conn: sqlite3.Connection) -> None:
-    conn.execute('''
+    conn.execute("""
         CREATE TABLE IF NOT EXISTS app_meta (
             k TEXT PRIMARY KEY,
             v TEXT NOT NULL
         )
-    ''')
+    """)
 
 
 def run_expiry_sweep() -> dict:
@@ -76,7 +88,7 @@ def run_expiry_sweep() -> dict:
     Returns execution summary (for logging/debugging).
     """
     if not os.path.exists(Config.DATABASE_PATH):
-        return {'skipped': True, 'reason': 'no database'}
+        return {"skipped": True, "reason": "no database"}
 
     today = date.today()
     today_s = today.isoformat()
@@ -91,7 +103,11 @@ def run_expiry_sweep() -> dict:
             last_s = row[0] if row else None
 
             if last_s == today_s:
-                return {'skipped': True, 'reason': 'already_swept_today', 'date': today_s}
+                return {
+                    "skipped": True,
+                    "reason": "already_swept_today",
+                    "date": today_s,
+                }
 
             if last_s is None:
                 # Old database without new init_db: add baseline date, no deduction today
@@ -100,7 +116,11 @@ def run_expiry_sweep() -> dict:
                     (today_s,),
                 )
                 conn.commit()
-                return {'skipped': True, 'reason': 'legacy_baseline_no_init_meta', 'date': today_s}
+                return {
+                    "skipped": True,
+                    "reason": "legacy_baseline_no_init_meta",
+                    "date": today_s,
+                }
 
             try:
                 last_d = date.fromisoformat(last_s)
@@ -110,24 +130,28 @@ def run_expiry_sweep() -> dict:
                     (today_s,),
                 )
                 conn.commit()
-                return {'skipped': True, 'reason': 'reset_invalid_last_date', 'date': today_s}
+                return {
+                    "skipped": True,
+                    "reason": "reset_invalid_last_date",
+                    "date": today_s,
+                }
 
             delta = (today - last_d).days
             if delta <= 0:
-                return {'skipped': True, 'reason': 'no_new_day', 'date': today_s}
+                return {"skipped": True, "reason": "no_new_day", "date": today_s}
 
             conn.execute(
-                'UPDATE inventory SET expiry_date = expiry_date - ? WHERE expiry_date > 0',
+                "UPDATE inventory SET expiry_date = expiry_date - ? WHERE expiry_date > 0",
                 (delta,),
             )
             cur = conn.execute(
-                '''SELECT drug_id, name, quantity, expiry_date, shelf_x, shelf_y, shelve_id
-                   FROM inventory WHERE expiry_date <= 0 AND quantity > 0'''
+                """SELECT drug_id, name, quantity, expiry_date, shelf_x, shelf_y, shelve_id
+                   FROM inventory WHERE expiry_date <= 0 AND quantity > 0"""
             )
             expired_to_remove = [dict(r) for r in cur.fetchall()]
 
             cur = conn.execute(
-                'UPDATE inventory SET quantity = 0 WHERE expiry_date <= 0'
+                "UPDATE inventory SET quantity = 0 WHERE expiry_date <= 0"
             )
             cleared_rows = cur.rowcount
 
@@ -139,15 +163,16 @@ def run_expiry_sweep() -> dict:
 
             ros_n = 0
             for drug in expired_to_remove:
-                publish_expiry_removal(drug, int(drug['quantity']))
+                publish_expiry_removal(drug, int(drug["quantity"]))
                 ros_n += 1
 
             return {
-                'success': True, 'ok': True,
-                'date': today_s,
-                'days_applied': delta,
-                'expired_rows_cleared_qty': cleared_rows,
-                'expiry_ros_published': ros_n,
+                "success": True,
+                "ok": True,
+                "date": today_s,
+                "days_applied": delta,
+                "expired_rows_cleared_qty": cleared_rows,
+                "expiry_ros_published": ros_n,
             }
         finally:
             conn.close()
@@ -157,12 +182,12 @@ def _expiry_sweep_loop():
     while True:
         try:
             summary = run_expiry_sweep()
-            if summary.get('ok'):
-                print(f'[expiry] 清扫完成: {summary}')
-            elif not summary.get('skipped'):
-                print(f'[expiry] 清扫结果: {summary}')
+            if summary.get("ok"):
+                print(f"[expiry] 清扫完成: {summary}")
+            elif not summary.get("skipped"):
+                print(f"[expiry] 清扫结果: {summary}")
         except Exception as e:
-            print(f'[expiry] 清扫异常: {e}')
+            print(f"[expiry] 清扫异常: {e}")
         time.sleep(EXPIRY_SWEEP_INTERVAL_SEC)
 
 
@@ -178,13 +203,13 @@ def _boot_expiry_worker_once():
 
 # Werkzeug auto-reload: only child processes have WERKZEUG_RUN_MAIN=true;
 # starting here avoids parent process spawning duplicate threads causing duplicate deductions.
-if os.environ.get('WERKZEUG_RUN_MAIN') == 'true':
+if os.environ.get("WERKZEUG_RUN_MAIN") == "true":
     _boot_expiry_worker_once()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     if not os.path.exists(Config.DATABASE_PATH):
-        print('请先运行: python3 init_db.py')
+        print("请先运行: python3 init_db.py")
         exit(1)
     _debug = True
     _use_reloader = _debug
@@ -193,4 +218,6 @@ if __name__ == '__main__':
     if not (_debug and _use_reloader):
         _boot_expiry_worker_once()
 
-    app.run(host=Config.HOST, port=Config.PORT, debug=_debug, use_reloader=_use_reloader)
+    app.run(
+        host=Config.HOST, port=Config.PORT, debug=_debug, use_reloader=_use_reloader
+    )

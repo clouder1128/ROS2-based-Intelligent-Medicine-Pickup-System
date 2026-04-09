@@ -20,8 +20,8 @@ def query_drug(drug_id: int) -> dict | None:
     try:
         conn = get_db_connection()
         cur = conn.execute(
-            'SELECT drug_id, name, quantity, expiry_date, shelf_x, shelf_y, shelve_id FROM inventory WHERE drug_id = ?',
-            (drug_id,)
+            "SELECT drug_id, name, quantity, expiry_date, shelf_x, shelf_y, shelve_id FROM inventory WHERE drug_id = ?",
+            (drug_id,),
         )
         row = cur.fetchone()
         return dict(row) if row else None
@@ -46,10 +46,10 @@ def validate_and_get_drug(drug_id: int, num: int) -> tuple[dict | None, str | No
     """
     drug = query_drug(drug_id)
     if not drug:
-        return None, f'药品不存在: id={drug_id}'
-    if drug['expiry_date'] is not None and drug['expiry_date'] <= 0:
+        return None, f"药品不存在: id={drug_id}"
+    if drug["expiry_date"] is not None and drug["expiry_date"] <= 0:
         return None, f'药品已过期: {drug["name"]}'
-    if drug['quantity'] < num:
+    if drug["quantity"] < num:
         return None, f'库存不足: {drug["name"]} 库存 {drug["quantity"]}，需求 {num}'
     return drug, None
 
@@ -81,38 +81,36 @@ def find_drug_id_by_name(drug_name: str) -> int | None:
         return None
 
     # Create cleaned version: remove all whitespace and punctuation
-    cleaned = re.sub(r'[\s\W_]+', '', normalized)
+    cleaned = re.sub(r"[\s\W_]+", "", normalized)
 
     conn = None
     try:
         conn = get_db_connection()
         # 1. Exact match
         cur = conn.execute(
-            'SELECT drug_id FROM inventory WHERE name = ?',
-            (normalized,)
+            "SELECT drug_id FROM inventory WHERE name = ?", (normalized,)
         )
         row = cur.fetchone()
         if row:
-            return row['drug_id']
+            return row["drug_id"]
 
         # 2. Normalized match (if cleaned differs from original and is not empty)
         if cleaned and cleaned != normalized:
             # Get all drug names for client-side normalized matching
-            cur = conn.execute('SELECT drug_id, name FROM inventory')
+            cur = conn.execute("SELECT drug_id, name FROM inventory")
             rows = cur.fetchall()
             for r in rows:
-                db_name = r['name']
-                db_cleaned = re.sub(r'[\s\W_]+', '', db_name)
+                db_name = r["name"]
+                db_cleaned = re.sub(r"[\s\W_]+", "", db_name)
                 if cleaned == db_cleaned:
-                    return r['drug_id']
+                    return r["drug_id"]
 
         # 3. Fuzzy match (fallback)
         cur = conn.execute(
-            'SELECT drug_id FROM inventory WHERE name LIKE ?',
-            (f'%{normalized}%',)
+            "SELECT drug_id FROM inventory WHERE name LIKE ?", (f"%{normalized}%",)
         )
         row = cur.fetchone()
-        return row['drug_id'] if row else None
+        return row["drug_id"] if row else None
 
     except Exception as e:
         # Log the error (in production, use proper logging)

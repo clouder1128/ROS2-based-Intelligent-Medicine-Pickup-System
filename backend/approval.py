@@ -6,6 +6,7 @@
 环境变量:
     APPROVAL_DB_PATH  数据库路径；默认与本文件同目录下的 pharmacy.db。
 """
+
 from __future__ import annotations
 
 import logging
@@ -18,7 +19,7 @@ from typing import Any
 
 _logger = logging.getLogger(__name__)
 
-_DEFAULT_DB = os.path.join(os.path.dirname(__file__), 'pharmacy.db')
+_DEFAULT_DB = os.path.join(os.path.dirname(__file__), "pharmacy.db")
 _lock = threading.Lock()
 
 
@@ -27,23 +28,23 @@ def _utc_iso() -> str:
 
 
 def _new_approval_id() -> str:
-    d = date.today().isoformat().replace('-', '')
-    return f'AP-{d}-{secrets.token_hex(4).upper()}'
+    d = date.today().isoformat().replace("-", "")
+    return f"AP-{d}-{secrets.token_hex(4).upper()}"
 
 
 class ApprovalManager:
     """审批单 CRUD；表不存在时自动创建。"""
 
-    STATUS_PENDING = 'pending'
-    STATUS_APPROVED = 'approved'
-    STATUS_REJECTED = 'rejected'
+    STATUS_PENDING = "pending"
+    STATUS_APPROVED = "approved"
+    STATUS_REJECTED = "rejected"
 
     def __init__(self, db_path: str | None = None) -> None:
-        self.db_path = db_path or os.environ.get('APPROVAL_DB_PATH', _DEFAULT_DB)
+        self.db_path = db_path or os.environ.get("APPROVAL_DB_PATH", _DEFAULT_DB)
         self._table_ready = False
 
     def ensure_table(self, conn: sqlite3.Connection) -> None:
-        conn.execute('''
+        conn.execute("""
             CREATE TABLE IF NOT EXISTS approvals (
                 id TEXT PRIMARY KEY,
                 patient_name TEXT NOT NULL,
@@ -60,17 +61,17 @@ class ApprovalManager:
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                 approved_at DATETIME
             )
-        ''')
+        """)
         # 尝试添加quantity列（如果表已存在但缺少该列）
         try:
-            conn.execute('ALTER TABLE approvals ADD COLUMN quantity INTEGER DEFAULT 1')
+            conn.execute("ALTER TABLE approvals ADD COLUMN quantity INTEGER DEFAULT 1")
         except sqlite3.OperationalError:
             pass  # 列已存在，忽略错误
         conn.execute(
-            'CREATE INDEX IF NOT EXISTS idx_approvals_status ON approvals(status)'
+            "CREATE INDEX IF NOT EXISTS idx_approvals_status ON approvals(status)"
         )
         conn.execute(
-            'CREATE INDEX IF NOT EXISTS idx_approvals_created ON approvals(created_at DESC)'
+            "CREATE INDEX IF NOT EXISTS idx_approvals_created ON approvals(created_at DESC)"
         )
 
     def _connect(self) -> sqlite3.Connection:
@@ -102,10 +103,10 @@ class ApprovalManager:
             conn = self._connect()
             try:
                 conn.execute(
-                    '''INSERT INTO approvals (
+                    """INSERT INTO approvals (
                         id, patient_name, patient_age, patient_weight, symptoms,
                         advice, drug_name, drug_type, quantity, status
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                     (
                         aid,
                         patient_name,
@@ -127,9 +128,7 @@ class ApprovalManager:
     def get(self, approval_id: str) -> dict[str, Any] | None:
         conn = self._connect()
         try:
-            cur = conn.execute(
-                'SELECT * FROM approvals WHERE id = ?', (approval_id,)
-            )
+            cur = conn.execute("SELECT * FROM approvals WHERE id = ?", (approval_id,))
             row = cur.fetchone()
             return dict(row) if row else None
         finally:
@@ -140,8 +139,8 @@ class ApprovalManager:
         conn = self._connect()
         try:
             cur = conn.execute(
-                '''SELECT * FROM approvals WHERE status = ?
-                   ORDER BY created_at ASC LIMIT ?''',
+                """SELECT * FROM approvals WHERE status = ?
+                   ORDER BY created_at ASC LIMIT ?""",
                 (self.STATUS_PENDING, limit),
             )
             return [dict(r) for r in cur.fetchall()]
@@ -156,16 +155,15 @@ class ApprovalManager:
                 # 如果需要添加医生建议，先查询原有建议
                 if notes:
                     cur = conn.execute(
-                        'SELECT advice FROM approvals WHERE id = ?',
-                        (approval_id,)
+                        "SELECT advice FROM approvals WHERE id = ?", (approval_id,)
                     )
                     row = cur.fetchone()
                     if row:
-                        new_advice = row['advice'] + '\n[doctor] ' + notes
+                        new_advice = row["advice"] + "\n[doctor] " + notes
                         # 更新状态和医生建议
                         cur = conn.execute(
-                            '''UPDATE approvals SET status = ?, doctor_id = ?, approved_at = ?, advice = ?
-                               WHERE id = ? AND status = ?''',
+                            """UPDATE approvals SET status = ?, doctor_id = ?, approved_at = ?, advice = ?
+                               WHERE id = ? AND status = ?""",
                             (
                                 self.STATUS_APPROVED,
                                 doctor_id,
@@ -181,8 +179,8 @@ class ApprovalManager:
                 else:
                     # 不添加医生建议，只更新状态
                     cur = conn.execute(
-                        '''UPDATE approvals SET status = ?, doctor_id = ?, approved_at = ?
-                           WHERE id = ? AND status = ?''',
+                        """UPDATE approvals SET status = ?, doctor_id = ?, approved_at = ?
+                           WHERE id = ? AND status = ?""",
                         (
                             self.STATUS_APPROVED,
                             doctor_id,
@@ -202,8 +200,8 @@ class ApprovalManager:
             conn = self._connect()
             try:
                 cur = conn.execute(
-                    '''UPDATE approvals SET status = ?, doctor_id = ?, reject_reason = ?, approved_at = ?
-                       WHERE id = ? AND status = ?''',
+                    """UPDATE approvals SET status = ?, doctor_id = ?, reject_reason = ?, approved_at = ?
+                       WHERE id = ? AND status = ?""",
                     (
                         self.STATUS_REJECTED,
                         doctor_id,
