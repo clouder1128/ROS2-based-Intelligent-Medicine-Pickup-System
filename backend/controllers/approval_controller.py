@@ -7,7 +7,7 @@ from datetime import datetime
 from flask import Blueprint, jsonify, request
 from utils.database import get_db_connection
 from utils.ros2_bridge import publish_task
-from .drug_controller import validate_and_get_drug, find_drug_id_by_name
+from utils.drug_helpers import validate_and_get_drug, find_drug_id_by_name
 
 # Create blueprint for approval routes
 approval_bp = Blueprint('approval', __name__, url_prefix='/api')
@@ -19,15 +19,16 @@ def create_approval():
     try:
         data = request.get_json(silent=True)
         if data is None:
-            return jsonify({"error": True, "message": "Invalid JSON data provided"}), 400
+            return jsonify({"success": False, "ok": False, "error": "Invalid JSON data provided", "code": "INVALID_JSON"}), 400
 
         # Validate required fields
         required_fields = ['patient_name', 'advice']
         for field in required_fields:
             if field not in data:
                 return jsonify({
-                    "error": True,
-                    "message": f"Missing required field: {field}",
+                    "success": False,
+                    "ok": False,
+                    "error": f"Missing required field: {field}",
                     "code": "MISSING_FIELD"
                 }), 400
 
@@ -65,8 +66,9 @@ def create_approval():
 
     except Exception as e:
         return jsonify({
-            "error": True,
-            "message": f"Failed to create approval: {str(e)}",
+            "success": False,
+            "ok": False,
+            "error": f"Failed to create approval: {str(e)}",
             "code": "CREATION_ERROR"
         }), 500
 
@@ -82,8 +84,9 @@ def get_approval(approval_id):
 
         if not approval:
             return jsonify({
-                "error": True,
-                "message": f"Approval not found: {approval_id}",
+                "success": False,
+                "ok": False,
+                "error": f"Approval not found: {approval_id}",
                 "code": "NOT_FOUND"
             }), 404
 
@@ -102,8 +105,9 @@ def get_approval(approval_id):
 
     except Exception as e:
         return jsonify({
-            "error": True,
-            "message": f"Failed to get approval: {str(e)}",
+            "success": False,
+            "ok": False,
+            "error": f"Failed to get approval: {str(e)}",
             "code": "RETRIEVAL_ERROR"
         }), 500
 
@@ -140,8 +144,9 @@ def get_pending_approvals():
 
     except Exception as e:
         return jsonify({
-            "error": True,
-            "message": f"Failed to get pending approvals: {str(e)}",
+            "success": False,
+            "ok": False,
+            "error": f"Failed to get pending approvals: {str(e)}",
             "code": "RETRIEVAL_ERROR"
         }), 500
 
@@ -153,8 +158,9 @@ def approve_approval(approval_id):
         data = request.get_json()
         if not data or 'doctor_id' not in data:
             return jsonify({
-                "error": True,
-                "message": "Missing doctor_id in request",
+                "success": False,
+                "ok": False,
+                "error": "Missing doctor_id in request",
                 "code": "MISSING_DOCTOR_ID"
             }), 400
 
@@ -166,8 +172,9 @@ def approve_approval(approval_id):
 
         if not success:
             return jsonify({
-                "error": True,
-                "message": f"Cannot approve approval {approval_id}. It may not exist or not be pending.",
+                "success": False,
+                "ok": False,
+                "error": f"Cannot approve approval {approval_id}. It may not exist or not be pending.",
                 "code": "APPROVAL_FAILED"
             }), 400
 
@@ -189,26 +196,35 @@ def approve_approval(approval_id):
                     # Validate drug
                     drug, err = validate_and_get_drug(drug_id, quantity)
                     if not err:
-                        conn = get_db_connection()
-                        # Atomic inventory deduction
-                        cur = conn.execute(
-                            'UPDATE inventory SET quantity = quantity - ? WHERE drug_id = ? AND quantity >= ?',
-                            (quantity, drug_id, quantity)
-                        )
-                        if cur.rowcount > 0:
-                            # Write to order_log
+                        conn = None
+                        try:
+                            conn = get_db_connection()
+                            # Atomic inventory deduction
                             cur = conn.execute(
-                                'INSERT INTO order_log (status, target_drug_id, quantity) VALUES (?, ?, ?)',
-                                ('pending', drug_id, quantity)
+                                'UPDATE inventory SET quantity = quantity - ? WHERE drug_id = ? AND quantity >= ?',
+                                (quantity, drug_id, quantity)
                             )
-                            task_id = cur.lastrowid
-                            conn.commit()
-                            # Publish ROS2 task
-                            publish_task(task_id, drug, quantity)
-                            order_created = True
-                            order_message = f"订单创建成功，任务ID: {task_id}，数量: {quantity}"
-                        else:
-                            order_message = f"库存不足，需要{quantity}个，库存不足"
+                            if cur.rowcount > 0:
+                                # Write to order_log
+                                cur = conn.execute(
+                                    'INSERT INTO order_log (status, target_drug_id, quantity) VALUES (?, ?, ?)',
+                                    ('pending', drug_id, quantity)
+                                )
+                                task_id = cur.lastrowid
+                                conn.commit()
+                                # Publish ROS2 task
+                                publish_task(task_id, drug, quantity)
+                                order_created = True
+                                order_message = f"订单创建成功，任务ID: {task_id}，数量: {quantity}"
+                            else:
+                                order_message = f"库存不足，需要{quantity}个，库存不足"
+                        except Exception as db_error:
+                            order_message = f"数据库错误: {str(db_error)}"
+                            if conn:
+                                conn.rollback()
+                        finally:
+                            if conn:
+                                conn.close()
                     else:
                         order_message = f"药品验证失败: {err}"
                 else:
@@ -237,8 +253,9 @@ def approve_approval(approval_id):
 
     except Exception as e:
         return jsonify({
-            "error": True,
-            "message": f"Failed to approve approval: {str(e)}",
+            "success": False,
+            "ok": False,
+            "error": f"Failed to approve approval: {str(e)}",
             "code": "APPROVAL_ERROR"
         }), 500
 
@@ -250,15 +267,17 @@ def reject_approval(approval_id):
         data = request.get_json()
         if not data or 'doctor_id' not in data:
             return jsonify({
-                "error": True,
-                "message": "Missing doctor_id in request",
+                "success": False,
+                "ok": False,
+                "error": "Missing doctor_id in request",
                 "code": "MISSING_DOCTOR_ID"
             }), 400
 
         if 'reason' not in data:
             return jsonify({
-                "error": True,
-                "message": "Missing rejection reason",
+                "success": False,
+                "ok": False,
+                "error": "Missing rejection reason",
                 "code": "MISSING_REASON"
             }), 400
 
@@ -269,8 +288,9 @@ def reject_approval(approval_id):
 
         if not success:
             return jsonify({
-                "error": True,
-                "message": f"Cannot reject approval {approval_id}. It may not exist or not be pending.",
+                "success": False,
+                "ok": False,
+                "error": f"Cannot reject approval {approval_id}. It may not exist or not be pending.",
                 "code": "REJECTION_FAILED"
             }), 400
 
@@ -285,7 +305,8 @@ def reject_approval(approval_id):
 
     except Exception as e:
         return jsonify({
-            "error": True,
-            "message": f"Failed to reject approval: {str(e)}",
+            "success": False,
+            "ok": False,
+            "error": f"Failed to reject approval: {str(e)}",
             "code": "REJECTION_ERROR"
         }), 500

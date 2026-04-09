@@ -128,8 +128,9 @@ def test_get_drug_by_id_not_found(client):
 
     assert response.status_code == 404
     result = json.loads(response.data)
-    assert result['error'] == True
-    assert 'Drug not found' in result['message']
+    assert result['success'] == False
+    assert result['ok'] == False
+    assert 'Drug not found' in result['error']
     assert result['code'] == 'DRUG_NOT_FOUND'
 
 

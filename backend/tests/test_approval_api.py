@@ -72,9 +72,10 @@ def test_create_approval_missing_required_fields(client):
 
     assert response.status_code == 400
     result = json.loads(response.data)
-    assert result['error'] == True
-    assert 'Missing required field' in result['message']
-    assert 'patient_name' in result['message']
+    assert result['success'] == False
+    assert result['ok'] == False
+    assert 'Missing required field' in result['error']
+    assert 'patient_name' in result['error']
 
     # Test missing advice
     data = {
@@ -86,9 +87,10 @@ def test_create_approval_missing_required_fields(client):
 
     assert response.status_code == 400
     result = json.loads(response.data)
-    assert result['error'] == True
-    assert 'Missing required field' in result['message']
-    assert 'advice' in result['message']
+    assert result['success'] == False
+    assert result['ok'] == False
+    assert 'Missing required field' in result['error']
+    assert 'advice' in result['error']
 
 
 def test_get_approval_not_found(client):
@@ -97,8 +99,9 @@ def test_get_approval_not_found(client):
 
     assert response.status_code == 404
     result = json.loads(response.data)
-    assert result['error'] == True
-    assert 'Approval not found' in result['message']
+    assert result['success'] == False
+    assert result['ok'] == False
+    assert 'Approval not found' in result['error']
     assert result['code'] == 'NOT_FOUND'
 
 
@@ -111,8 +114,10 @@ def test_create_approval_invalid_json(client):
 
     assert response.status_code == 400
     result = json.loads(response.data)
-    assert result['error'] == True
-    assert 'Invalid JSON data provided' in result['message']
+    assert result['success'] == False
+    assert result['ok'] == False
+    assert 'Invalid JSON data provided' in result['error']
+    assert result['code'] == 'INVALID_JSON'
 
     # Test with malformed JSON
     response = client.post('/api/approvals',
@@ -121,8 +126,10 @@ def test_create_approval_invalid_json(client):
 
     assert response.status_code == 400
     result = json.loads(response.data)
-    assert result['error'] == True
-    assert 'Invalid JSON data provided' in result['message']
+    assert result['success'] == False
+    assert result['ok'] == False
+    assert 'Invalid JSON data provided' in result['error']
+    assert result['code'] == 'INVALID_JSON'
 
 
 def test_get_pending_approvals(client):
