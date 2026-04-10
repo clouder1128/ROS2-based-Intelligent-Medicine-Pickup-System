@@ -112,8 +112,8 @@ else
 fi
 echo "Press Ctrl+C to exit CLI"
 echo ""
-cd P1
-../venv/bin/python3 cli/patient_cli.py
+# 保持在项目根目录，使用模块方式运行
+venv/bin/python3 -m P1.cli.patient_cli
 
 # Cleanup on exit
 if [ "$BACKEND_STARTED_BY_ME" = true ] && [ $BACKEND_PID -ne 0 ]; then

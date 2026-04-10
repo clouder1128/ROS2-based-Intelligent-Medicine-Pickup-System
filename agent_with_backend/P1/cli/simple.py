@@ -37,7 +37,7 @@ def simple_interactive_mode(patient_id: Optional[str] = None):
     print("=" * 60)
 
     try:
-        from core.agent import MedicalAgent
+        from ..core.agent import MedicalAgent
 
         # 创建Agent
         agent = MedicalAgent()

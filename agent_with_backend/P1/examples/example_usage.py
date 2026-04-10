@@ -25,8 +25,8 @@ def demo_basic_usage() -> None:
     print("=" * 60)
 
     try:
-        from core.config import Config
-        from core.agent import MedicalAgent
+        from ..core.config import Config
+        from ..core.agent import MedicalAgent
 
         # 显示配置
         print("\n1. 检查配置...")
@@ -101,7 +101,7 @@ def demo_config_check() -> None:
     print("=" * 60)
 
     try:
-        from core.config import Config
+        from ..core.config import Config
 
         print("\n当前环境变量:")
         env_vars = [
@@ -151,7 +151,7 @@ def demo_llm_client() -> None:
     print("=" * 60)
 
     try:
-        from llm.client import LLMClient
+        from ..llm.client import LLMClient
 
         print("\n1. 创建LLM客户端...")
         client = LLMClient()

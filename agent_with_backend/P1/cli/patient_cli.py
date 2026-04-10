@@ -169,7 +169,7 @@ class InteractiveCLI:
 
         try:
             if not self.agent:
-                from P1.core.agent import MedicalAgent
+                from ..core.agent import MedicalAgent
 
                 self.agent = MedicalAgent()
 
@@ -341,7 +341,7 @@ class InteractiveCLI:
 
     def _cmd_stats(self, args: List[str] = None) -> bool:
         """显示统计信息"""
-        from P1.llm.client import LLMClient
+        from ..llm.client import LLMClient
 
         print("\n" + "=" * 60)
         print("系统统计")
@@ -442,7 +442,7 @@ class InteractiveCLI:
         # 确保Agent已初始化
         if not self.agent:
             try:
-                from P1.core.agent import MedicalAgent
+                from ..core.agent import MedicalAgent
 
                 print("正在初始化MedicalAgent...")
                 self.agent = MedicalAgent()
@@ -487,12 +487,14 @@ class InteractiveCLI:
 
         # 尝试初始化Agent
         try:
-            from P1.core.agent import MedicalAgent
+            from ..core.agent import MedicalAgent
 
             self.agent = MedicalAgent()
             print("✓ MedicalAgent初始化成功")
         except Exception as e:
             print(f"! Agent初始化失败: {e}")
+            import traceback
+            traceback.print_exc()  
             print("请检查配置和依赖")
             print("可以继续尝试使用，某些功能可能受限")
 

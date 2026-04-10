@@ -10,7 +10,7 @@ from typing import Dict, List, Any, Optional
 from datetime import datetime, timedelta
 
 from ..utils.http_client import PharmacyHTTPClient
-from services.pharmacy_client import get_all_drugs
+from ..services.pharmacy_client import get_all_drugs
 
 logger = logging.getLogger(__name__)
 

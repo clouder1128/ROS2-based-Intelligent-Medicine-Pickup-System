@@ -370,7 +370,7 @@ class MedicalAgent:
             return None
 
         try:
-            from utils.http_client import PharmacyHTTPClient
+            from ..utils.http_client import PharmacyHTTPClient
 
             client = PharmacyHTTPClient()
             result = client.get_approval(target_id)
