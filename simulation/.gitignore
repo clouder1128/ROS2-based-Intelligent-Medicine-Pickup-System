@@ -1,0 +1,171 @@
+# ============================================
+# ROS2 工作空间忽略规则
+# ============================================
+
+# ROS2 构建产物（通常应该忽略，但用户要求保留）
+# 如果要忽略构建产物，取消以下注释
+# ros_workspace/build/
+# ros_workspace/install/
+# ros_workspace/log/
+
+# ROS2 开发文件
+ros_workspace/.catkin_workspace
+ros_workspace/.cmake
+ros_workspace/.settings/
+ros_workspace/.clang-format
+ros_workspace/.clang-tidy
+
+# ============================================
+# Unity 项目忽略规则
+# ============================================
+
+# Unity 临时文件和构建产物
+unity_simulation/ROSPackage/[Ll]ibrary/
+unity_simulation/ROSPackage/[Tt]emp/
+unity_simulation/ROSPackage/[Oo]bj/
+unity_simulation/ROSPackage/[Bb]uild/
+unity_simulation/ROSPackage/[Bb]uilds/
+unity_simulation/ROSPackage/[Ll]ogs/
+unity_simulation/ROSPackage/[Mm]emoryCaptures/
+
+# Unity 项目设置（应该保留）
+# unity_simulation/ROSPackage/[Pp]rojectSettings/  # 需要保留，不要忽略
+# unity_simulation/ROSPackage/[Aa]ssets/          # 需要保留，不要忽略
+
+# Unity 自动生成文件
+unity_simulation/ROSPackage/[Aa]ssets/AssetStoreTools*
+unity_simulation/ROSPackage/.vs/
+unity_simulation/ROSPackage/.vscode/
+unity_simulation/ROSPackage/*.csproj
+unity_simulation/ROSPackage/*.sln
+unity_simulation/ROSPackage/*.suo
+unity_simulation/ROSPackage/*.user
+unity_simulation/ROSPackage/*.userprefs
+unity_simulation/ROSPackage/*.pidb
+unity_simulation/ROSPackage/*.booproj
+unity_simulation/ROSPackage/*.svd
+unity_simulation/ROSPackage/*.pdb
+unity_simulation/ROSPackage/*.opendb
+unity_simulation/ROSPackage/*.VC.db
+
+# Unity 3D 特定文件
+unity_simulation/ROSPackage/*.unity
+unity_simulation/ROSPackage/*.unityproj
+unity_simulation/ROSPackage/*.mat
+unity_simulation/ROSPackage/*.fbx
+unity_simulation/ROSPackage/*.mdl
+unity_simulation/ROSPackage/*.prefab
+
+# 可执行程序（通常应该忽略，但用户要求保留）
+# 如果要忽略可执行程序，取消以下注释
+# unity_simulation/RosCar/
+# unity_simulation/ROSPackage.rar
+# unity_simulation/RosCar.rar
+
+# ============================================
+# 系统文件忽略规则
+# ============================================
+
+# 操作系统文件
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# 编辑器文件
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+~$*
+
+# 临时文件
+*.tmp
+*.temp
+*.bak
+*.backup
+
+# 日志文件
+*.log
+*.log.*
+
+# ============================================
+# 文档生成文件
+# ============================================
+
+# 文档构建产物
+docs/_build/
+docs/_site/
+docs/.jekyll-cache/
+
+# ============================================
+# 配置文件忽略规则
+# ============================================
+
+# 本地配置文件（不应提交）
+configs/local_*.json
+configs/local_*.yaml
+configs/local_*.txt
+
+# 敏感信息（绝对不要提交）
+*.env
+*.secret
+*.key
+*.pem
+*.crt
+credentials.json
+secrets.json
+
+# ============================================
+# Python 虚拟环境
+# ============================================
+
+# Python 虚拟环境
+venv/
+env/
+ENV/
+.env/
+.venv/
+
+# Python 缓存文件
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# ============================================
+# 其他忽略规则
+# ============================================
+
+# 大文件
+*.zip
+*.rar
+*.7z
+*.tar
+*.gz
+*.tgz
+*.bz2
+
+# 媒体文件（通常应该保留，但可选择性忽略）
+# *.mp4
+# *.avi
+# *.mov
+# *.wav
+# *.mp3
+
+# 注意：根据用户要求，以下内容被保留（未忽略）：
+# 1. ros_workspace/build/, install/, log/ - ROS构建产物
+# 2. unity_simulation/RosCar/ - Unity可执行程序
+# 3. unity_simulation/ROSPackage.rar, RosCar.rar - 压缩文件
+# 4. unity_simulation/ROSPackage/Assets/, ProjectSettings/ - Unity项目文件
+
+# 如果需要减少仓库大小，建议忽略上述构建产物和可执行程序
+# 要忽略它们，取消相应行的注释
+# Claude Code 缓存文件
+.claude/

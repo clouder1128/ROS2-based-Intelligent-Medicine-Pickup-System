@@ -1,0 +1,67 @@
+{
+  "tasks": [
+    {
+      "task_id": "task_001",
+      "type": "0",
+      "cabinets": [
+        {
+          "cabinet_id": "0",
+          "medicine_list": [
+            {"row": 1, "column": 0, "count": 3},
+            {"row": 8, "column": 4, "count": 2},
+            {"row": 4, "column": 1, "count": 2}
+          ]
+        },
+        {
+          "cabinet_id": "2",
+          "medicine_list": [
+            {"row": 5, "column": 4, "count": 1},
+            {"row": 4, "column": 1, "count": 1}
+          ]
+        }
+      ]
+    },
+    {
+      "task_id": "task_002",
+      "type": "0",
+      "cabinets": [
+        {
+          "cabinet_id": "1",
+          "medicine_list": [
+            {"row": 2, "column": 3, "count": 1},
+            {"row": 6, "column": 4, "count": 1},
+            {"row": 4, "column": 2, "count": 1}
+          ]
+        }
+      ]
+    },
+    {
+      "task_id": "task_003",
+      "type": "1",
+      "cabinets": [
+        {
+          "cabinet_id": "1",
+          "medicine_list": [
+            {"row": 3, "column": 3, "count": 1},
+            {"row": 6, "column": 4, "count": 1},
+            {"row": 1, "column": 2, "count": 1}
+          ]
+        }
+      ]
+    },
+    {
+      "task_id": "task_004",
+      "type": "0",
+      "cabinets": [
+        {
+          "cabinet_id": "1",
+          "medicine_list": [
+            {"row": 5, "column": 3, "count": 1},
+            {"row": 6, "column": 1, "count": 1},
+            {"row": 7, "column": 4, "count": 1}
+          ]
+        }
+      ]
+    }
+  ]
+}
