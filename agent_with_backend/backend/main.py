@@ -22,6 +22,15 @@ from controllers.approval_controller import approval_bp
 # Utility imports
 from utils.ros2_bridge import init_ros2, publish_expiry_removal
 from utils.logger import setup_logger
+from utils.database import get_db_connection
+
+# ROS2集成模块（可选）
+try:
+    from backend.ros_integration.health_monitor import HealthMonitor
+    ROS2_INTEGRATION_AVAILABLE = True
+except ImportError:
+    ROS2_INTEGRATION_AVAILABLE = False
+    HealthMonitor = None
 
 # ROS2 optional: skip publishing if environment not configured
 # ros2_available and task_publisher are now imported from utils.ros2_bridge
@@ -29,6 +38,16 @@ from utils.logger import setup_logger
 # Start ROS2 initialization in background thread
 _ros_thread = threading.Thread(target=init_ros2, daemon=True)
 _ros_thread.start()
+
+# Start health monitor if ROS2 integration is available
+_health_monitor = None
+if ROS2_INTEGRATION_AVAILABLE and HealthMonitor is not None:
+    try:
+        _health_monitor = HealthMonitor()
+        _health_monitor.start()
+        print("[Main] Health monitor started")
+    except Exception as e:
+        print(f"[Main] Failed to start health monitor: {e}")
 
 # Flask app
 app = Flask(__name__)
@@ -94,7 +113,7 @@ def run_expiry_sweep() -> dict:
     today_s = today.isoformat()
 
     with _expiry_sweep_lock:
-        conn = sqlite3.connect(Config.DATABASE_PATH)
+        conn = get_db_connection()
         try:
             _ensure_app_meta(conn)
             row = conn.execute(
