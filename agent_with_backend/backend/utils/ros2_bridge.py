@@ -1,3 +1,8 @@
+"""
+ROS2桥接适配器 - 向后兼容层
+使用新的ROS2集成模块，保持现有API不变
+"""
+
 import threading
 import time
 import signal
@@ -5,16 +10,32 @@ from typing import Dict, Any, Optional
 
 # Thread-safe global variables with locks
 ros2_available = False
-task_publisher = None
+task_publisher_instance = None
 ros2_lock = threading.Lock()
 shutdown_requested = False
 
+# 尝试导入新模块
+try:
+    from backend.ros_integration.node_manager import RosNodeManager
+    from backend.ros_integration.task_publisher import TaskPublisher
+    from backend.ros_integration.config import Config
+    NEW_MODULES_AVAILABLE = True
+except ImportError as e:
+    NEW_MODULES_AVAILABLE = False
+    print(f"[ROS2 Bridge] New modules not available: {e}, using legacy fallback")
+
 
 def init_ros2() -> None:
-    """Initialize ROS2 in background thread and continuously spin"""
-    global ros2_available, task_publisher, shutdown_requested
+    """初始化ROS2（向后兼容）
+    使用新的节点管理器，保持现有接口
+    """
+    global ros2_available, task_publisher_instance, shutdown_requested
 
-    # Set up signal handlers for graceful shutdown (only in main thread)
+    if not NEW_MODULES_AVAILABLE:
+        print("[ROS2 Bridge] New modules not available, cannot initialize")
+        return
+
+    # 设置信号处理（仅在主线程）
     def signal_handler(signum, frame):
         global shutdown_requested
         shutdown_requested = True
@@ -22,128 +43,140 @@ def init_ros2() -> None:
     if threading.current_thread() == threading.main_thread():
         signal.signal(signal.SIGINT, signal_handler)
         signal.signal(signal.SIGTERM, signal_handler)
-    else:
-        # Background thread: signal handlers not needed
-        pass
 
     try:
-        import rclpy
-        from rclpy.node import Node
-        from std_msgs.msg import String
+        # 获取节点管理器单例（会自动初始化ROS2）
+        node_manager = RosNodeManager.get_instance()
 
-        class TaskPublisher(Node):
-            def __init__(self):
-                super().__init__("backend_task_publisher")
-                self.pub = self.create_publisher(String, "/task_request", 10)
+        # 启动节点管理器
+        node_manager.start()
 
-        rclpy.init()
-        node = TaskPublisher()
+        # 创建任务发布器
+        publisher = TaskPublisher()
 
-        # Thread-safe update of global variables
+        # 线程安全更新全局变量
         with ros2_lock:
-            task_publisher = node
+            task_publisher_instance = publisher
             ros2_available = True
 
-        print("[ROS2] Connected, tasks will be published to /task_request")
+        print("[ROS2 Bridge] Initialized with new integration modules")
+        print(f"[ROS2 Bridge] Integration mode: {Config().INTEGRATION_MODE}")
 
-        executor = rclpy.executors.SingleThreadedExecutor()
-        executor.add_node(node)
+        # 等待ROS2节点运行
+        time.sleep(1)  # 给节点启动时间
 
-        # Add proper shutdown handling
-        while rclpy.ok() and not shutdown_requested:
-            executor.spin_once(timeout_sec=0.1)
+        # 简单循环等待关闭信号
+        while not shutdown_requested:
+            time.sleep(0.5)
 
-        # Cleanup on shutdown
+        # 关闭时清理
         if shutdown_requested:
-            print("[ROS2] Shutdown requested, cleaning up...")
-            node.destroy_node()
-            rclpy.shutdown()
+            print("[ROS2 Bridge] Shutdown requested, cleaning up...")
+            node_manager.shutdown()
             with ros2_lock:
                 ros2_available = False
-                task_publisher = None
+                task_publisher_instance = None
+
     except Exception as e:
-        print(f"[ROS2] Not enabled: {e}, tasks will only be logged to database")
+        print(f"[ROS2 Bridge] Failed to initialize: {e}")
+        with ros2_lock:
+            ros2_available = False
+            task_publisher_instance = None
 
 
 def publish_task(task_id: int, drug: Dict[str, Any], quantity: int) -> None:
-    """Publish medication pickup task to ROS2 /task_request"""
-    global task_publisher
+    """发布取药任务（向后兼容）
+    使用新的TaskPublisher，保持相同接口
+    """
+    global task_publisher_instance
+
     with ros2_lock:
-        if not ros2_available or task_publisher is None:
-            return
+        if not ros2_available or task_publisher_instance is None:
+            # 尝试延迟初始化
+            try:
+                if NEW_MODULES_AVAILABLE:
+                    publisher = TaskPublisher()
+                    task_publisher_instance = publisher
+                    ros2_available = True
+                else:
+                    print("[ROS2 Bridge] Cannot publish: new modules not available")
+                    return
+            except Exception as e:
+                print(f"[ROS2 Bridge] Failed to initialize publisher: {e}")
+                return
 
     try:
-        from std_msgs.msg import String
-        import json
+        # 使用新的TaskPublisher发布任务
+        success = task_publisher_instance.publish_task(task_id, drug, quantity)
 
-        msg = String()
-        msg.data = json.dumps(
-            {
-                "task_id": task_id,
-                "type": "pickup",
-                "drug_id": drug["drug_id"],
-                "name": drug["name"],
-                "shelve_id": drug["shelve_id"],
-                "x": drug["shelf_x"],
-                "y": drug["shelf_y"],
-                "quantity": quantity,
-            }
-        )
+        if success:
+            print(f'[ROS2 Bridge] Published task task_id={task_id} -> ({drug["shelf_x"]},{drug["shelf_y"]})')
+        else:
+            print(f'[ROS2 Bridge] Failed to publish task {task_id} (see TaskPublisher logs)')
 
-        # Thread-safe access to publisher
-        with ros2_lock:
-            if task_publisher is not None:
-                task_publisher.pub.publish(msg)
-                print(
-                    f'[ROS2] Published task task_id={task_id} -> ({drug["shelf_x"]},{drug["shelf_y"]})'
-                )
     except Exception as e:
-        print(f"[ROS2] Publish failed: {e}")
+        print(f"[ROS2 Bridge] Publish failed: {e}")
 
 
 def publish_expiry_removal(drug: Dict[str, Any], remove_quantity: int) -> None:
-    """Publish expired drug removal task to ROS2 /task_request (called when expired stock is found during periodic cleanup)"""
-    global task_publisher
+    """发布过期药品清理任务（向后兼容）"""
+    global task_publisher_instance
+
     with ros2_lock:
-        if not ros2_available or task_publisher is None:
-            return
+        if not ros2_available or task_publisher_instance is None:
+            # 尝试延迟初始化
+            try:
+                if NEW_MODULES_AVAILABLE:
+                    publisher = TaskPublisher()
+                    task_publisher_instance = publisher
+                    ros2_available = True
+                else:
+                    print("[ROS2 Bridge] Cannot publish expiry removal: new modules not available")
+                    return
+            except Exception as e:
+                print(f"[ROS2 Bridge] Failed to initialize publisher: {e}")
+                return
 
     try:
-        from std_msgs.msg import String
-        import json
+        # 使用新的TaskPublisher发布过期清理任务
+        success = task_publisher_instance.publish_expiry_removal(drug, remove_quantity)
 
-        msg = String()
-        msg.data = json.dumps(
-            {
-                "task_id": None,
-                "type": "expiry_removal",
-                "drug_id": drug["drug_id"],
-                "name": drug["name"],
-                "shelve_id": drug["shelve_id"],
-                "x": drug["shelf_x"],
-                "y": drug["shelf_y"],
-                "quantity": remove_quantity,
-                "reason": "expired",
-            },
-            ensure_ascii=False,
-        )
+        if success:
+            print(f'[ROS2 Bridge] Published expiry removal drug_id={drug["drug_id"]} qty={remove_quantity}')
+        else:
+            print(f'[ROS2 Bridge] Failed to publish expiry removal (see TaskPublisher logs)')
 
-        # Thread-safe access to publisher
-        with ros2_lock:
-            if task_publisher is not None:
-                task_publisher.pub.publish(msg)
-                print(
-                    f'[ROS2] Published expiry removal type=expiry_removal drug_id={drug["drug_id"]} '
-                    f'qty={remove_quantity} -> ({drug["shelf_x"]},{drug["shelf_y"]})'
-                )
     except Exception as e:
-        print(f"[ROS2] Expiry removal publish failed: {e}")
+        print(f"[ROS2 Bridge] Expiry removal publish failed: {e}")
 
 
 def check_ros2_status() -> Dict[str, Any]:
-    """Check ROS2 status"""
-    with ros2_lock:
-        return {
-            "available": ros2_available,
-            "publisher_initialized": task_publisher is not None,
-        }
+    """检查ROS2状态（向后兼容）"""
+    if not NEW_MODULES_AVAILABLE:
+        with ros2_lock:
+            return {
+                "available": ros2_available,
+                "publisher_initialized": task_publisher_instance is not None,
+                "integration": "legacy_fallback"
+            }
+
+    try:
+        from backend.ros_integration.node_manager import RosNodeManager
+        node_manager = RosNodeManager.get_instance()
+
+        with ros2_lock:
+            return {
+                "available": ros2_available,
+                "publisher_initialized": task_publisher_instance is not None,
+                "integration": "new",
+                "node_running": node_manager.is_running(),
+                "connection_ok": node_manager.check_connection()
+            }
+    except Exception as e:
+        with ros2_lock:
+            return {
+                "available": ros2_available,
+                "publisher_initialized": task_publisher_instance is not None,
+                "integration": "error",
+                "error": str(e)
+            }
