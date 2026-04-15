@@ -11,22 +11,22 @@ from datetime import date
 from flask import Flask
 
 # Configuration
-from config.settings import Config
+from .config.settings import Config
 
 # Controller imports
-from controllers.health_controller import health_bp
-from controllers.drug_controller import drug_bp
-from controllers.order_controller import order_bp
-from controllers.approval_controller import approval_bp
+from .controllers.health_controller import health_bp
+from .controllers.drug_controller import drug_bp
+from .controllers.order_controller import order_bp
+from .controllers.approval_controller import approval_bp
 
 # Utility imports
-from utils.ros2_bridge import init_ros2, publish_expiry_removal
-from utils.logger import setup_logger
-from utils.database import get_db_connection
+from .utils.ros2_bridge import init_ros2, publish_expiry_removal
+from .utils.logger import setup_logger
+from .utils.database import get_db_connection
 
 # ROS2集成模块（可选）
 try:
-    from backend.ros_integration.health_monitor import HealthMonitor
+    from .ros_integration.health_monitor import HealthMonitor
     ROS2_INTEGRATION_AVAILABLE = True
 except ImportError:
     ROS2_INTEGRATION_AVAILABLE = False

@@ -4,7 +4,7 @@ Provides health check endpoint for monitoring backend status
 """
 
 from flask import Blueprint, jsonify
-from utils.ros2_bridge import check_ros2_status
+from ..utils.ros2_bridge import check_ros2_status
 
 # Create blueprint for health routes
 health_bp = Blueprint("health", __name__, url_prefix="/api")

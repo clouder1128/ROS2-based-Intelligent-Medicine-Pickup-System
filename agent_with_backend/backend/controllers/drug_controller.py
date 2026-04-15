@@ -4,7 +4,7 @@ Handles drug inventory management and queries
 """
 
 from flask import Blueprint, jsonify, request
-from utils.database import get_db_connection
+from ..utils.database import get_db_connection
 
 # Create blueprint for drug routes
 drug_bp = Blueprint("drug", __name__, url_prefix="/api")

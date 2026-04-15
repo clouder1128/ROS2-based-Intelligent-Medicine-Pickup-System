@@ -1,0 +1,7 @@
+/home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/ros-todo/ros_workspace/build/task_msgs/rosidl_adapter/task_msgs:msg/MedicineData.idl
+/home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/ros-todo/ros_workspace/build/task_msgs/rosidl_adapter/task_msgs:msg/CabinetOrder.idl
+/home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/ros-todo/ros_workspace/build/task_msgs/rosidl_adapter/task_msgs:msg/Task.idl
+/home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/ros-todo/ros_workspace/build/task_msgs/rosidl_adapter/task_msgs:msg/CabinetRunning.idl
+/home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/ros-todo/ros_workspace/build/task_msgs/rosidl_adapter/task_msgs:msg/CabinetState.idl
+/home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/ros-todo/ros_workspace/build/task_msgs/rosidl_adapter/task_msgs:msg/CarState.idl
+/home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/ros-todo/ros_workspace/build/task_msgs/rosidl_adapter/task_msgs:msg/TaskState.idl

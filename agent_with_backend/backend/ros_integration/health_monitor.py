@@ -6,9 +6,9 @@
 import threading
 import time
 from typing import Dict, Any
-from backend.ros_integration.config import Config
-from backend.ros_integration.node_manager import RosNodeManager
-from backend.ros_integration.error_handler import ErrorHandler, GracefulDegradation
+from .config import Config
+from .node_manager import RosNodeManager
+from .error_handler import ErrorHandler, GracefulDegradation
 
 class HealthMonitor:
     """

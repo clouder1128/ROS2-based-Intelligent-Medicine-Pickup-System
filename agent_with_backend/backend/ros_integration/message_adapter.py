@@ -51,6 +51,13 @@ class MessageAdapter:
             KeyError: 如果drug缺少必要字段
             ValueError: 如果quantity无效
         """
+        # 先检查必要字段
+        required_fields = ["shelve_id", "shelf_x", "shelf_y"]
+        for field in required_fields:
+            if field not in drug:
+                raise KeyError(f"Missing required field: {field}")
+
+        # 然后验证quantity
         if quantity <= 0:
             raise ValueError(f"Invalid quantity: {quantity}")
 
@@ -90,12 +97,24 @@ class MessageAdapter:
         将过期药品数据转换为Unity清理任务消息
 
         Args:
-            drug: backend药品字典
+            drug: backend药品字典，必须包含:
+                - shelve_id: 货架ID
+                - shelf_x: X坐标（列）
+                - shelf_y: Y坐标（行）
             remove_quantity: 清理数量
 
         Returns:
             task_msgs.msg.Task: 过期清理任务消息
+
+        Raises:
+            KeyError: 如果drug缺少必要字段
         """
+        # 检查必要字段
+        required_fields = ["shelve_id", "shelf_x", "shelf_y"]
+        for field in required_fields:
+            if field not in drug:
+                raise KeyError(f"Missing required field: {field}")
+
         try:
             from task_msgs.msg import Task, CabinetOrder, MedicineData
 

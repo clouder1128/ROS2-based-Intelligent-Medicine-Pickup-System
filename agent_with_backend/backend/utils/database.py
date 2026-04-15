@@ -4,7 +4,7 @@ import os
 from datetime import date, datetime
 from typing import Any, Dict, Optional, Union
 
-from config.settings import Config
+from ..config.settings import Config
 
 
 def get_db_connection() -> sqlite3.Connection:
@@ -86,3 +86,9 @@ def json_serializer(obj: Any) -> str:
     if isinstance(obj, (datetime, date)):
         return obj.isoformat()
     raise TypeError(f"Type {type(obj)} not serializable")
+
+
+def close_db_connection(conn: sqlite3.Connection) -> None:
+    """Close database connection"""
+    if conn:
+        conn.close()

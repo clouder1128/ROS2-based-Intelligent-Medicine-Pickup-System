@@ -5,9 +5,9 @@ Handles approval request creation, retrieval, and management
 
 from datetime import datetime
 from flask import Blueprint, jsonify, request
-from utils.database import get_db_connection
-from utils.ros2_bridge import publish_task
-from utils.drug_helpers import validate_and_get_drug, find_drug_id_by_name
+from ..utils.database import get_db_connection
+from ..utils.ros2_bridge import publish_task
+from ..utils.drug_helpers import validate_and_get_drug, find_drug_id_by_name
 
 # Create blueprint for approval routes
 approval_bp = Blueprint("approval", __name__, url_prefix="/api")
@@ -48,7 +48,7 @@ def create_approval():
                 )
 
         # Import ApprovalManager
-        from approval import get_approval_manager
+        from ..approval import get_approval_manager
 
         # Create approval
         manager = get_approval_manager()
@@ -102,7 +102,7 @@ def create_approval():
 def get_approval(approval_id):
     """Get approval details by ID"""
     try:
-        from approval import get_approval_manager
+        from ..approval import get_approval_manager
 
         manager = get_approval_manager()
         approval = manager.get(approval_id)
@@ -148,7 +148,7 @@ def get_approval(approval_id):
 def get_pending_approvals():
     """Get list of pending approvals"""
     try:
-        from approval import get_approval_manager
+        from ..approval import get_approval_manager
 
         manager = get_approval_manager()
         limit = request.args.get("limit", default=100, type=int)
@@ -211,7 +211,7 @@ def approve_approval(approval_id):
                 400,
             )
 
-        from approval import get_approval_manager
+        from ..approval import get_approval_manager
 
         manager = get_approval_manager()
         notes = data.get("notes")
@@ -350,7 +350,7 @@ def reject_approval(approval_id):
                 400,
             )
 
-        from approval import get_approval_manager
+        from ..approval import get_approval_manager
 
         manager = get_approval_manager()
         success = manager.reject(approval_id, data["doctor_id"], data["reason"])

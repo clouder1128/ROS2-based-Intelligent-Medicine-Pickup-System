@@ -16,9 +16,9 @@ shutdown_requested = False
 
 # 尝试导入新模块
 try:
-    from backend.ros_integration.node_manager import RosNodeManager
-    from backend.ros_integration.task_publisher import TaskPublisher
-    from backend.ros_integration.config import Config
+    from ..ros_integration.node_manager import RosNodeManager
+    from ..ros_integration.task_publisher import TaskPublisher
+    from ..ros_integration.config import Config
     NEW_MODULES_AVAILABLE = True
 except ImportError as e:
     NEW_MODULES_AVAILABLE = False
@@ -88,7 +88,7 @@ def publish_task(task_id: int, drug: Dict[str, Any], quantity: int) -> None:
     """发布取药任务（向后兼容）
     使用新的TaskPublisher，保持相同接口
     """
-    global task_publisher_instance
+    global task_publisher_instance, ros2_available
 
     with ros2_lock:
         if not ros2_available or task_publisher_instance is None:
@@ -120,7 +120,7 @@ def publish_task(task_id: int, drug: Dict[str, Any], quantity: int) -> None:
 
 def publish_expiry_removal(drug: Dict[str, Any], remove_quantity: int) -> None:
     """发布过期药品清理任务（向后兼容）"""
-    global task_publisher_instance
+    global task_publisher_instance, ros2_available
 
     with ros2_lock:
         if not ros2_available or task_publisher_instance is None:
@@ -161,7 +161,7 @@ def check_ros2_status() -> Dict[str, Any]:
             }
 
     try:
-        from backend.ros_integration.node_manager import RosNodeManager
+        from ..ros_integration.node_manager import RosNodeManager
         node_manager = RosNodeManager.get_instance()
 
         with ros2_lock:

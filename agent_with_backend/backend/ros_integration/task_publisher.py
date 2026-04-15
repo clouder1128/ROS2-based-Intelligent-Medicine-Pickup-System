@@ -7,10 +7,10 @@ import threading
 import time
 import json
 from typing import Dict, Any, Optional
-from backend.ros_integration.config import Config, TopicConfig
-from backend.ros_integration.message_adapter import MessageAdapter
-from backend.ros_integration.node_manager import RosNodeManager
-from backend.ros_integration.error_handler import ErrorHandler, GracefulDegradation
+from .config import Config, TopicConfig
+from .message_adapter import MessageAdapter
+from .node_manager import RosNodeManager
+from .error_handler import ErrorHandler, GracefulDegradation
 
 # 条件导入ROS2模块
 try:
@@ -59,8 +59,8 @@ class TaskPublisher:
 
     def _init_publishers(self):
         """初始化ROS2发布器"""
-        if not ROS2_AVAILABLE or not TASK_MSGS_AVAILABLE:
-            print("[TaskPublisher] ROS2 or task_msgs not available, using fallback mode")
+        if not ROS2_AVAILABLE:
+            print("[TaskPublisher] ROS2 not available, using fallback mode")
             return
 
         try:
@@ -76,23 +76,48 @@ class TaskPublisher:
                 durability=QoSDurabilityPolicy.VOLATILE
             )
 
-            # 创建新话题发布器
-            self._new_publisher = node.create_publisher(
-                Task,
-                TopicConfig.TASK_TOPIC_NEW,
-                qos_profile
-            )
+            mode = self._config.INTEGRATION_MODE
 
-            # 根据配置决定是否创建旧话题发布器
-            if self._config.INTEGRATION_MODE in ["legacy", "parallel"] and STD_MSGS_AVAILABLE:
+            # 根据集成模式创建发布器
+            if mode == "new" and TASK_MSGS_AVAILABLE:
+                # 仅新话题
+                self._new_publisher = node.create_publisher(
+                    Task,
+                    TopicConfig.TASK_TOPIC_NEW,
+                    qos_profile
+                )
+                print("[TaskPublisher] Created new topic publisher only")
+
+            elif mode == "legacy" and STD_MSGS_AVAILABLE:
+                # 仅旧话题
                 self._legacy_publisher = node.create_publisher(
                     String,
                     TopicConfig.TASK_TOPIC_LEGACY,
                     qos_profile
                 )
+                print("[TaskPublisher] Created legacy topic publisher only")
+
+            elif mode == "parallel":
+                # 并行模式：两个话题都创建（如果依赖可用）
+                if TASK_MSGS_AVAILABLE:
+                    self._new_publisher = node.create_publisher(
+                        Task,
+                        TopicConfig.TASK_TOPIC_NEW,
+                        qos_profile
+                    )
+                if STD_MSGS_AVAILABLE:
+                    self._legacy_publisher = node.create_publisher(
+                        String,
+                        TopicConfig.TASK_TOPIC_LEGACY,
+                        qos_profile
+                    )
+                print("[TaskPublisher] Created both new and legacy publishers")
+            else:
+                print(f"[TaskPublisher] Invalid mode or missing dependencies: {mode}")
+                return
 
             self._initialized = True
-            print(f"[TaskPublisher] Initialized with mode: {self._config.INTEGRATION_MODE}")
+            print(f"[TaskPublisher] Initialized with mode: {mode}")
 
         except Exception as e:
             print(f"[TaskPublisher] Failed to initialize publishers: {e}")
@@ -116,28 +141,63 @@ class TaskPublisher:
             self._degradation.record_failure()
             return False
 
-        if not self._initialized or self._new_publisher is None:
+        if not self._initialized:
             print("[TaskPublisher] Not initialized, cannot publish")
             self._degradation.record_failure()
             return False
 
+        # 根据模式检查对应的发布器是否可用
+        mode = self._config.INTEGRATION_MODE
+        if mode == "new" and self._new_publisher is None:
+            print("[TaskPublisher] New publisher not available in new mode")
+            return False
+        elif mode == "legacy" and self._legacy_publisher is None:
+            print("[TaskPublisher] Legacy publisher not available in legacy mode")
+            return False
+        elif mode == "parallel" and self._new_publisher is None and self._legacy_publisher is None:
+            print("[TaskPublisher] No publishers available in parallel mode")
+            return False
+
         try:
-            # 转换消息格式
-            task_msg = self._message_adapter.backend_to_unity(task_id, drug, quantity)
+            mode = self._config.INTEGRATION_MODE
+            success = False
 
-            # 发布到新话题
-            self._new_publisher.publish(task_msg)
-            print(f"[TaskPublisher] Published task {task_id} to {TopicConfig.TASK_TOPIC_NEW}")
+            # 根据模式发布消息
+            if mode == "new" and self._new_publisher is not None:
+                # 仅新话题
+                task_msg = self._message_adapter.backend_to_unity(task_id, drug, quantity)
+                self._new_publisher.publish(task_msg)
+                print(f"[TaskPublisher] Published task {task_id} to {TopicConfig.TASK_TOPIC_NEW}")
+                success = True
 
-            # 如果配置为并行模式，也发布到旧话题
-            if self._config.INTEGRATION_MODE == "parallel" and self._legacy_publisher is not None:
+            elif mode == "legacy" and self._legacy_publisher is not None:
+                # 仅旧话题
                 legacy_msg = self._create_legacy_message(task_id, drug, quantity)
                 self._legacy_publisher.publish(legacy_msg)
-                print(f"[TaskPublisher] Also published task {task_id} to {TopicConfig.TASK_TOPIC_LEGACY}")
+                print(f"[TaskPublisher] Published task {task_id} to {TopicConfig.TASK_TOPIC_LEGACY}")
+                success = True
+
+            elif mode == "parallel":
+                # 并行模式：两个话题都发布（如果可用）
+                if self._new_publisher is not None:
+                    task_msg = self._message_adapter.backend_to_unity(task_id, drug, quantity)
+                    self._new_publisher.publish(task_msg)
+                    print(f"[TaskPublisher] Published task {task_id} to {TopicConfig.TASK_TOPIC_NEW}")
+                    success = True
+                if self._legacy_publisher is not None:
+                    legacy_msg = self._create_legacy_message(task_id, drug, quantity)
+                    self._legacy_publisher.publish(legacy_msg)
+                    print(f"[TaskPublisher] Also published task {task_id} to {TopicConfig.TASK_TOPIC_LEGACY}")
+                    success = True
 
             # 记录成功
-            self._degradation.record_success()
-            return True
+            if success:
+                self._degradation.record_success()
+                return True
+            else:
+                print(f"[TaskPublisher] Failed to publish in mode {mode}: no publishers available")
+                self._degradation.record_failure()
+                return False
 
         except Exception as e:
             print(f"[TaskPublisher] Failed to publish task {task_id}: {e}")
@@ -171,25 +231,59 @@ class TaskPublisher:
             print(f"[TaskPublisher] Cannot publish expiry removal in degradation mode")
             return False
 
-        if not self._initialized or self._new_publisher is None:
+        if not self._initialized:
             print("[TaskPublisher] Not initialized, cannot publish expiry removal")
             return False
 
+        # 根据模式检查对应的发布器是否可用
+        mode = self._config.INTEGRATION_MODE
+        if mode == "new" and self._new_publisher is None:
+            print("[TaskPublisher] New publisher not available in new mode for expiry removal")
+            return False
+        elif mode == "legacy" and self._legacy_publisher is None:
+            print("[TaskPublisher] Legacy publisher not available in legacy mode for expiry removal")
+            return False
+        elif mode == "parallel" and self._new_publisher is None and self._legacy_publisher is None:
+            print("[TaskPublisher] No publishers available in parallel mode for expiry removal")
+            return False
+
         try:
-            # 转换消息格式
-            task_msg = self._message_adapter.expiry_to_unity(drug, remove_quantity)
+            mode = self._config.INTEGRATION_MODE
+            success = False
 
-            # 发布到新话题
-            self._new_publisher.publish(task_msg)
-            print(f"[TaskPublisher] Published expiry removal for drug {drug.get('drug_id')}")
+            # 根据模式发布消息
+            if mode == "new" and self._new_publisher is not None:
+                # 仅新话题
+                task_msg = self._message_adapter.expiry_to_unity(drug, remove_quantity)
+                self._new_publisher.publish(task_msg)
+                print(f"[TaskPublisher] Published expiry removal for drug {drug.get('drug_id')}")
+                success = True
 
-            # 如果配置为并行模式，也发布到旧话题
-            if self._config.INTEGRATION_MODE == "parallel" and self._legacy_publisher is not None:
+            elif mode == "legacy" and self._legacy_publisher is not None:
+                # 仅旧话题
                 legacy_msg = self._create_legacy_expiry_message(drug, remove_quantity)
                 self._legacy_publisher.publish(legacy_msg)
-                print(f"[TaskPublisher] Also published expiry removal to legacy topic")
+                print(f"[TaskPublisher] Published expiry removal to legacy topic for drug {drug.get('drug_id')}")
+                success = True
 
-            return True
+            elif mode == "parallel":
+                # 并行模式：两个话题都发布（如果可用）
+                if self._new_publisher is not None:
+                    task_msg = self._message_adapter.expiry_to_unity(drug, remove_quantity)
+                    self._new_publisher.publish(task_msg)
+                    print(f"[TaskPublisher] Published expiry removal for drug {drug.get('drug_id')}")
+                    success = True
+                if self._legacy_publisher is not None:
+                    legacy_msg = self._create_legacy_expiry_message(drug, remove_quantity)
+                    self._legacy_publisher.publish(legacy_msg)
+                    print(f"[TaskPublisher] Also published expiry removal to legacy topic")
+                    success = True
+
+            if success:
+                return True
+            else:
+                print(f"[TaskPublisher] Failed to publish expiry removal in mode {mode}: no publishers available")
+                return False
 
         except Exception as e:
             print(f"[TaskPublisher] Failed to publish expiry removal: {e}")
@@ -203,11 +297,12 @@ class TaskPublisher:
 
         legacy_data = {
             "task_id": task_id,
+            "type": "pickup",  # 添加类型字段以满足测试期望
             "drug_id": drug.get("drug_id"),
             "name": drug.get("name"),
             "shelve_id": drug.get("shelve_id"),
-            "shelf_x": drug.get("shelf_x"),
-            "shelf_y": drug.get("shelf_y"),
+            "x": drug.get("shelf_x"),  # 注意：测试期望"x"而不是"shelf_x"
+            "y": drug.get("shelf_y"),  # 注意：测试期望"y"而不是"shelf_y"
             "quantity": quantity
         }
 
@@ -221,12 +316,15 @@ class TaskPublisher:
             return None
 
         legacy_data = {
+            "task_id": None,  # 添加task_id字段以保持格式一致
             "type": "expiry_removal",
             "drug_id": drug.get("drug_id"),
+            "name": drug.get("name", ""),  # 添加name字段
             "shelve_id": drug.get("shelve_id"),
-            "shelf_x": drug.get("shelf_x"),
-            "shelf_y": drug.get("shelf_y"),
-            "remove_quantity": remove_quantity
+            "x": drug.get("shelf_x"),  # 使用"x"而不是"shelf_x"
+            "y": drug.get("shelf_y"),  # 使用"y"而不是"shelf_y"
+            "quantity": remove_quantity,  # 使用"quantity"而不是"remove_quantity"
+            "reason": "expired"  # 添加reason字段
         }
 
         msg = String()

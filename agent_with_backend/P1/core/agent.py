@@ -58,29 +58,38 @@ except ImportError:
 SYSTEM_PROMPT = """你是一个医疗用药助手，必须严格遵循以下自动工作流程：
 
 自动工作流程（严格按照此顺序执行，不要添加任何额外解释）：
-1. 收集患者信息：症状、年龄、体重、过敏史。若患者未提供过敏史，必须主动询问。
-2. 使用 query_drug 查询与症状相关的药物。
-3. 使用 check_allergy 确认患者对推荐药物无过敏风险。
-4. 使用 calc_dosage 计算合适的剂量。
+1. 收集患者信息：症状、年龄、体重、过敏史。
+   - 如果患者已提供明确的过敏史信息（包括"无过敏历史"、"没有过敏史"等表述），则直接进入下一步
+   - 只有当患者完全没有提到过敏史时，才需要询问一次
+2. 立即调用 query_drug 查询与症状相关的药物（使用症状关键词）。
+3. 立即调用 check_allergy 确认患者对推荐药物无过敏风险。
+4. 立即调用 calc_dosage 计算合适的剂量。
 5. 立即调用 generate_advice，使用 calc_dosage 结果中的 "drug_name" 和 "dosage" 字段。
-6. 立即调用 submit_approval，使用 generate_advice 结果中的 "advice_text" 作为 advice 参数。如果 calc_dosage 结果中有 "estimated_quantity" 字段，则传递 quantity=estimated_quantity。
+6. 立即调用 submit_approval，使用 generate_advice 结果中的 "advice_text" 作为 advice 参数。
 
-核心规则：
-1. 每次只调用一个工具，等待结果后再继续。
-2. 不要添加任何文本解释，直接调用下一个工具。
-3. 严格按照顺序：query_drug → check_allergy → calc_dosage → generate_advice → submit_approval
-4. 如果 calc_dosage 返回了结果，你的下一个响应必须是调用 generate_advice。
-5. 如果 generate_advice 返回了结果，你的下一个响应必须是调用 submit_approval。
-6. 完成 submit_approval 后，向用户显示审批ID和后续步骤，然后结束对话。
+强制规则（必须遵守）：
+1. 工作流是自动的，一旦开始就连续执行所有步骤，不要停顿
+2. 如果患者已提供过敏史，不要重复询问
+3. 每次只调用一个工具，等待结果后再继续
+4. 严格按照顺序：query_drug → check_allergy → calc_dosage → generate_advice → submit_approval
+5. 不要添加任何文本解释，直接调用工具
+6. 完成 submit_approval 后，向用户显示审批ID和后续步骤
 
-工具使用说明：
-- query_drug: 输入症状关键词，返回药品列表
-- check_allergy: 输入患者过敏史和药品名称，检查过敏风险
-- calc_dosage: 输入药品名称、年龄、体重、病情严重程度，返回剂量计算和"dosage"字段
-- generate_advice: 输入药品名称和"dosage"字段，生成用药建议
-- submit_approval: 输入患者信息、症状、药品名称和用药建议，提交审批
+工作流示例：
+用户：老王,30岁,60kg,偏头痛,无过敏历史
+助手：调用 query_drug(症状="偏头痛")
+[工具返回结果]
+助手：调用 check_allergy(patient_allergies="无", drug_name="布洛芬")
+[工具返回结果]
+助手：调用 calc_dosage(drug_name="布洛芬", age=30, weight_kg=60, condition_severity="轻")
+[工具返回结果]
+助手：调用 generate_advice(drug_name="布洛芬", dosage="成人剂量：200-400mg，每4-6小时一次")
+[工具返回结果]
+助手：调用 submit_approval(patient_name="老王", advice="[advice_text内容]", patient_age=30, patient_weight=60, symptoms="偏头痛", drug_name="布洛芬")
+[工具返回结果]
+助手：审批已提交，审批ID: AP-20260415-XXXX。请等待医生审批。
 
-重要：工作流是自动的，一旦开始就执行所有步骤，直到提交审批。不要停顿，不要询问用户确认。
+记住：工作流一旦启动，必须连续执行到 submit_approval 完成。
 """
 
 
@@ -143,9 +152,26 @@ class MedicalAgent:
 
         # 4. Agent循环
         max_iterations = Config.MAX_ITERATIONS
+        last_tool_called = None
+        tools_called = []  # 记录已调用的工具
+
         for i in range(max_iterations):
             step_start = time.time()
             messages = self.message_manager.get_full_messages()
+
+            # === 新增：工作流完整性检查 ===
+            if i >= 3 and len(tools_called) > 0 and not self.workflow_completed:
+                # 检查工作流是否停滞
+                expected_workflow = ["query_drug", "check_allergy", "calc_dosage", "generate_advice", "submit_approval"]
+                current_progress = len([t for t in tools_called if t in expected_workflow])
+
+                if current_progress >= 3 and last_tool_called == "generate_advice":
+                    # 如果generate_advice已调用但submit_approval未调用，添加提示
+                    logger.warning(f"工作流可能停滞在 {last_tool_called}，添加提示继续")
+                    self.message_manager.add_message(
+                        "user", "工作流下一步：请立即调用 submit_approval 提交审批"
+                    )
+            # === 新增结束 ===
 
             # 调用LLM
             with log_duration(logger, f"Iteration {i} LLM call"):
@@ -189,6 +215,11 @@ class MedicalAgent:
             if tool_calls:
                 for tc in tool_calls:
                     tool_name = tc["name"]
+
+                    # 记录调用的工具
+                    last_tool_called = tool_name
+                    tools_called.append(tool_name)
+
                     tool_input = tc["input"]
                     step_record = {
                         "step": i,
@@ -268,45 +299,48 @@ class MedicalAgent:
         """
         判断LLM的响应是否需要用户输入
 
-        Args:
-            text: LLM返回的文本
-
-        Returns:
-            bool: 如果文本包含问句或明确要求用户输入，返回True
+        改进：排除工作流相关的标准询问，避免误判
         """
         if not text:
             return False
 
-        # 中文问句特征
-        question_indicators = [
-            "？",
-            "?",
-            "请问",
-            "请提供",
-            "请告诉我",
-            "需要您",
-            "您是否",
-            "您有",
-            "您能",
-            "吗？",
-            "吗?",
-            "什么",
-            "如何",
-            "怎样",
-            "能否",
+        # 工作流相关的标准询问，不需要用户输入
+        workflow_actions = [
+            "调用 query_drug",
+            "调用 check_allergy",
+            "调用 calc_dosage",
+            "调用 generate_advice",
+            "调用 submit_approval",
+            "请根据工作流继续执行下一步",
+            "正在执行工作流",
+            "工作流下一步"
         ]
 
-        # 检查是否包含问句特征
+        for action in workflow_actions:
+            if action in text:
+                return False
+
+        # 明确表示工作流完成或需要继续
+        if "审批已提交" in text or "审批ID:" in text:
+            return False
+
+        # 原有逻辑（保留）
+        question_indicators = [
+            "？", "?", "请问", "请提供", "请告诉我", "需要您", "您是否",
+            "您有", "您能", "吗？", "吗?", "什么", "如何", "怎样", "能否"
+        ]
+
         text_lower = text.lower()
         for indicator in question_indicators:
             if indicator in text_lower:
+                # 但排除这些特殊情况
+                if "过敏" in text and "已提供" in text:
+                    continue
                 return True
 
-        # 检查是否以问号结尾
         if text.strip().endswith(("？", "?")):
             return True
 
-        # 检查是否包含明确的用户输入要求
         input_requests = ["请回答", "请回复", "请告知", "请说明", "请描述"]
         for request in input_requests:
             if request in text:

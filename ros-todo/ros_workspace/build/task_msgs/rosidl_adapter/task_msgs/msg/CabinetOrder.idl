@@ -1,0 +1,17 @@
+// generated from rosidl_adapter/resource/msg.idl.em
+// with input from task_msgs/msg/CabinetOrder.msg
+// generated code does not contain a copyright notice
+
+#include "task_msgs/msg/MedicineData.idl"
+
+module task_msgs {
+  module msg {
+    @verbatim (language="comment", text=
+      "CabinetOrder.msg")
+    struct CabinetOrder {
+      string cabinet_id;
+
+      sequence<task_msgs::msg::MedicineData> medicine_list;
+    };
+  };
+};

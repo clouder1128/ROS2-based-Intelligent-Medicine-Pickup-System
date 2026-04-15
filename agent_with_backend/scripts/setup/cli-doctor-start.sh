@@ -6,6 +6,8 @@ echo "Starting Doctor CLI with Backend..."
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 cd "$PROJECT_ROOT"
+# Set Python path to include project root for module resolution
+export PYTHONPATH="$PROJECT_ROOT:$PYTHONPATH"
 
 # Lock file for backend coordination
 LOCK_FILE="$(dirname "$0")/backend.lock"
@@ -36,7 +38,7 @@ BACKEND_STARTED_BY_ME=false
 if curl -s http://localhost:8001/api/health > /dev/null 2>&1; then
     echo "✓ Backend is already running on port 8001, reusing it"
     # Try to find the backend process PID
-    BACKEND_PID=$(pgrep -f "python3.*app\.py" | head -1)
+    BACKEND_PID=$(pgrep -f "python.*backend" | head -1)
     if [ -n "$BACKEND_PID" ]; then
         echo "  Using existing backend process (PID: $BACKEND_PID)"
     else
@@ -54,11 +56,9 @@ if curl -s http://localhost:8001/api/health > /dev/null 2>&1; then
 else
     # Start backend
     echo "Starting backend on port 8001..."
-    cd backend
-    python3 app.py &
+    venv/bin/python3 -m backend.main &
     BACKEND_PID=$!
     BACKEND_STARTED_BY_ME=true
-    cd ..
 
     # Create lock file immediately
     update_lock_file "$BACKEND_PID" "$SCRIPT_PID"
@@ -112,8 +112,7 @@ else
 fi
 echo "Press Ctrl+C to exit CLI"
 echo ""
-cd P1
-python3 cli/doctor_cli.py
+venv/bin/python3 -m P1.cli.doctor_cli
 
 # Cleanup on exit
 if [ "$BACKEND_STARTED_BY_ME" = true ] && [ $BACKEND_PID -ne 0 ]; then

@@ -28,13 +28,16 @@ class Config:
     DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./medical_assistant.db")
     LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
     MAX_HISTORY_LEN = int(os.getenv("MAX_HISTORY_LEN", "20"))
-    MAX_ITERATIONS = int(os.getenv("MAX_ITERATIONS", "10"))
+    MAX_ITERATIONS = int(os.getenv("MAX_ITERATIONS", "15"))
     SESSION_STATE_DIR = os.getenv("SESSION_STATE_DIR", "./sessions")
 
     # 新增配置项
     ENABLE_ASYNC = os.getenv("ENABLE_ASYNC", "false").lower() == "true"
     MAX_CONCURRENT_SESSIONS = int(os.getenv("MAX_CONCURRENT_SESSIONS", "100"))
     REQUEST_TIMEOUT = int(os.getenv("REQUEST_TIMEOUT", "30"))
+    REQUEST_BATCHING = os.getenv("REQUEST_BATCHING", "false").lower() == "true"
+    LLM_REQUEST_CACHE_SIZE = int(os.getenv("LLM_REQUEST_CACHE_SIZE", "50"))
+    ENABLE_STREAMING = os.getenv("ENABLE_STREAMING", "false").lower() == "true"
 
     @classmethod
     def validate(cls) -> None:
@@ -81,6 +84,12 @@ class Config:
         if cls.REQUEST_TIMEOUT <= 0:
             raise ConfigurationError(
                 f"REQUEST_TIMEOUT必须大于0，当前值: {cls.REQUEST_TIMEOUT}"
+            )
+
+        # 验证LLM_REQUEST_CACHE_SIZE范围
+        if cls.LLM_REQUEST_CACHE_SIZE <= 0:
+            raise ConfigurationError(
+                f"LLM_REQUEST_CACHE_SIZE必须大于0，当前值: {cls.LLM_REQUEST_CACHE_SIZE}"
             )
 
         # 验证SESSION_STATE_DIR目录

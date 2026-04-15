@@ -6,7 +6,7 @@ import time
 import logging
 from typing import Dict, Any
 from enum import IntEnum
-from backend.ros_integration.config import Config
+from .config import Config
 
 # 条件导入ROS2模块，避免硬依赖
 try:

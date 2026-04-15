@@ -6,10 +6,10 @@
 import threading
 import time
 from typing import Dict, Any, Optional
-from backend.ros_integration.config import Config, TopicConfig
-from backend.ros_integration.node_manager import RosNodeManager
-from backend.ros_integration.message_adapter import MessageAdapter
-from backend.ros_integration.error_handler import ErrorHandler
+from .config import Config, TopicConfig
+from .node_manager import RosNodeManager
+from .message_adapter import MessageAdapter
+from .error_handler import ErrorHandler
 
 # 条件导入ROS2模块
 try:

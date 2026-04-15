@@ -1,0 +1,36 @@
+{
+  "type_description_msg": {
+    "type_description": {
+      "type_name": "task_msgs/msg/CabinetRunning",
+      "fields": [
+        {
+          "name": "cabinet_id",
+          "type": {
+            "type_id": 3,
+            "capacity": 0,
+            "string_capacity": 0,
+            "nested_type_name": ""
+          },
+          "default_value": ""
+        },
+        {
+          "name": "isrunning",
+          "type": {
+            "type_id": 3,
+            "capacity": 0,
+            "string_capacity": 0,
+            "nested_type_name": ""
+          },
+          "default_value": ""
+        }
+      ]
+    },
+    "referenced_type_descriptions": []
+  },
+  "type_hashes": [
+    {
+      "type_name": "task_msgs/msg/CabinetRunning",
+      "hash_string": "RIHS01_04cc66c11a3921cd8709637752a382944c3aeb31b6a4ac9922887b2929b99099"
+    }
+  ]
+}
