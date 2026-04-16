@@ -159,6 +159,22 @@ class TestStructuredSymptoms(unittest.TestCase):
         assert result2["medical_history"] is None
 
 
+class TestExtractionError(unittest.TestCase):
+    """测试ExtractionError异常类"""
+
+    def test_extraction_error(self):
+        """测试 ExtractionError 异常"""
+        from subagents.exceptions import ExtractionError
+
+        try:
+            raise ExtractionError("症状提取失败")
+        except ExtractionError as e:
+            assert str(e) == "症状提取失败"
+
+        # 验证它是 Exception 的子类
+        assert issubclass(ExtractionError, Exception)
+
+
 if __name__ == "__main__":
     """直接运行测试"""
     # 运行所有测试
