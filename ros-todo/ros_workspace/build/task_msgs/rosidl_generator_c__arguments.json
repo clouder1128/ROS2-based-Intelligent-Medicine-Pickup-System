@@ -1,0 +1,60 @@
+{
+  "package_name": "task_msgs",
+  "output_dir": "/home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/ros-todo/ros_workspace/build/task_msgs/rosidl_generator_c/task_msgs",
+  "template_dir": "/opt/ros/jazzy/share/rosidl_generator_c/cmake/../resource",
+  "idl_tuples": [
+    "/home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/ros-todo/ros_workspace/build/task_msgs/rosidl_adapter/task_msgs:msg/MedicineData.idl",
+    "/home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/ros-todo/ros_workspace/build/task_msgs/rosidl_adapter/task_msgs:msg/CabinetOrder.idl",
+    "/home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/ros-todo/ros_workspace/build/task_msgs/rosidl_adapter/task_msgs:msg/Task.idl",
+    "/home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/ros-todo/ros_workspace/build/task_msgs/rosidl_adapter/task_msgs:msg/CabinetRunning.idl",
+    "/home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/ros-todo/ros_workspace/build/task_msgs/rosidl_adapter/task_msgs:msg/CabinetState.idl",
+    "/home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/ros-todo/ros_workspace/build/task_msgs/rosidl_adapter/task_msgs:msg/CarState.idl",
+    "/home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/ros-todo/ros_workspace/build/task_msgs/rosidl_adapter/task_msgs:msg/TaskState.idl"
+  ],
+  "ros_interface_files": [
+    "/home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/ros-todo/ros_workspace/src/task_msgs/msg/MedicineData.msg",
+    "/home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/ros-todo/ros_workspace/src/task_msgs/msg/CabinetOrder.msg",
+    "/home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/ros-todo/ros_workspace/src/task_msgs/msg/Task.msg",
+    "/home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/ros-todo/ros_workspace/src/task_msgs/msg/CabinetRunning.msg",
+    "/home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/ros-todo/ros_workspace/src/task_msgs/msg/CabinetState.msg",
+    "/home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/ros-todo/ros_workspace/src/task_msgs/msg/CarState.msg",
+    "/home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/ros-todo/ros_workspace/src/task_msgs/msg/TaskState.msg"
+  ],
+  "target_dependencies": [
+    "/opt/ros/jazzy/share/rosidl_generator_c/cmake/../../../lib/rosidl_generator_c/rosidl_generator_c",
+    "/opt/ros/jazzy/share/rosidl_generator_c/cmake/../../../lib/python3.12/site-packages/rosidl_generator_c/__init__.py",
+    "/opt/ros/jazzy/share/rosidl_generator_c/cmake/../resource/action__type_support.h.em",
+    "/opt/ros/jazzy/share/rosidl_generator_c/cmake/../resource/action__type_support.c.em",
+    "/opt/ros/jazzy/share/rosidl_generator_c/cmake/../resource/empty__description.c.em",
+    "/opt/ros/jazzy/share/rosidl_generator_c/cmake/../resource/full__description.c.em",
+    "/opt/ros/jazzy/share/rosidl_generator_c/cmake/../resource/idl.h.em",
+    "/opt/ros/jazzy/share/rosidl_generator_c/cmake/../resource/idl__description.c.em",
+    "/opt/ros/jazzy/share/rosidl_generator_c/cmake/../resource/idl__functions.c.em",
+    "/opt/ros/jazzy/share/rosidl_generator_c/cmake/../resource/idl__functions.h.em",
+    "/opt/ros/jazzy/share/rosidl_generator_c/cmake/../resource/idl__struct.h.em",
+    "/opt/ros/jazzy/share/rosidl_generator_c/cmake/../resource/idl__type_support.c.em",
+    "/opt/ros/jazzy/share/rosidl_generator_c/cmake/../resource/idl__type_support.h.em",
+    "/opt/ros/jazzy/share/rosidl_generator_c/cmake/../resource/msg__functions.c.em",
+    "/opt/ros/jazzy/share/rosidl_generator_c/cmake/../resource/msg__functions.h.em",
+    "/opt/ros/jazzy/share/rosidl_generator_c/cmake/../resource/msg__struct.h.em",
+    "/opt/ros/jazzy/share/rosidl_generator_c/cmake/../resource/msg__type_support.h.em",
+    "/opt/ros/jazzy/share/rosidl_generator_c/cmake/../resource/srv__type_support.c.em",
+    "/opt/ros/jazzy/share/rosidl_generator_c/cmake/../resource/srv__type_support.h.em",
+    "/home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/ros-todo/ros_workspace/build/task_msgs/rosidl_adapter/task_msgs/msg/MedicineData.idl",
+    "/home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/ros-todo/ros_workspace/build/task_msgs/rosidl_adapter/task_msgs/msg/CabinetOrder.idl",
+    "/home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/ros-todo/ros_workspace/build/task_msgs/rosidl_adapter/task_msgs/msg/Task.idl",
+    "/home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/ros-todo/ros_workspace/build/task_msgs/rosidl_adapter/task_msgs/msg/CabinetRunning.idl",
+    "/home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/ros-todo/ros_workspace/build/task_msgs/rosidl_adapter/task_msgs/msg/CabinetState.idl",
+    "/home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/ros-todo/ros_workspace/build/task_msgs/rosidl_adapter/task_msgs/msg/CarState.idl",
+    "/home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/ros-todo/ros_workspace/build/task_msgs/rosidl_adapter/task_msgs/msg/TaskState.idl"
+  ],
+  "type_description_tuples": [
+    "msg/MedicineData.idl:/home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/ros-todo/ros_workspace/build/task_msgs/rosidl_generator_type_description/task_msgs/msg/MedicineData.json",
+    "msg/CabinetOrder.idl:/home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/ros-todo/ros_workspace/build/task_msgs/rosidl_generator_type_description/task_msgs/msg/CabinetOrder.json",
+    "msg/Task.idl:/home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/ros-todo/ros_workspace/build/task_msgs/rosidl_generator_type_description/task_msgs/msg/Task.json",
+    "msg/CabinetRunning.idl:/home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/ros-todo/ros_workspace/build/task_msgs/rosidl_generator_type_description/task_msgs/msg/CabinetRunning.json",
+    "msg/CabinetState.idl:/home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/ros-todo/ros_workspace/build/task_msgs/rosidl_generator_type_description/task_msgs/msg/CabinetState.json",
+    "msg/CarState.idl:/home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/ros-todo/ros_workspace/build/task_msgs/rosidl_generator_type_description/task_msgs/msg/CarState.json",
+    "msg/TaskState.idl:/home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/ros-todo/ros_workspace/build/task_msgs/rosidl_generator_type_description/task_msgs/msg/TaskState.json"
+  ]
+}

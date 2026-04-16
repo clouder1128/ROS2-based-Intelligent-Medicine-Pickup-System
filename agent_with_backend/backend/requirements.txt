@@ -1,0 +1,6 @@
+Flask>=3.0.0
+flask-cors>=4.0.0
+rclpy>=4.0.0
+std-msgs>=4.0.0
+# 新增 task_msgs 依赖 - 需要从ros_workspace移植
+# task_msgs>=1.0.0
