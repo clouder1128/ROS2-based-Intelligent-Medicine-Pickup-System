@@ -54,6 +54,21 @@ if curl -s http://localhost:8001/api/health > /dev/null 2>&1; then
     fi
     BACKEND_STARTED_BY_ME=false
 else
+    # Initialize database if it doesn't exist
+    if [ ! -f "$PROJECT_ROOT/backend/pharmacy.db" ]; then
+        echo "Initializing database..."
+        venv/bin/python3 -c "
+import sys
+sys.path.insert(0, '$PROJECT_ROOT')
+from backend.init_db import init_db
+init_db()
+" || {
+            echo "✗ Database initialization failed"
+            exit 1
+        }
+        echo "✓ Database initialized"
+    fi
+
     # Start backend
     echo "Starting backend on port 8001..."
     venv/bin/python3 -m backend.main &

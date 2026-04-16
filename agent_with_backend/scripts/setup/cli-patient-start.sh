@@ -10,7 +10,7 @@ cd "$PROJECT_ROOT"
 export PYTHONPATH="$PROJECT_ROOT:$PYTHONPATH"
 
 # Add ROS2 workspace for task_msgs support
-export ROS2_WS_PATH="/home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/ros-todo/ros_workspace"
+export ROS2_WS_PATH="$PROJECT_ROOT/ros-todo/ros_workspace"
 if [ -d "$ROS2_WS_PATH" ]; then
     # Add task_msgs Python package to PYTHONPATH
     export PYTHONPATH="$ROS2_WS_PATH/install/task_msgs/lib/python3.12/site-packages:$PYTHONPATH"
@@ -71,9 +71,24 @@ if curl -s http://localhost:8001/api/health > /dev/null 2>&1; then
     fi
     BACKEND_STARTED_BY_ME=false
 else
+    # Initialize database if it doesn't exist
+    if [ ! -f "$PROJECT_ROOT/backend/pharmacy.db" ]; then
+        echo "Initializing database..."
+        python3 -c "
+import sys
+sys.path.insert(0, '$PROJECT_ROOT')
+from backend.init_db import init_db
+init_db()
+" || {
+            echo "✗ Database initialization failed"
+            exit 1
+        }
+        echo "✓ Database initialized"
+    fi
+
     # Start backend
     echo "Starting backend on port 8001..."
-    venv/bin/python3 -m backend.main &
+    python3 -m backend.main &
     BACKEND_PID=$!
     BACKEND_STARTED_BY_ME=true
 
@@ -130,7 +145,7 @@ fi
 echo "Press Ctrl+C to exit CLI"
 echo ""
 # 保持在项目根目录，使用模块方式运行
-venv/bin/python3 -m P1.cli.patient_cli
+python3 -m P1.cli.patient_cli
 
 # Cleanup on exit
 if [ "$BACKEND_STARTED_BY_ME" = true ] && [ $BACKEND_PID -ne 0 ]; then
