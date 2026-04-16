@@ -191,7 +191,7 @@ class SymptomExtractor:
         return info
 
     def extract_symptoms(self, text: str) -> List[str]:
-        """提取症状列表"""
+        """提取症状列表（带否定词过滤）"""
         # 常见症状库
         symptom_keywords = [
             '头痛', '头晕', '发热', '发烧', '烧', '咳嗽', '咳', '喉咙痛',
@@ -203,11 +203,33 @@ class SymptomExtractor:
             '湿疹', '荨麻疹', '过敏', '浮肿', '肿胀', '出血'
         ]
 
+        # 从配置获取否定词
+        from core.config import Config
+        negation_words = Config.NEGATION_WORDS
+
         symptoms = []
         for symptom in symptom_keywords:
-            if symptom in text:
-                if symptom not in symptoms:
+            position = text.find(symptom)
+            while position != -1:
+                # 检查症状词是否出现在否定上下文中
+                is_negated = False
+                preceding_text = text[:position]
+
+                for negation in negation_words:
+                    # 检查否定词是否在症状词前且距离较近（20字符内）
+                    negation_pos = preceding_text.rfind(negation)
+                    if negation_pos != -1 and (position - negation_pos) < 20:
+                        # 验证否定词和症状词之间没有句号等分隔符
+                        text_between = preceding_text[negation_pos:position]
+                        if '。' not in text_between and '！' not in text_between and '？' not in text_between:
+                            is_negated = True
+                            break
+
+                if not is_negated and symptom not in symptoms:
                     symptoms.append(symptom)
+
+                # 查找下一个出现位置
+                position = text.find(symptom, position + len(symptom))
 
         return symptoms
 

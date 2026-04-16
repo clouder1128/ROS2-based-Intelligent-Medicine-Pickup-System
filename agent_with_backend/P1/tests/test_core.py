@@ -828,6 +828,68 @@ class TestInteractiveWorkflowExtensions:
                 content = f.read()
                 assert len(content.strip()) > 0, f"提示词文件为空: {file_path}"
 
+    def test_negation_filtering(self):
+        """测试否定词过滤功能"""
+        from subagents.extractor import SymptomExtractor
+
+        # 创建规则提取器（不使用LLM）
+        extractor = SymptomExtractor(use_llm=False)
+
+        # 测试1: 正常症状应该被识别
+        result1 = extractor.extract_symptoms("患者头痛、发热")
+        assert "头痛" in result1
+        assert "发热" in result1
+
+        # 测试2: 否定上下文中的症状不应该被识别
+        result2 = extractor.extract_symptoms("患者无头痛，无发热历史")
+        assert "头痛" not in result2, f"否定词'无'后的'头痛'不应被识别，但得到: {result2}"
+        assert "发热" not in result2, f"否定词'无'后的'发热'不应被识别，但得到: {result2}"
+
+        # 测试3: 混合情况
+        result3 = extractor.extract_symptoms("患者头痛，但没有发热")
+        assert "头痛" in result3, "没有否定词的'头痛'应该被识别"
+        assert "发热" not in result3, f"否定词'没有'后的'发热'不应被识别"
+
+        # 测试4: 各种否定词
+        test_cases = [
+            ("无过敏历史", "过敏", False),
+            ("没有头痛症状", "头痛", False),
+            ("不发热", "发热", False),
+            ("否认为偏头痛", "偏头痛", False),  # "否认"中的"否"
+            ("非典型头痛", "头痛", False),  # "非典型"
+            ("未出现发热", "发热", False),
+        ]
+
+        for text, symptom, should_be_present in test_cases:
+            result = extractor.extract_symptoms(text)
+            if should_be_present:
+                assert symptom in result, f"'{text}'中的'{symptom}'应该被识别"
+            else:
+                assert symptom not in result, f"'{text}'中的'{symptom}'不应被识别，但得到: {result}"
+
+    def test_negation_filtering_edge_cases(self):
+        """测试否定词过滤边界情况"""
+        from subagents.extractor import SymptomExtractor
+
+        extractor = SymptomExtractor(use_llm=False)
+
+        # 测试1: 否定词距离较远不应过滤
+        result1 = extractor.extract_symptoms("患者说昨天没有不适。今天头痛明显。")
+        assert "头痛" in result1, "句号分隔后的'头痛'应该被识别"
+
+        # 测试2: 否定词和症状词之间有标点分隔不应过滤
+        result2 = extractor.extract_symptoms("无。头痛严重")
+        assert "头痛" in result2, "句号分隔后的'头痛'应该被识别"
+
+        # 测试3: 症状词作为否定词的一部分不应被错误过滤
+        # 例如"不发热"中的"发热"应该被过滤，但"不"本身不是症状词
+        result3 = extractor.extract_symptoms("不头痛")  # "不"是单独的词
+        assert "头痛" not in result3, "'不头痛'中的'头痛'应该被过滤"
+
+        # 测试4: 中文否定词变体
+        result4 = extractor.extract_symptoms("并未头痛")
+        assert "头痛" not in result4, "'并未头痛'中的'头痛'应该被过滤"
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
