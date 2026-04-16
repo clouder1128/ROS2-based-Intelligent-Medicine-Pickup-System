@@ -39,6 +39,14 @@ class Config:
     LLM_REQUEST_CACHE_SIZE = int(os.getenv("LLM_REQUEST_CACHE_SIZE", "50"))
     ENABLE_STREAMING = os.getenv("ENABLE_STREAMING", "false").lower() == "true"
 
+    # 症状提取模式开关
+    ENABLE_LLM_SYMPTOM_EXTRACTION = os.getenv(
+        "ENABLE_LLM_SYMPTOM_EXTRACTION", "true"
+    ).lower() == "true"
+
+    # 否定词列表（用于规则提取器改进）
+    NEGATION_WORDS = ["无", "没有", "不", "否", "非", "未"]
+
     @classmethod
     def validate(cls) -> None:
         """验证配置项的有效性

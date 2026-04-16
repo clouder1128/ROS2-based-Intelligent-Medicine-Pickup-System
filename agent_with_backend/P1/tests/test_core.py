@@ -169,7 +169,11 @@ class TestMedicalAgent:
         mock_message_manager,
     ):
         """测试Agent基本运行"""
-        mock_extract_symptoms.return_value = {"symptoms": "头痛"}
+        # 模拟StructuredSymptoms对象
+        mock_structure = MagicMock()
+        mock_structure.symptoms = ["头痛"]
+        mock_structure.to_dict.return_value = {"symptoms": ["头痛"], "chief_complaint": "我头痛"}
+        mock_extract_symptoms.return_value = mock_structure
         mock_llm_client.chat.return_value = {"content": "请提供更多症状信息"}
 
         agent = MedicalAgent(
@@ -198,7 +202,11 @@ class TestMedicalAgent:
         mock_message_manager,
     ):
         """测试Agent运行包含工具调用"""
-        mock_extract_symptoms.return_value = {"symptoms": "头痛"}
+        # 模拟StructuredSymptoms对象
+        mock_structure = MagicMock()
+        mock_structure.symptoms = ["头痛"]
+        mock_structure.to_dict.return_value = {"symptoms": ["头痛"], "chief_complaint": "我头痛"}
+        mock_extract_symptoms.return_value = mock_structure
         mock_execute_tool.return_value = {"drugs": ["布洛芬"]}
 
         # 模拟LLM响应序列：第一次返回工具调用，第二次返回普通回复
@@ -296,7 +304,12 @@ class TestMedicalAgent:
         assert agent.get_workflow_state() is None
 
         # 运行一次以创建工作流
-        with patch("core.agent.extract_symptoms"):
+        with patch("core.agent.extract_symptoms") as mock_extract:
+            # 模拟StructuredSymptoms对象
+            mock_structure = MagicMock()
+            mock_structure.symptoms = []
+            mock_structure.to_dict.return_value = {"symptoms": [], "chief_complaint": "测试"}
+            mock_extract.return_value = mock_structure
             with patch.object(
                 mock_llm_client, "chat", return_value={"content": "测试"}
             ):
@@ -313,7 +326,12 @@ class TestMedicalAgent:
         )
 
         # 创建多个工作流
-        with patch("core.agent.extract_symptoms"):
+        with patch("core.agent.extract_symptoms") as mock_extract:
+            # 模拟StructuredSymptoms对象
+            mock_structure = MagicMock()
+            mock_structure.symptoms = []
+            mock_structure.to_dict.return_value = {"symptoms": [], "chief_complaint": "测试"}
+            mock_extract.return_value = mock_structure
             with patch.object(
                 mock_llm_client, "chat", return_value={"content": "测试"}
             ):
@@ -697,6 +715,118 @@ class TestAgentCoreFunctions:
         assert stats["requests"] == 0
         # 注意：实际调用LLM需要API密钥，这里只测试方法存在
         assert callable(LLMClient.get_stats)
+
+
+class TestInteractiveWorkflowExtensions:
+    """测试交互式工作流扩展"""
+
+    def test_workflowstep_enum_extension(self):
+        """测试WorkflowStep枚举扩展"""
+        from core.workflows import WorkflowStep
+
+        # 原有步骤
+        assert WorkflowStep.COLLECT_INFO.value == "collect_info"
+        assert WorkflowStep.QUERY_DRUG.value == "query_drug"
+
+        # 新增交互步骤
+        assert WorkflowStep.USER_FEEDBACK.value == "user_feedback"
+        assert WorkflowStep.TERMINATED_WITHOUT_APPROVAL.value == "terminated_without_approval"
+        assert WorkflowStep.SYMPTOM_CORRECTION.value == "symptom_correction"
+
+        # 验证所有步骤数量
+        all_steps = list(WorkflowStep)
+        assert len(all_steps) == 10  # 原有7个 + 新增3个
+
+    def test_workflowstate_extension(self):
+        """测试WorkflowState状态扩展"""
+        from core.workflows import WorkflowState
+
+        # 创建实例
+        state = WorkflowState(patient_id="test_patient")
+
+        # 原有字段
+        assert state.patient_id == "test_patient"
+        assert state.current_step.value == "collect_info"
+
+        # 新增字段默认值
+        assert state.termination_reason is None
+        assert state.user_feedback_data is None
+        assert state.awaiting_user_input is False
+        assert state.symptoms_corrected is False
+        assert state.original_user_input is None
+
+    def test_config_interactive_workflow(self):
+        """测试交互式工作流配置"""
+        from core.config import Config
+
+        # 验证配置项存在
+        assert hasattr(Config, 'ENABLE_LLM_SYMPTOM_EXTRACTION')
+        assert hasattr(Config, 'NEGATION_WORDS')
+
+        # 验证默认值
+        assert Config.ENABLE_LLM_SYMPTOM_EXTRACTION == True  # 默认true
+
+        # 验证否定词列表
+        assert isinstance(Config.NEGATION_WORDS, list)
+        assert "无" in Config.NEGATION_WORDS
+        assert "没有" in Config.NEGATION_WORDS
+        assert "不" in Config.NEGATION_WORDS
+
+    def test_config_env_override(self):
+        """测试环境变量覆盖配置"""
+        import os
+        from core.config import Config
+
+        # 保存原始环境变量
+        original_env = os.getenv("ENABLE_LLM_SYMPTOM_EXTRACTION")
+
+        try:
+            # 测试false值
+            os.environ["ENABLE_LLM_SYMPTOM_EXTRACTION"] = "false"
+            from importlib import reload
+            import core.config
+            reload(core.config)
+            from core.config import Config as ReloadedConfig
+
+            assert ReloadedConfig.ENABLE_LLM_SYMPTOM_EXTRACTION == False
+
+            # 测试true值
+            os.environ["ENABLE_LLM_SYMPTOM_EXTRACTION"] = "true"
+            reload(core.config)
+            from core.config import Config as ReloadedConfig2
+
+            assert ReloadedConfig2.ENABLE_LLM_SYMPTOM_EXTRACTION == True
+
+        finally:
+            # 恢复环境变量
+            if original_env:
+                os.environ["ENABLE_LLM_SYMPTOM_EXTRACTION"] = original_env
+            else:
+                os.environ.pop("ENABLE_LLM_SYMPTOM_EXTRACTION", None)
+            # 重新加载配置
+            from importlib import reload
+            import core.config
+            reload(core.config)
+
+    def test_prompt_files_exist(self):
+        """测试提示词文件是否存在"""
+        import os
+
+        prompt_files = [
+            "prompts/interactive_system_prompt.md",
+            "prompts/feedback_generation.md",
+            "prompts/symptom_correction.md",
+            "prompts/advice_generation.md"
+        ]
+
+        for file_path in prompt_files:
+            full_path = os.path.join(os.path.dirname(__file__), "..", file_path)
+            assert os.path.exists(full_path), f"提示词文件不存在: {file_path}"
+
+            # 验证文件内容非空
+            with open(full_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+                assert len(content.strip()) > 0, f"提示词文件为空: {file_path}"
 
 
 if __name__ == "__main__":

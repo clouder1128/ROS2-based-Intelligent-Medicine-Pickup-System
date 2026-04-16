@@ -11,13 +11,19 @@ from datetime import datetime
 class WorkflowStep(Enum):
     """工作流步骤枚举"""
 
-    COLLECT_INFO = "collect_info"  # 收集患者信息
-    QUERY_DRUG = "query_drug"  # 查询药物
-    CHECK_ALLERGY = "check_allergy"  # 检查过敏
-    CALC_DOSAGE = "calc_dosage"  # 计算剂量
+    # 原有步骤
+    COLLECT_INFO = "collect_info"        # 收集患者信息
+    QUERY_DRUG = "query_drug"            # 查询药物
+    CHECK_ALLERGY = "check_allergy"      # 检查过敏
+    CALC_DOSAGE = "calc_dosage"          # 计算剂量
     GENERATE_ADVICE = "generate_advice"  # 生成建议
     SUBMIT_APPROVAL = "submit_approval"  # 提交审批
     FILL_PRESCRIPTION = "fill_prescription"  # 配药（系统自动）
+
+    # 新增交互步骤
+    USER_FEEDBACK = "user_feedback"      # 等待用户反馈（药品未找到时）
+    TERMINATED_WITHOUT_APPROVAL = "terminated_without_approval"  # 未创建审批单结束
+    SYMPTOM_CORRECTION = "symptom_correction"  # 症状纠正处理
 
 
 @dataclass
@@ -32,6 +38,13 @@ class WorkflowState:
     last_update_time: float = field(default_factory=time.time)
     is_completed: bool = False
     approval_id: Optional[str] = None
+
+    # 新增字段
+    termination_reason: Optional[str] = None          # 终止原因
+    user_feedback_data: Optional[Dict[str, Any]] = None  # 用户反馈数据
+    awaiting_user_input: bool = False                 # 是否等待用户输入
+    symptoms_corrected: bool = False                  # 症状是否已纠正
+    original_user_input: Optional[str] = None         # 原始用户输入（用于重新提取）
 
     def mark_step_completed(
         self, step: WorkflowStep, data: Optional[Dict[str, Any]] = None
@@ -91,6 +104,11 @@ class WorkflowState:
             "approval_id": self.approval_id,
             "progress": self.get_progress(),
             "duration": self.get_duration(),
+            "termination_reason": self.termination_reason,
+            "user_feedback_data": self.user_feedback_data,
+            "awaiting_user_input": self.awaiting_user_input,
+            "symptoms_corrected": self.symptoms_corrected,
+            "original_user_input": self.original_user_input,
         }
 
 
