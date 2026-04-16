@@ -40,7 +40,7 @@ def _placeholder_extract_symptoms(user_input: str) -> Dict[str, Any]:
 
 # 尝试导入P3的真实模块，如果失败则使用占位
 try:
-    from planner import TodoManager
+    from ..planner.models import TodoManager
 
     TodoManager  # 避免IDE警告
 except ImportError:
@@ -48,10 +48,10 @@ except ImportError:
     logger.warning("P3 planner not found, using placeholder")
 
 try:
-    from subagents.symptom_extractor import extract_symptoms
-except ImportError:
+    from ..subagents.symptom_extractor import extract_symptoms
+except ImportError as e:
+    logger.warning(f"P3 symptom extractor not found: {e}, using placeholder")
     extract_symptoms = _placeholder_extract_symptoms
-    logger.warning("P3 symptom extractor not found, using placeholder")
 
 
 # ==================== 系统提示词 ====================
@@ -134,11 +134,11 @@ class MedicalAgent:
         # 1. 调用子代理提取症状（P3实现）
         structured_info = extract_symptoms(user_message)
         if (
-            structured_info.get("symptoms")
-            and structured_info.get("symptoms") != user_message
+            structured_info.symptoms
+            and structured_info.symptoms != [user_message]
         ):
             user_message = (
-                f"[系统提取的症状信息] {user_message}\n提取结果: {structured_info}"
+                f"[系统提取的症状信息] {user_message}\n提取结果: {structured_info.to_dict()}"
             )
 
         # 2. 添加用户消息

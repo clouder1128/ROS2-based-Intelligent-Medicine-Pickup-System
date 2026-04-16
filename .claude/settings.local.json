@@ -1,7 +1,12 @@
 {
   "permissions": {
     "allow": [
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(python test_p3_integration.py)",
+      "Bash(python test_medical_agent_integration.py)",
+      "Bash(python test_end_to_end.py)",
+      "Bash(python validate_restructure.py)",
+      "Bash(python test_final_integration.py)"
     ]
   }
 }
