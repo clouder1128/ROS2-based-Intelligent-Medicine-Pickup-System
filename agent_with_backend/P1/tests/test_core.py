@@ -828,6 +828,33 @@ class TestInteractiveWorkflowExtensions:
                 content = f.read()
                 assert len(content.strip()) > 0, f"提示词文件为空: {file_path}"
 
+    def test_symptom_extraction_service(self):
+        """测试症状提取服务"""
+        from core.symptom_service import SymptomExtractionService
+
+        # 测试服务类存在
+        service = SymptomExtractionService()
+
+        # 测试提取方法存在
+        assert hasattr(service, 'extract')
+
+        # 测试默认使用LLM模式（当llm_client为None时）
+        # 这里只验证接口存在，实际提取测试在后续任务
+
+    def test_symptom_extraction_with_correction(self):
+        """测试带纠正的症状提取"""
+        from core.symptom_service import SymptomExtractionService
+
+        # 模拟输入
+        original_input = "老王,30岁,60kg,头痛,无过敏历史"
+        correction_text = "不是头痛，是偏头痛"
+
+        # 测试方法存在
+        assert hasattr(SymptomExtractionService, 'extract_with_correction')
+
+        # 测试调用（使用规则模式，因为没有提供llm_client）
+        # 这里主要验证接口可用，实际提取逻辑在后续测试
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
