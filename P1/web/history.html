@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI开药助手 - 用药历史</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+        <!-- 顶部导航栏 -->
+        <header class="header">
+            <div class="logo">
+                <i class="fas fa-history"></i>
+                <h1>AI开药助手</h1>
+                <span class="role-badge">历史查询</span>
+            </div>
+            <nav class="nav">
+                <a href="patient.html" class="nav-link"><i class="fas fa-user"></i> 患者咨询</a>
+                <a href="history.html" class="nav-link active"><i class="fas fa-history"></i> 用药历史</a>
+                <a href="#" class="nav-link" id="logout-btn"><i class="fas fa-sign-out-alt"></i> 退出</a>
+            </nav>
+        </header>
+
+        <main class="main-content">
+            <!-- 左侧：查询面板 -->
+            <aside class="info-panel">
+                <div class="info-card">
+                    <h3><i class="fas fa-search"></i> 查询条件</h3>
+                    <div class="filter-form">
+                        <div class="form-group">
+                            <label for="patient-name-input">患者姓名:</label>
+                            <input type="text" id="patient-name-input" placeholder="请输入患者姓名" value="张三">
+                        </div>
+                        <div class="form-group">
+                            <label for="date-range-start">开始日期:</label>
+                            <input type="date" id="date-range-start" value="2026-04-01">
+                        </div>
+                        <div class="form-group">
+                            <label for="date-range-end">结束日期:</label>
+                            <input type="date" id="date-range-end" value="2026-04-14">
+                        </div>
+                        <div class="form-group">
+                            <label for="drug-type-filter">药品类型:</label>
+                            <select id="drug-type-filter">
+                                <option value="">全部</option>
+                                <option value="prescription">处方药</option>
+                                <option value="otc">非处方药</option>
+                            </select>
+                        </div>
+                        <button class="btn btn-primary btn-block" id="search-btn">
+                            <i class="fas fa-search"></i> 查询
+                        </button>
+                        <button class="btn btn-secondary btn-block" id="reset-btn">
+                            <i class="fas fa-redo"></i> 重置
+                        </button>
+                    </div>
+                </div>
+
+                <div class="info-card">
+                    <h3><i class="fas fa-chart-bar"></i> 统计概览</h3>
+                    <div class="stats-overview">
+                        <div class="stat-card">
+                            <div class="stat-icon" style="background-color: #e3f2fd;">
+                                <i class="fas fa-prescription-bottle" style="color: #2196f3;"></i>
+                            </div>
+                            <div class="stat-content">
+                                <div class="stat-number" id="total-prescriptions">12</div>
+                                <div class="stat-label">总处方数</div>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon" style="background-color: #e8f5e9;">
+                                <i class="fas fa-check-circle" style="color: #4caf50;"></i>
+                            </div>
+                            <div class="stat-content">
+                                <div class="stat-number" id="approved-prescriptions">10</div>
+                                <div class="stat-label">已批准</div>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon" style="background-color: #fff3e0;">
+                                <i class="fas fa-pills" style="color: #ff9800;"></i>
+                            </div>
+                            <div class="stat-content">
+                                <div class="stat-number" id="total-drugs">25</div>
+                                <div class="stat-label">药品总数</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="info-card">
+                    <h3><i class="fas fa-info-circle"></i> 使用说明</h3>
+                    <ul class="notice-list">
+                        <li><i class="fas fa-check-circle"></i> 可查询任意时间段的用药历史</li>
+                        <li><i class="fas fa-check-circle"></i> 支持按患者姓名筛选</li>
+                        <li><i class="fas fa-check-circle"></i> 可查看处方详情和取药记录</li>
+                        <li><i class="fas fa-check-circle"></i> 数据仅供医疗参考</li>
+                    </ul>
+                </div>
+            </aside>
+
+            <!-- 右侧：历史记录 -->
+            <section class="work-section">
+                <div class="section-header">
+                    <h2><i class="fas fa-file-medical-alt"></i> 用药历史记录</h2>
+                    <div class="section-actions">
+                        <button class="btn btn-secondary" id="export-btn">
+                            <i class="fas fa-download"></i> 导出
+                        </button>
+                        <button class="btn btn-primary" id="print-btn">
+                            <i class="fas fa-print"></i> 打印
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 历史记录列表 -->
+                <div class="history-list" id="history-list">
+                    <!-- 加载状态 -->
+                    <div class="loading-state" id="loading-state">
+                        <div class="loading-spinner"></div>
+                        <p>正在加载用药历史...</p>
+                    </div>
+
+                    <!-- 空状态 -->
+                    <div class="empty-state" id="empty-state" style="display: none;">
+                        <i class="fas fa-file-medical-alt"></i>
+                        <h3>暂无历史记录</h3>
+                        <p>请修改查询条件或患者暂无用药记录</p>
+                    </div>
+
+                    <!-- 历史记录卡片将动态插入这里 -->
+                </div>
+
+                <!-- 分页 -->
+                <div class="pagination" id="pagination" style="display: none;">
+                    <button class="btn btn-secondary" id="prev-page" disabled>上一页</button>
+                    <span class="page-info">第 <span id="current-page">1</span> 页 / 共 <span id="total-pages">1</span> 页</span>
+                    <button class="btn btn-secondary" id="next-page" disabled>下一页</button>
+                </div>
+            </section>
+        </main>
+
+        <footer class="footer">
+            <p>© 2026 AI开药助手系统 | 医疗辅助工具，不能替代专业医疗建议</p>
+            <p class="footer-links">
+                <a href="#"><i class="fas fa-shield-alt"></i> 隐私政策</a>
+                <a href="#"><i class="fas fa-file-alt"></i> 使用条款</a>
+                <a href="#"><i class="fas fa-phone-alt"></i> 紧急联系</a>
+            </p>
+        </footer>
+    </div>
+
+    <!-- 模态框 - 历史详情 -->
+    <div class="modal" id="history-modal">
+        <div class="modal-content wide-modal">
+            <div class="modal-header">
+                <h3><i class="fas fa-file-medical"></i> 历史记录详情</h3>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="history-detail">
+                    <!-- 处方信息 -->
+                    <div class="detail-section">
+                        <h4><i class="fas fa-info-circle"></i> 处方信息</h4>
+                        <div class="detail-grid">
+                            <div class="detail-item">
+                                <span class="detail-label">处方号</span>
+                                <span class="detail-value" id="detail-prescription-id">RX-20250414-001</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">患者姓名</span>
+                                <span class="detail-value" id="detail-patient-name">张三</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">审批状态</span>
+                                <span class="detail-value status approved" id="detail-status">已批准</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">审批医生</span>
+                                <span class="detail-value" id="detail-doctor">王医生</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">创建时间</span>
+                                <span class="detail-value" id="detail-created-at">2026-04-14 10:30:25</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">配药时间</span>
+                                <span class="detail-value" id="detail-dispensed-at">2026-04-14 11:15:30</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 症状与建议 -->
+                    <div class="detail-section">
+                        <div class="two-column">
+                            <div class="column">
+                                <h4><i class="fas fa-comment-medical"></i> 症状描述</h4>
+                                <div class="content-box" id="detail-symptoms">
+                                    患者主诉头痛、发烧，体温38.5°C，伴有轻微咳嗽。无药物过敏史。
+                                </div>
+                            </div>
+                            <div class="column">
+                                <h4><i class="fas fa-robot"></i> AI建议</h4>
+                                <div class="content-box" id="detail-advice">
+                                    建议服用布洛芬缓解头痛和发烧，每次200mg，每日3次，饭后服用。
+                                    同时建议多喝水，注意休息。
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 药品清单 -->
+                    <div class="detail-section">
+                        <h4><i class="fas fa-pills"></i> 药品清单</h4>
+                        <div class="table-container">
+                            <table id="drugs-table">
+                                <thead>
+                                    <tr>
+                                        <th>药品名称</th>
+                                        <th>规格</th>
+                                        <th>数量</th>
+                                        <th>单价</th>
+                                        <th>小计</th>
+                                        <th>类型</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="drugs-table-body">
+                                    <!-- 药品数据将动态插入 -->
+                                </tbody>
+                                <tfoot>
+                                    <tr>
+                                        <td colspan="4" style="text-align: right; font-weight: 600;">总计:</td>
+                                        <td colspan="2" style="font-weight: 600;" id="detail-total-price">¥ 13.00</td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- 取药信息 -->
+                    <div class="detail-section">
+                        <h4><i class="fas fa-qrcode"></i> 取药信息</h4>
+                        <div class="pickup-info-detail">
+                            <div class="detail-grid">
+                                <div class="detail-item">
+                                    <span class="detail-label">取药码</span>
+                                    <span class="detail-value pickup-code" id="detail-pickup-code">A1B2C3</span>
+                                </div>
+                                <div class="detail-item">
+                                    <span class="detail-label">配药药师</span>
+                                    <span class="detail-value" id="detail-pharmacist">张药师</span>
+                                </div>
+                                <div class="detail-item">
+                                    <span class="detail-label">取药方式</span>
+                                    <span class="detail-value" id="detail-pickup-method">窗口自取</span>
+                                </div>
+                                <div class="detail-item">
+                                    <span class="detail-label">支付方式</span>
+                                    <span class="detail-value" id="detail-payment-method">医保支付</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 审批记录 -->
+                    <div class="detail-section">
+                        <h4><i class="fas fa-clipboard-check"></i> 审批记录</h4>
+                        <div class="approval-record">
+                            <div class="timeline">
+                                <div class="timeline-item">
+                                    <div class="timeline-dot"></div>
+                                    <div class="timeline-content">
+                                        <div class="timeline-title">提交咨询</div>
+                                        <div class="timeline-time">2026-04-14 10:30:25</div>
+                                        <div class="timeline-desc">患者提交症状咨询</div>
+                                    </div>
+                                </div>
+                                <div class="timeline-item">
+                                    <div class="timeline-dot"></div>
+                                    <div class="timeline-content">
+                                        <div class="timeline-title">AI分析</div>
+                                        <div class="timeline-time">2026-04-14 10:32:10</div>
+                                        <div class="timeline-desc">AI分析症状并生成建议</div>
+                                    </div>
+                                </div>
+                                <div class="timeline-item">
+                                    <div class="timeline-dot approved"></div>
+                                    <div class="timeline-content">
+                                        <div class="timeline-title">医生审批</div>
+                                        <div class="timeline-time">2026-04-14 10:45:30</div>
+                                        <div class="timeline-desc">王医生批准用药建议</div>
+                                    </div>
+                                </div>
+                                <div class="timeline-item">
+                                    <div class="timeline-dot"></div>
+                                    <div class="timeline-content">
+                                        <div class="timeline-title">药房配药</div>
+                                        <div class="timeline-time">2026-04-14 11:15:30</div>
+                                        <div class="timeline-desc">张药师完成配药，生成取药码</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary modal-close">关闭</button>
+                <button class="btn btn-secondary" id="print-detail-btn">
+                    <i class="fas fa-print"></i> 打印详情
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 模态框 - 导出选项 -->
+    <div class="modal" id="export-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-download"></i> 导出选项</h3>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="export-options">
+                    <div class="form-group">
+                        <label for="export-format">导出格式:</label>
+                        <select id="export-format">
+                            <option value="pdf">PDF 文档</option>
+                            <option value="excel">Excel 表格</option>
+                            <option value="csv">CSV 文件</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="export-range">导出范围:</label>
+                        <select id="export-range">
+                            <option value="current">当前查询结果</option>
+                            <option value="all">全部历史记录</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="export-fields">包含字段:</label>
+                        <div class="checkbox-group">
+                            <label><input type="checkbox" checked> 处方信息</label>
+                            <label><input type="checkbox" checked> 药品清单</label>
+                            <label><input type="checkbox" checked> 审批记录</label>
+                            <label><input type="checkbox"> 取药信息</label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary modal-close">取消</button>
+                <button class="btn btn-primary" id="confirm-export-btn">
+                    <i class="fas fa-download"></i> 开始导出
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/app.js"></script>
+    <script src="js/history.js"></script>
+</body>
+</html>

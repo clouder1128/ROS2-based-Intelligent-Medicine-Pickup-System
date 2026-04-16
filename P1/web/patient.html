@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI开药助手 - 患者端</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+        <!-- 顶部导航栏 -->
+        <header class="header">
+            <div class="logo">
+                <i class="fas fa-stethoscope"></i>
+                <h1>AI开药助手</h1>
+                <span class="role-badge">患者端</span>
+            </div>
+            <nav class="nav">
+                <a href="patient.html" class="nav-link active"><i class="fas fa-user"></i> 患者咨询</a>
+                <a href="history.html" class="nav-link"><i class="fas fa-history"></i> 用药历史</a>
+                <a href="#" class="nav-link" id="logout-btn"><i class="fas fa-sign-out-alt"></i> 退出</a>
+            </nav>
+        </header>
+
+        <main class="main-content">
+            <!-- 左侧：聊天区域 -->
+            <section class="chat-section">
+                <div class="section-header">
+                    <h2><i class="fas fa-comments"></i> 症状咨询</h2>
+                    <div class="patient-info">
+                        <span>患者ID: <strong id="patient-id">未设置</strong></span>
+                        <button class="btn btn-sm" id="change-patient-btn">切换患者</button>
+                    </div>
+                </div>
+
+                <!-- 聊天消息容器 -->
+                <div class="chat-container" id="chat-container">
+                    <!-- 初始欢迎消息 -->
+                    <div class="message ai-message">
+                        <div class="message-header">
+                            <i class="fas fa-robot"></i>
+                            <span class="sender">AI开药助手</span>
+                            <span class="timestamp">刚刚</span>
+                        </div>
+                        <div class="message-content">
+                            您好！我是AI开药助手，可以帮您分析症状并提供用药建议。
+                            请描述您的症状，例如："我头痛、发烧"。
+                            注意：所有用药建议都需要医生审批。
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 输入区域 -->
+                <div class="input-section">
+                    <div class="input-group">
+                        <textarea id="message-input" placeholder="请输入您的症状，例如：头痛、发烧、咳嗽..."></textarea>
+                        <button id="send-btn" class="btn btn-primary">
+                            <i class="fas fa-paper-plane"></i> 发送
+                        </button>
+                    </div>
+                    <div class="input-hint">
+                        <i class="fas fa-info-circle"></i>
+                        您可以描述症状的持续时间、严重程度以及是否有药物过敏史。
+                    </div>
+                </div>
+
+                <!-- 状态指示器 -->
+                <div class="status-indicator" id="status-indicator">
+                    <div class="status-dot"></div>
+                    <span id="status-text">等待输入</span>
+                </div>
+            </section>
+
+            <!-- 右侧：信息面板 -->
+            <aside class="info-panel">
+                <!-- 当前审批状态 -->
+                <div class="info-card">
+                    <h3><i class="fas fa-clipboard-check"></i> 当前审批状态</h3>
+                    <div class="approval-status" id="approval-status">
+                        <div class="status-item">
+                            <span class="status-label">建议状态:</span>
+                            <span class="status-value pending">无待审批建议</span>
+                        </div>
+                        <div class="status-item">
+                            <span class="status-label">审批医生:</span>
+                            <span class="status-value">-</span>
+                        </div>
+                        <div class="status-item">
+                            <span class="status-label">提交时间:</span>
+                            <span class="status-value">-</span>
+                        </div>
+                    </div>
+                    <div class="approval-actions" id="approval-actions" style="display: none;">
+                        <button class="btn btn-secondary btn-block" id="refresh-status-btn">
+                            <i class="fas fa-sync-alt"></i> 刷新状态
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 取药信息 -->
+                <div class="info-card">
+                    <h3><i class="fas fa-pills"></i> 取药信息</h3>
+                    <div class="pickup-info" id="pickup-info">
+                        <p class="no-info">暂无取药信息</p>
+                    </div>
+                </div>
+
+                <!-- 注意事项 -->
+                <div class="info-card">
+                    <h3><i class="fas fa-exclamation-triangle"></i> 注意事项</h3>
+                    <ul class="notice-list">
+                        <li><i class="fas fa-check-circle"></i> 所有用药建议必须经过医生审批</li>
+                        <li><i class="fas fa-check-circle"></i> 请勿自行调整药物剂量</li>
+                        <li><i class="fas fa-check-circle"></i> 如有严重症状请立即就医</li>
+                        <li><i class="fas fa-check-circle"></i> 请仔细阅读药品说明书</li>
+                    </ul>
+                </div>
+            </aside>
+        </main>
+
+        <!-- 页脚 -->
+        <footer class="footer">
+            <p>© 2026 AI开药助手系统 | 医疗辅助工具，不能替代专业医疗建议</p>
+            <p class="footer-links">
+                <a href="#"><i class="fas fa-shield-alt"></i> 隐私政策</a>
+                <a href="#"><i class="fas fa-file-alt"></i> 使用条款</a>
+                <a href="#"><i class="fas fa-phone-alt"></i> 紧急联系</a>
+            </p>
+        </footer>
+    </div>
+
+    <!-- 模态框 - 患者ID设置 -->
+    <div class="modal" id="patient-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-user-edit"></i> 设置患者ID</h3>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p>请输入您的患者ID，用于关联您的医疗记录。</p>
+                <div class="form-group">
+                    <label for="patient-id-input">患者ID:</label>
+                    <input type="text" id="patient-id-input" placeholder="例如: patient_001">
+                </div>
+                <div class="form-group">
+                    <label for="patient-name-input">患者姓名:</label>
+                    <input type="text" id="patient-name-input" placeholder="例如: 张三">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary modal-close">取消</button>
+                <button class="btn btn-primary" id="save-patient-btn">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 模态框 - 取药码显示 -->
+    <div class="modal" id="pickup-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-qrcode"></i> 取药码</h3>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="pickup-code-display">
+                    <div class="pickup-code" id="pickup-code-value">123456</div>
+                    <p class="pickup-instruction">请凭此码到药房取药</p>
+                    <div class="pickup-details" id="pickup-details">
+                        <!-- 动态填充取药详情 -->
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary modal-close">确定</button>
+                <button class="btn btn-secondary" id="print-pickup-btn">
+                    <i class="fas fa-print"></i> 打印
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/app.js"></script>
+    <script src="js/patient.js"></script>
+</body>
+</html>
