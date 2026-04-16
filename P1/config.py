@@ -1,10 +1,50 @@
 # config.py
 import os
 import logging
-from typing import Dict, Any
+from pathlib import Path
+from typing import Dict, Any, List
 from dotenv import load_dotenv
 
-load_dotenv()
+
+logger = logging.getLogger(__name__)
+
+
+def _load_env_files() -> List[str]:
+    """按固定顺序加载环境变量文件，避免因启动目录不同而找不到配置。"""
+    config_dir = Path(__file__).resolve().parent
+    project_root = config_dir.parent
+    explicit_env = os.getenv("MEDICAL_ASSISTANT_ENV_FILE")
+
+    candidates = []
+    if explicit_env:
+        candidates.append(Path(explicit_env).expanduser())
+
+    candidates.extend([
+        project_root / ".env.local",
+        project_root / ".env",
+        config_dir / ".env.local",
+        config_dir / ".env",
+    ])
+
+    loaded_files: List[str] = []
+    seen_paths = set()
+    for candidate in candidates:
+        resolved = candidate.resolve(strict=False)
+        if resolved in seen_paths or not candidate.is_file():
+            continue
+        load_dotenv(dotenv_path=candidate, override=False)
+        loaded_files.append(str(candidate))
+        seen_paths.add(resolved)
+
+    if loaded_files:
+        logger.info("已加载环境变量文件: %s", ", ".join(loaded_files))
+    else:
+        logger.warning("未找到可加载的环境变量文件，将仅使用进程环境变量")
+
+    return loaded_files
+
+
+_LOADED_ENV_FILES = _load_env_files()
 
 class Config:
     """全局配置，从环境变量读取"""
@@ -35,7 +75,7 @@ class Config:
         Raises:
             ConfigurationError: 当配置无效时抛出
         """
-        from exceptions import ConfigurationError
+        from P1.exceptions import ConfigurationError
 
         # 验证LLM提供商和API密钥
         if cls.LLM_PROVIDER not in ["claude", "openai"]:
@@ -100,7 +140,7 @@ class Config:
 try:
     Config.validate()
 except Exception as e:
-    from exceptions import ConfigurationError
+    from P1.exceptions import ConfigurationError
     if isinstance(e, ConfigurationError):
         logging.error(f"配置验证失败: {str(e)}")
         raise
