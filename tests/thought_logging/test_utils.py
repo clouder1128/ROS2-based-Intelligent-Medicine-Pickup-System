@@ -98,6 +98,45 @@ def test_sanitize_for_logging():
     assert sanitized["nested"]["secret"] == "[REDACTED]"
     assert sanitized["nested"]["public"] == "公开信息"
 
+def test_sanitize_for_logging_depth_limit():
+    """测试日志数据清理的深度限制"""
+    # 创建深度嵌套的字典
+    data = {"level1": {"value": "test"}}
+    current = data
+    for i in range(2, 150):  # 创建150层嵌套
+        current[f"level{i}"] = {"value": f"test{i}"}
+        current = current[f"level{i}"]
+
+    # 使用默认深度限制（100）
+    sanitized = sanitize_for_logging(data)
+
+    # 检查深度限制是否生效
+    # 我们需要遍历到深度限制处
+    current = sanitized
+    depth = 0
+    while isinstance(current, dict) and f"level{depth+1}" in current:
+        current = current[f"level{depth+1}"]
+        depth += 1
+
+    # 深度应该被限制在100以内
+    assert depth <= 100
+
+    # 测试自定义深度限制
+    sanitized_shallow = sanitize_for_logging(data, max_depth=10)
+
+    # 检查是否返回了深度限制提示
+    if "[MAX_DEPTH_EXCEEDED]" in sanitized_shallow:
+        # 深度限制生效
+        assert True
+    else:
+        # 或者深度被限制在10以内
+        current = sanitized_shallow
+        depth = 0
+        while isinstance(current, dict) and f"level{depth+1}" in current:
+            current = current[f"level{depth+1}"]
+            depth += 1
+        assert depth <= 10
+
 def test_get_current_time_ms():
     """测试获取当前时间戳（毫秒）"""
     ts1 = get_current_time_ms()

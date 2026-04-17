@@ -31,7 +31,7 @@ def safe_json_dumps(obj: Any, default=None) -> str:
             if default:
                 return default(o)
             return str(o)
-        except:
+        except Exception as e:
             return f"[{type(o).__name__}]"
 
     try:
@@ -53,10 +53,23 @@ def get_current_time_ms() -> int:
     """获取当前时间戳（毫秒）"""
     return int(time.time() * 1000)
 
-def sanitize_for_logging(data: Dict[str, Any]) -> Dict[str, Any]:
-    """清理敏感数据，避免日志中泄露敏感信息"""
+def sanitize_for_logging(data: Dict[str, Any], max_depth: int = 100, current_depth: int = 0) -> Dict[str, Any]:
+    """清理敏感数据，避免日志中泄露敏感信息
+
+    参数:
+        data: 要清理的数据
+        max_depth: 最大递归深度，防止无限递归
+        current_depth: 当前递归深度（内部使用）
+
+    返回:
+        清理后的数据
+    """
     if not isinstance(data, dict):
         return data
+
+    # 检查深度限制
+    if current_depth >= max_depth:
+        return {"[MAX_DEPTH_EXCEEDED]": f"已达到最大递归深度 {max_depth}"}
 
     # 敏感字段关键字
     SENSITIVE_KEYS = [
@@ -74,14 +87,18 @@ def sanitize_for_logging(data: Dict[str, Any]) -> Dict[str, Any]:
             if sensitive in key_lower:
                 return "[REDACTED]"
 
-        # 如果是字典或列表，递归处理
+        # 如果是字典，递归处理
         if isinstance(value, dict):
-            return sanitize_for_logging(value)
+            return sanitize_for_logging(value, max_depth, current_depth + 1)
+        # 如果是列表，处理每个元素
         elif isinstance(value, list):
-            return [
-                _redact_value(f"{key}_item", item) if isinstance(item, dict) else item
-                for item in value
-            ]
+            result_list = []
+            for item in value:
+                if isinstance(item, dict):
+                    result_list.append(sanitize_for_logging(item, max_depth, current_depth + 1))
+                else:
+                    result_list.append(item)
+            return result_list
 
         return value
 
