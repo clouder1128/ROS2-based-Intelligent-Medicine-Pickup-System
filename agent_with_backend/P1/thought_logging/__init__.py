@@ -3,6 +3,13 @@
 
 from .config import ThoughtLoggingConfig
 from .recorder import ThoughtRecorder
+from .output import OutputManager
+from .decorators import (
+    record_llm_calls,
+    record_tool_decisions,
+    ThoughtLoggingDecorator,
+    with_thought_logging
+)
 from .utils import (
     generate_session_id,
     format_timestamp,
@@ -15,6 +22,11 @@ from .utils import (
 __all__ = [
     'ThoughtLoggingConfig',
     'ThoughtRecorder',
+    'OutputManager',
+    'record_llm_calls',
+    'record_tool_decisions',
+    'ThoughtLoggingDecorator',
+    'with_thought_logging',
     'generate_session_id',
     'format_timestamp',
     'safe_json_dumps',
