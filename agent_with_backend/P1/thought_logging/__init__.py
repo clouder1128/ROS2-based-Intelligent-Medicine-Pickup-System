@@ -1,6 +1,8 @@
 # agent_with_backend/P1/thought_logging/__init__.py
 """Thought logging utilities for agent system."""
 
+from .config import ThoughtLoggingConfig
+from .recorder import ThoughtRecorder
 from .utils import (
     generate_session_id,
     format_timestamp,
@@ -11,6 +13,8 @@ from .utils import (
 )
 
 __all__ = [
+    'ThoughtLoggingConfig',
+    'ThoughtRecorder',
     'generate_session_id',
     'format_timestamp',
     'safe_json_dumps',
