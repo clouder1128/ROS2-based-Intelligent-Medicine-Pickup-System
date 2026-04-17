@@ -47,6 +47,16 @@ class Config:
     # 否定词列表（用于规则提取器改进）
     NEGATION_WORDS = ["无", "没有", "不", "否", "非", "未"]
 
+    # 思考记录配置
+    ENABLE_THOUGHT_LOGGING = os.getenv("ENABLE_THOUGHT_LOGGING", "false").lower() == "true"
+    THOUGHT_LOG_LEVEL = os.getenv("THOUGHT_LOG_LEVEL", "DETAILED")
+    THOUGHT_LOG_TO_FILE = os.getenv("THOUGHT_LOG_TO_FILE", "true").lower() == "true"
+    THOUGHT_LOG_TO_CONSOLE = os.getenv("THOUGHT_LOG_TO_CONSOLE", "false").lower() == "true"
+    THOUGHT_LOG_DIR = os.getenv("THOUGHT_LOG_DIR", "./logs/thoughts")
+    THOUGHT_LOG_FORMATS = os.getenv("THOUGHT_LOG_FORMATS", "json,text").split(",")
+    THOUGHT_SESSION_AUTO_CLEANUP = os.getenv("THOUGHT_SESSION_AUTO_CLEANUP", "true").lower() == "true"
+    THOUGHT_SESSION_RETENTION_DAYS = int(os.getenv("THOUGHT_SESSION_RETENTION_DAYS", "7"))
+
     @classmethod
     def validate(cls) -> None:
         """验证配置项的有效性
@@ -109,6 +119,22 @@ class Config:
                     f"无法创建会话目录 {cls.SESSION_STATE_DIR}: {str(e)}"
                 )
 
+        # 验证思考记录配置
+        if cls.THOUGHT_LOG_LEVEL not in ["BASIC", "STANDARD", "DETAILED", "DEBUG"]:
+            raise ConfigurationError(
+                f"无效的THOUGHT_LOG_LEVEL: {cls.THOUGHT_LOG_LEVEL}, 必须是 BASIC, STANDARD, DETAILED 或 DEBUG"
+            )
+
+        if not all(fmt in ["json", "text"] for fmt in cls.THOUGHT_LOG_FORMATS):
+            raise ConfigurationError(
+                f"无效的THOUGHT_LOG_FORMATS: {cls.THOUGHT_LOG_FORMATS}, 只能包含 json 和 text"
+            )
+
+        if cls.THOUGHT_SESSION_RETENTION_DAYS <= 0:
+            raise ConfigurationError(
+                f"THOUGHT_SESSION_RETENTION_DAYS必须大于0，当前值: {cls.THOUGHT_SESSION_RETENTION_DAYS}"
+            )
+
         logging.debug("配置验证通过")
 
     @classmethod
@@ -136,6 +162,14 @@ class Config:
             "ENABLE_ASYNC": cls.ENABLE_ASYNC,
             "MAX_CONCURRENT_SESSIONS": cls.MAX_CONCURRENT_SESSIONS,
             "REQUEST_TIMEOUT": cls.REQUEST_TIMEOUT,
+            "ENABLE_THOUGHT_LOGGING": cls.ENABLE_THOUGHT_LOGGING,
+            "THOUGHT_LOG_LEVEL": cls.THOUGHT_LOG_LEVEL,
+            "THOUGHT_LOG_TO_FILE": cls.THOUGHT_LOG_TO_FILE,
+            "THOUGHT_LOG_TO_CONSOLE": cls.THOUGHT_LOG_TO_CONSOLE,
+            "THOUGHT_LOG_DIR": cls.THOUGHT_LOG_DIR,
+            "THOUGHT_LOG_FORMATS": cls.THOUGHT_LOG_FORMATS,
+            "THOUGHT_SESSION_AUTO_CLEANUP": cls.THOUGHT_SESSION_AUTO_CLEANUP,
+            "THOUGHT_SESSION_RETENTION_DAYS": cls.THOUGHT_SESSION_RETENTION_DAYS,
         }
 
 
