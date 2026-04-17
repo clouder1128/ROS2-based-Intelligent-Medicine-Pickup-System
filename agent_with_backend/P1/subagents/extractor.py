@@ -190,7 +190,7 @@ class SymptomExtractor:
         """提取症状列表（带否定词过滤）"""
         # 常见症状库
         symptom_keywords = [
-            '头痛', '头晕', '发热', '发烧', '烧', '咳嗽', '咳', '喉咙痛',
+            '头痛', '头疼', '头晕', '发热', '发烧', '烧', '咳嗽', '咳', '喉咙痛',
             '喉症', '流鼻涕', '打喷嚏', '喷嚏', '恶心', '呕吐', '腹泻',
             '腹痛', '肚子痛', '肌肉酸痛', '乏力', '疲劳', '疲惫',
             '失眠', '多梦', '食欲', '胃痛', '胃酸', '反酸',
@@ -200,7 +200,7 @@ class SymptomExtractor:
         ]
 
         # 从配置获取否定词
-        from core.config import Config
+        from ..core.config import Config
         negation_words = Config.NEGATION_WORDS
 
         symptoms = []

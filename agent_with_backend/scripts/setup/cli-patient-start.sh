@@ -10,7 +10,7 @@ cd "$PROJECT_ROOT"
 export PYTHONPATH="$PROJECT_ROOT:$PYTHONPATH"
 
 # Add ROS2 workspace for task_msgs support
-export ROS2_WS_PATH="/home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/ros-todo/ros_workspace"
+export ROS2_WS_PATH="$PROJECT_ROOT/ros-todo/ros_workspace"
 if [ -d "$ROS2_WS_PATH" ]; then
     # Add task_msgs Python package to PYTHONPATH
     export PYTHONPATH="$ROS2_WS_PATH/install/task_msgs/lib/python3.12/site-packages:$PYTHONPATH"
@@ -71,6 +71,23 @@ if curl -s http://localhost:8001/api/health > /dev/null 2>&1; then
     fi
     BACKEND_STARTED_BY_ME=false
 else
+    # Check and initialize database if needed
+    echo "Checking database..."
+    DB_PATH="$(dirname "$0")/../backend/pharmacy.db"
+    if [ ! -f "$DB_PATH" ]; then
+        echo "Database not found, initializing..."
+        cd "$PROJECT_ROOT"
+        venv/bin/python3 -m backend.init_db
+        if [ $? -eq 0 ]; then
+            echo "✓ Database initialized successfully"
+        else
+            echo "✗ Database initialization failed"
+            exit 1
+        fi
+    else
+        echo "✓ Database already exists"
+    fi
+
     # Start backend
     echo "Starting backend on port 8001..."
     venv/bin/python3 -m backend.main &

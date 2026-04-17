@@ -133,13 +133,32 @@ class MedicalAgent:
 
         # 1. 调用子代理提取症状（P3实现）
         structured_info = extract_symptoms(user_message)
-        if (
-            structured_info.symptoms
-            and structured_info.symptoms != [user_message]
-        ):
-            user_message = (
-                f"[系统提取的症状信息] {user_message}\n提取结果: {structured_info.to_dict()}"
+
+        # 2. 清晰传递提取的症状信息
+        if structured_info.symptoms and structured_info.symptoms != [user_message]:
+            # 构建清晰的信息格式
+            symptoms_text = "、".join(structured_info.symptoms)
+            patient_info = structured_info.patient_info
+
+            # 构建增强的用户消息
+            # 处理过敏史（可能是列表）
+            allergies_text = '无'
+            if patient_info.allergies:
+                if isinstance(patient_info.allergies, list):
+                    allergies_text = '、'.join(patient_info.allergies) if patient_info.allergies else '无'
+                else:
+                    allergies_text = str(patient_info.allergies)
+
+            enhanced_message = (
+                f"[患者描述] {user_message}\n"
+                f"[系统提取信息]\n"
+                f"- 症状: {symptoms_text}\n"
+                f"- 年龄: {patient_info.age or '未提供'}岁\n"
+                f"- 体重: {patient_info.weight or '未提供'}kg\n"
+                f"- 过敏史: {allergies_text}\n"
+                f"- 主诉: {structured_info.chief_complaint}"
             )
+            user_message = enhanced_message
 
         # 2. 添加用户消息
         self.message_manager.add_message("user", user_message)
@@ -313,7 +332,9 @@ class MedicalAgent:
             "调用 submit_approval",
             "请根据工作流继续执行下一步",
             "正在执行工作流",
-            "工作流下一步"
+            "工作流下一步",
+            "请立即调用",
+            "使用默认药品"
         ]
 
         for action in workflow_actions:

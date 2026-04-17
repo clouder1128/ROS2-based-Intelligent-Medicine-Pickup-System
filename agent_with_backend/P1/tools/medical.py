@@ -97,16 +97,34 @@ def query_drug(query: str) -> str:
         # Use pharmacy_client module for real queries
         from ..services.pharmacy_client import query_drugs_by_symptom, query_drug_by_name
 
-        if any(
-            keyword in query.lower()
-            for keyword in ["头痛", "发热", "咳嗽", "疼痛", "fever", "pain", "cough"]
-        ):
+        # 扩展症状关键词检测
+        symptom_keywords = ["头痛", "头疼", "发热", "咳嗽", "疼痛", "fever", "pain", "cough"]
+        is_symptom_query = any(keyword in query.lower() for keyword in symptom_keywords)
+
+        if is_symptom_query:
             # Symptom query
             drugs = query_drugs_by_symptom(query)
         else:
             # Name query
             drug = query_drug_by_name(query)
             drugs = [drug] if drug else []
+
+            # 症状映射回退机制
+            if not drugs:
+                symptom_mapping = {
+                    "头疼": "布洛芬",
+                    "头痛": "布洛芬",
+                    "发热": "对乙酰氨基酚",
+                    "咳嗽": "头孢克肟",
+                    "过敏": "氯雷他定"
+                }
+                for symptom, default_drug in symptom_mapping.items():
+                    if symptom in query:
+                        drug = query_drug_by_name(default_drug)
+                        if drug:
+                            drugs = [drug]
+                            logger.info(f"症状'{symptom}'映射到默认药品'{default_drug}'")
+                        break
 
         if not drugs:
             return json.dumps(
