@@ -1,0 +1,1 @@
+# tests/thought_logging/__init__.py
