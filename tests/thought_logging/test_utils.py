@@ -97,3 +97,18 @@ def test_sanitize_for_logging():
     assert sanitized["safe_data"] == "正常数据"
     assert sanitized["nested"]["secret"] == "[REDACTED]"
     assert sanitized["nested"]["public"] == "公开信息"
+
+def test_get_current_time_ms():
+    """测试获取当前时间戳（毫秒）"""
+    ts1 = get_current_time_ms()
+    import time
+    time.sleep(0.001)  # 等待1毫秒
+    ts2 = get_current_time_ms()
+
+    assert ts2 > ts1  # 确保时间在前进
+    assert isinstance(ts1, int)  # 确保返回的是整数
+
+    # 验证是毫秒级时间戳（应该在合理范围内）
+    current_seconds = time.time()
+    current_millis = int(current_seconds * 1000)
+    assert abs(ts1 - current_millis) < 1000  # 误差应该在1秒内
