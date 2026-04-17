@@ -29,15 +29,37 @@ def simple_interactive_mode(patient_id: Optional[str] = None):
     print("输入您的症状或问题，Agent会进行处理")
     print("输入 '/reset' 重置对话")
     print("输入 '/exit' 或按 Ctrl+C 退出")
+
+    # 显示思考记录状态
+    from ..core.config import Config
+    if Config.ENABLE_THOUGHT_LOGGING:
+        print("思考记录: 已启用")
+        print(f"日志目录: {Config.THOUGHT_LOG_DIR}")
+    else:
+        print("思考记录: 已禁用")
+
     print("=" * 60)
 
     try:
-        from core.agent import MedicalAgent
+        from ..core.agent import MedicalAgent
+        from ..thought_logging import with_thought_logging
+
+        # 创建配置
+        from ..thought_logging.config import ThoughtLoggingConfig
+        thought_config = ThoughtLoggingConfig()
 
         # 创建Agent
-        agent = MedicalAgent()
-        current_patient_id = patient_id or "default_patient"
+        base_agent = MedicalAgent()
 
+        # 根据配置决定是否启用思考记录
+        if thought_config.enabled:
+            agent = with_thought_logging(base_agent, thought_config)
+            print(f"\n思考记录已启用，会话ID: {agent._recorder.session_id}")
+        else:
+            agent = base_agent
+            print("\n思考记录已禁用")
+
+        current_patient_id = patient_id or "default_patient"
         print(f"\n患者ID: {current_patient_id}")
         print("MedicalAgent已初始化，开始对话...\n")
 
@@ -56,13 +78,35 @@ def simple_interactive_mode(patient_id: Optional[str] = None):
                 elif user_input.lower() == "/reset":
                     agent.reset()
                     print("对话已重置")
+
+                    # 如果启用了思考记录，也重置记录器
+                    if hasattr(agent, '_recorder') and agent._recorder.enabled:
+                        agent._recorder.clear_thoughts()
+                        agent._recorder.update_iteration(0)
+                        print("思考记录已重置")
+
                     continue
                 elif user_input.lower() == "/help":
                     print("\n可用命令:")
                     print("  /reset  - 重置对话")
                     print("  /exit   - 退出程序")
                     print("  /help   - 显示帮助")
+                    if hasattr(agent, '_recorder') and agent._recorder.enabled:
+                        print("  /thoughts - 显示思考记录统计")
                     print("\n直接输入您的症状或问题进行咨询")
+                    continue
+                elif user_input.lower() == "/thoughts":
+                    if hasattr(agent, '_recorder') and agent._recorder.enabled:
+                        stats = agent._recorder.get_stats()
+                        print("\n思考记录统计:")
+                        print(f"  总记录数: {stats['total']}")
+                        print(f"  会话ID: {stats['session_id']}")
+                        if 'by_type' in stats:
+                            print("  按类型统计:")
+                            for ttype, count in stats['by_type'].items():
+                                print(f"    - {ttype}: {count}")
+                    else:
+                        print("\n思考记录未启用")
                     continue
                 elif user_input.startswith("/"):
                     print(f"未知命令: {user_input}")
@@ -84,6 +128,11 @@ def simple_interactive_mode(patient_id: Optional[str] = None):
                     tool_calls = len([s for s in steps if s.get("type") == "tool_call"])
                     if tool_calls > 0:
                         print(f"[本次使用了 {tool_calls} 个工具调用]")
+
+                    # 如果启用了思考记录，显示简要统计
+                    if hasattr(agent, '_recorder') and agent._recorder.enabled:
+                        stats = agent._recorder.get_stats()
+                        print(f"[思考记录: {stats['total']} 条记录]")
 
                 except Exception as e:
                     print(f"\n处理失败: {e}")
