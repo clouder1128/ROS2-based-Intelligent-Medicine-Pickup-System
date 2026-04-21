@@ -8,7 +8,15 @@
       "Bash(python validate_restructure.py)",
       "Bash(python test_final_integration.py)",
       "Bash(python3 -c ' *)",
-      "Bash(venv/bin/python3 -m backend.init_db)"
+      "Bash(venv/bin/python3 -m backend.init_db)",
+      "Bash(git merge *)",
+      "Bash(git worktree *)",
+      "Bash(venv/bin/python3 -m py_compile agent_with_backend/P1/cli/patient_cli.py)",
+      "Bash(venv/bin/python -m py_compile agent_with_backend/P1/cli/patient_cli.py)",
+      "Bash(python3 -m py_compile agent_with_backend/P1/cli/patient_cli.py)"
+    ],
+    "additionalDirectories": [
+      "/home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/.worktrees/llm-thought-logging"
     ]
   }
 }

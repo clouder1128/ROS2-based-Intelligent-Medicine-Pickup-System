@@ -128,27 +128,29 @@ class MedicalAgent:
         self.patient_id = patient_id or "anonymous"
         steps: List[Dict] = []
 
-        # 为患者创建工作流（如果不存在）
+        # 为患者创建工作流（如果不存在）。workflow是一个未使用的对象，主要是为了为患者ID初始化工作流状态，重点在于workflow_manager内部的状态管理
         workflow = self.workflow_manager.create_workflow(self.patient_id)
 
-        # 1. 调用子代理提取症状（P3实现）
-        structured_info = extract_symptoms(user_message)
+        # 1. 调用子代理提取症状
+        structured_info = extract_symptoms(user_message,self.llm_client)
 
-        # 2. 清晰传递提取的症状信息
+        # 2. 由提取的症状信息增强用户消息
+        # 症状列表存在并且非空，并且症状信息与原始用户消息不同
         if structured_info.symptoms and structured_info.symptoms != [user_message]:
-            # 构建清晰的信息格式
-            symptoms_text = "、".join(structured_info.symptoms)
-            patient_info = structured_info.patient_info
+
+            symptoms_text = "、".join(structured_info.symptoms) # 将结构化信息转化为人类可读的文本形式
+            patient_info = structured_info.patient_info # 获取患者信息对象
 
             # 构建增强的用户消息
-            # 处理过敏史（可能是列表）
+            # 处理过敏史，如果是列表则用顿号连接，如果是字符串则直接使用，如果没有则显示无
             allergies_text = '无'
             if patient_info.allergies:
                 if isinstance(patient_info.allergies, list):
                     allergies_text = '、'.join(patient_info.allergies) if patient_info.allergies else '无'
                 else:
                     allergies_text = str(patient_info.allergies)
-
+            
+            # 构建增强消息，包含患者描述和系统提取的信息
             enhanced_message = (
                 f"[患者描述] {user_message}\n"
                 f"[系统提取信息]\n"
@@ -158,18 +160,18 @@ class MedicalAgent:
                 f"- 过敏史: {allergies_text}\n"
                 f"- 主诉: {structured_info.chief_complaint}"
             )
-            user_message = enhanced_message
+            user_message = enhanced_message #将用户消息替换为增强消息，让LLM看到更清晰的信息，提升工具调用的准确性
 
-        # 2. 添加用户消息
+        # 3. 将用户消息添加到消息历史（message_manager）中，LLM和工具调用都依赖这个消息历史来获取上下文
         self.message_manager.add_message("user", user_message)
 
-        # 3. 获取当前待办事项（P3实现）
+        # 4. 获取当前待办事项
         todo_list = self.todo_manager.get_todo_list()
         if todo_list:
             todo_prompt = f"\n当前待办任务: {todo_list}\n请按顺序完成。"
             self.message_manager.add_message("user", todo_prompt)
 
-        # 4. Agent循环
+        # 5. Agent循环
         max_iterations = Config.MAX_ITERATIONS
         last_tool_called = None
         tools_called = []  # 记录已调用的工具
@@ -200,6 +202,7 @@ class MedicalAgent:
 
             # 处理LLM响应中的文本内容
             if response.get("content"):
+                #取出回复的文本内容，添加到消息历史中，并记录步骤
                 assistant_reply = response["content"]
                 self.message_manager.add_message("assistant", assistant_reply)
                 steps.append(
@@ -247,8 +250,8 @@ class MedicalAgent:
                         "input": tool_input,
                         "duration_ms": 0,
                     }
-                    tool_start = time.time()
 
+                    tool_start = time.time()
                     # 执行工具
                     try:
                         tool_result = execute_tool(tool_name, tool_input)
@@ -477,6 +480,7 @@ class MedicalAgent:
             return None
 
     # ========== 会话持久化（P1职责：仅状态保存，不涉及数据库） ==========
+    # 在cli中有调用，/save时候将内容保存到session目录下。
     def save_state(self, filepath: str) -> None:
         """保存Agent状态到文件（用于长任务恢复）"""
         os.makedirs(os.path.dirname(filepath), exist_ok=True)

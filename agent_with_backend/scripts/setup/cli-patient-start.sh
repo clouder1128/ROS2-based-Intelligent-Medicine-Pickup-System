@@ -6,6 +6,25 @@ echo "Starting Patient CLI with Backend..."
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 cd "$PROJECT_ROOT"
+
+# 新增：加载 P1/.env 文件（如果存在）
+ENV_FILE="$PROJECT_ROOT/P1/.env"
+if [ -f "$ENV_FILE" ]; then
+    echo "✓ 从 P1/.env 文件加载环境变量: $ENV_FILE"
+    # 安全地加载环境变量（避免执行代码）
+    while IFS='=' read -r key value; do
+        # 跳过注释和空行
+        if [[ ! "$key" =~ ^[[:space:]]*# ]] && [[ -n "$key" ]] && [[ -n "$value" ]]; then
+            # 去除引号和空格
+            key=$(echo "$key" | tr -d '[:space:]')
+            value=$(echo "$value" | tr -d '[:space:]' | sed -e "s/^['\"]//" -e "s/['\"]$//")
+            export "$key"="$value"
+        fi
+    done < "$ENV_FILE"
+else
+    echo "⚠ 未找到 P1/.env 文件，使用环境变量或默认值"
+fi
+
 # Set Python path to include project root for module resolution
 export PYTHONPATH="$PROJECT_ROOT:$PYTHONPATH"
 
@@ -128,7 +147,65 @@ else
 fi
 
 # Set environment for P1
-export PHARMACY_BASE_URL=http://localhost:8001
+if [ -z "$PHARMACY_BASE_URL" ]; then
+    export PHARMACY_BASE_URL=http://localhost:8001
+fi
+
+# LLM思考记录配置
+# 若要启用思考记录，设置以下环境变量：
+# 如果未设置，使用默认值
+if [ -z "$ENABLE_THOUGHT_LOGGING" ]; then
+    export ENABLE_THOUGHT_LOGGING=true
+fi
+if [ -z "$THOUGHT_LOG_DIR" ]; then
+    export THOUGHT_LOG_DIR=./logs/thoughts
+fi
+if [ -z "$THOUGHT_LOG_LEVEL" ]; then
+    export THOUGHT_LOG_LEVEL=DETAILED
+fi
+if [ "$ENABLE_THOUGHT_LOGGING" = "true" ]; then
+    echo "✓ LLM思考记录已启用"
+    if [ -n "$THOUGHT_LOG_DIR" ]; then
+        echo "  日志目录: $THOUGHT_LOG_DIR"
+    fi
+else
+    echo "✗ LLM思考记录已禁用 (设置 ENABLE_THOUGHT_LOGGING=true 启用)"
+fi
+
+# LLM症状提取配置
+# 若要启用LLM提取，设置以下环境变量：
+if [ -z "$ENABLE_LLM_SYMPTOM_EXTRACTION" ]; then
+    # 如果未设置，默认启用LLM提取
+    export ENABLE_LLM_SYMPTOM_EXTRACTION=true
+fi
+if [ "$ENABLE_LLM_SYMPTOM_EXTRACTION" = "true" ]; then
+    echo "✓ LLM症状提取已启用"
+    # 设置LLM提供商和模型默认值
+    if [ -z "$LLM_PROVIDER" ]; then
+        export LLM_PROVIDER="claude"
+    fi
+    if [ -z "$LLM_MODEL" ]; then
+        # 根据提供商设置默认模型
+        if [ "$LLM_PROVIDER" = "claude" ]; then
+            export LLM_MODEL="claude-3-sonnet-20240229"
+        elif [ "$LLM_PROVIDER" = "openai" ]; then
+            export LLM_MODEL="gpt-4"
+        else
+            export LLM_MODEL="deepseek-chhat"
+        fi
+    fi
+    echo "  LLM提供商: $LLM_PROVIDER"
+    echo "  LLM模型: $LLM_MODEL"
+    # 检查必要的LLM环境变量
+    if [ -z "$ANTHROPIC_API_KEY" ] && [ -z "$OPENAI_API_KEY" ]; then
+        echo "⚠ 警告: 未检测到LLM API密钥 (ANTHROPIC_API_KEY 或 OPENAI_API_KEY)"
+        echo "⚠ LLM提取将降级为规则提取"
+    else
+        echo "✓ LLM API密钥已配置"
+    fi
+else
+    echo "✗ LLM症状提取已禁用 (使用规则提取模式)"
+fi
 
 # Start P1 Patient CLI
 echo ""

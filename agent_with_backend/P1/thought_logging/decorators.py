@@ -311,4 +311,10 @@ def with_thought_logging(obj, config: Optional[ThoughtLoggingConfig] = None):
 
             obj.run = wrapped_run
 
+        # 如果对象有llm_client属性，并且llm_client有chat方法，也装饰它
+        if hasattr(obj, 'llm_client'):
+            llm_client = obj.llm_client
+            if hasattr(llm_client, 'chat'):
+                llm_client.chat = record_llm_calls(obj._recorder)(llm_client.chat)
+
         return obj

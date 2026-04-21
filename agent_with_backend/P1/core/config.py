@@ -8,7 +8,7 @@ load_dotenv()
 
 
 class Config:
-    """全局配置，从环境变量读取"""
+    """全局配置，从环境变量（.env)读取"""
 
     LLM_PROVIDER = os.getenv("LLM_PROVIDER", "claude")
     ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY") or os.getenv(
@@ -24,6 +24,7 @@ class Config:
     )  # 快速模型（可选）
     LLM_MAX_TOKENS = int(os.getenv("LLM_MAX_TOKENS", "4096"))
     LLM_TEMPERATURE = float(os.getenv("LLM_TEMPERATURE", "0.3"))
+    
     PHARMACY_BASE_URL = os.getenv("PHARMACY_BASE_URL", "http://localhost:8001")
     DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./medical_assistant.db")
     LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")

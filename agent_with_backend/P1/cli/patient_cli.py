@@ -30,6 +30,11 @@ project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(_
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
+# 思考记录导入
+from ..thought_logging import with_thought_logging
+from ..thought_logging.config import ThoughtLoggingConfig
+from ..core.config import Config
+
 
 class InteractiveCLI:
     """交互式命令行界面"""
@@ -47,6 +52,9 @@ class InteractiveCLI:
         self.agent = None
         self.session_file = None
         self.command_history: List[str] = []
+
+        # 思考记录配置
+        self.thought_config = ThoughtLoggingConfig()
 
         # 确保保存目录存在
         os.makedirs(save_dir, exist_ok=True)
@@ -66,12 +74,29 @@ class InteractiveCLI:
             "/quit": self._cmd_exit,
             "/clear": self._cmd_clear,
             "/patient": self._cmd_patient,
+            "/thoughts": self._cmd_thoughts,
         }
 
     def _generate_patient_id(self) -> str:
         """生成患者ID"""
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         return f"patient_{timestamp}"
+
+    def _create_agent(self):
+        """创建MedicalAgent，根据配置决定是否启用思考记录"""
+        from ..core.agent import MedicalAgent
+
+        base_agent = MedicalAgent()
+
+        # 根据配置决定是否启用思考记录
+        if self.thought_config.enabled:
+            agent = with_thought_logging(base_agent, self.thought_config)
+            print(f"思考记录已启用，会话ID: {agent._recorder.session_id}")
+        else:
+            agent = base_agent
+            print("思考记录已禁用")
+
+        return agent
 
     def _print_banner(self) -> None:
         """打印欢迎横幅"""
@@ -80,6 +105,11 @@ class InteractiveCLI:
         print("=" * 60)
         print(f"患者ID: {self.patient_id}")
         print(f"会话目录: {self.save_dir}")
+        # 显示思考记录状态
+        if Config.ENABLE_THOUGHT_LOGGING:
+            print(f"思考记录: 已启用 | 日志目录: {Config.THOUGHT_LOG_DIR}")
+        else:
+            print("思考记录: 已禁用")
         print("输入 '/help' 查看可用命令")
         print("输入 '/exit' 退出程序")
         print("=" * 60 + "\n")
@@ -100,6 +130,7 @@ class InteractiveCLI:
         print("  /stats               - 显示统计信息")
         print("  /patient [新ID]      - 查看或更改患者ID")
         print("  /clear               - 清空屏幕")
+        print("  /thoughts            - 显示思考记录统计")
         print("  /exit, /quit         - 退出程序")
         print("\n常规使用:")
         print("  直接输入您的症状或问题，Agent会进行处理")
@@ -114,6 +145,12 @@ class InteractiveCLI:
             self.agent.reset()
             print("✓ 会话已重置")
             self.session_file = None
+
+            # 如果启用了思考记录，也重置记录器
+            if hasattr(self.agent, '_recorder') and self.agent._recorder.enabled:
+                self.agent._recorder.clear_thoughts()
+                self.agent._recorder.update_iteration(0)
+                print("思考记录已重置")
         else:
             print("! Agent未初始化")
         return False
@@ -169,9 +206,7 @@ class InteractiveCLI:
 
         try:
             if not self.agent:
-                from ..core.agent import MedicalAgent
-
-                self.agent = MedicalAgent()
+                self.agent = self._create_agent()
 
             success = self.agent.load_state(filepath)
             if success:
@@ -413,6 +448,21 @@ class InteractiveCLI:
 
         return False
 
+    def _cmd_thoughts(self, args: List[str] = None) -> bool:
+        """显示思考记录统计"""
+        if hasattr(self.agent, '_recorder') and self.agent._recorder.enabled:
+            stats = self.agent._recorder.get_stats()
+            print("\n思考记录统计:")
+            print(f"  总记录数: {stats['total']}")
+            print(f"  会话ID: {stats['session_id']}")
+            if 'by_type' in stats:
+                print("  按类型统计:")
+                for ttype, count in stats['by_type'].items():
+                    print(f"    - {ttype}: {count}")
+        else:
+            print("\n思考记录未启用")
+        return False
+
     def _process_input(self, user_input: str) -> bool:
         """处理用户输入"""
         user_input = user_input.strip()
@@ -442,10 +492,8 @@ class InteractiveCLI:
         # 确保Agent已初始化
         if not self.agent:
             try:
-                from ..core.agent import MedicalAgent
-
                 print("正在初始化MedicalAgent...")
-                self.agent = MedicalAgent()
+                self.agent = self._create_agent()
                 print("✓ Agent初始化完成")
             except Exception as e:
                 print(f"✗ Agent初始化失败: {e}")
@@ -487,9 +535,7 @@ class InteractiveCLI:
 
         # 尝试初始化Agent
         try:
-            from ..core.agent import MedicalAgent
-
-            self.agent = MedicalAgent()
+            self.agent = self._create_agent()
             print("✓ MedicalAgent初始化成功")
         except Exception as e:
             print(f"! Agent初始化失败: {e}")

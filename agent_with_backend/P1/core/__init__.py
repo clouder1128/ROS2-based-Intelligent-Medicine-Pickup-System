@@ -14,7 +14,7 @@ def _get_global_agent() -> MedicalAgent:
     """获取全局Agent实例（懒加载）"""
     global _global_agent
     if _global_agent is None:
-        _global_agent = MedicalAgent()
+        _global_agent = MedicalAgent() #没有agent就创建一个新的agent
     return _global_agent
 
 

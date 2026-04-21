@@ -1,4 +1,5 @@
 # exceptions.py
+# 定义Agent相关的异常类,不够完善
 class AgentError(Exception):
     """Base exception for Agent related errors."""
 
