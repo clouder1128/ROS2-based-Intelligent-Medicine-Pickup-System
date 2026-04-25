@@ -52,6 +52,7 @@ Thumbs.db
 # Logs
 *.log
 logs/
+agent_with_backend/pharmacy.db
 agent_with_backend/backend/pharmacy.db
 agent_with_backend/backend.lock
 agent_with_backend/P1/.env.optimized
