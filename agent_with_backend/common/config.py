@@ -64,6 +64,9 @@ class Config:
     # === ROS2 配置 ===
     ENABLE_ROS2: bool = os.getenv("ENABLE_ROS2", "true").lower() in ["true", "1"]
 
+    # === 工作流规划器配置 ===
+    ENABLE_WORKFLOW_PLANNER: bool = os.getenv("ENABLE_WORKFLOW_PLANNER", "true").lower() in ["true", "1"]
+
     # === 症状提取配置 ===
     ENABLE_LLM_SYMPTOM_EXTRACTION = os.getenv(
         "ENABLE_LLM_SYMPTOM_EXTRACTION", "true"

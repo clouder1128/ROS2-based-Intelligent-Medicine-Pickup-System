@@ -8,7 +8,7 @@ from flask import Blueprint, jsonify, request
 from common.utils.database import get_db_connection
 from ros_integration.bridge import publish_task
 from common.utils.drug_helpers import validate_and_get_drug, find_drug_id_by_name
-from approval import get_approval_manager
+from database.approval_manager import get_approval_manager
 
 approval_bp = Blueprint("approval", __name__, url_prefix="/api")
 

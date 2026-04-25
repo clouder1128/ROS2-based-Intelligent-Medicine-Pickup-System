@@ -37,10 +37,12 @@ def _placeholder_extract_symptoms(user_input: str) -> Dict[str, Any]:
 
 
 try:
-    from agent.planner.models import TodoManager
+    from agent.planner.models import TodoManager, TaskCategory
     TodoManager
+    TaskCategory
 except ImportError:
     TodoManager = _PlaceholderTodoManager
+    TaskCategory = None
     logger.warning("P3 planner not found, using placeholder")
 
 try:
@@ -90,7 +92,17 @@ class MedicalAgent:
         self.message_manager = message_manager or MessageManager(
             system_prompt=SYSTEM_PROMPT
         )
+        self.planner_enabled = Config.ENABLE_WORKFLOW_PLANNER
         self.todo_manager = TodoManager()
+        if self.planner_enabled:
+            try:
+                from agent.planner.storage import SQLiteStorage
+                self.todo_manager = TodoManager(
+                    storage=SQLiteStorage(db_path="tasks.db")
+                )
+            except Exception as e:
+                logger.warning(f"Planner storage init failed, using in-memory: {e}")
+                self.todo_manager = TodoManager()
         self.workflow_manager = WorkflowManager()
         self.patient_id: Optional[str] = None
         self.approval_id: Optional[str] = None
@@ -145,6 +157,63 @@ class MedicalAgent:
 
         return []  # 全部失败
 
+    def _create_workflow_plan(self, symptoms: List[str], drug_count: int) -> None:
+        """创建工作流任务计划（planner 启用时）"""
+        if not self.planner_enabled:
+            return
+
+        # 清空旧会话任务
+        for task_id in list(self.todo_manager.tasks.keys()):
+            self.todo_manager.delete_todo(task_id)
+
+        t1 = self.todo_manager.add_todo(
+            content=f"症状分析: {'、'.join(symptoms)}",
+            category=TaskCategory.SYMPTOM.value,
+            priority=5,
+            related_symptoms=symptoms,
+        )
+        self.todo_manager.mark_completed(t1.id, notes=f"找到 {drug_count} 种匹配药品")
+
+        self.todo_manager.add_todo(
+            content="过敏风险检查",
+            category=TaskCategory.CHECK.value,
+            priority=4,
+            dependencies=[t1.id],
+        )
+        self.todo_manager.add_todo(
+            content="用药剂量计算",
+            category=TaskCategory.DOSAGE.value,
+            priority=3,
+        )
+        self.todo_manager.add_todo(
+            content="生成用药建议",
+            category=TaskCategory.OTHER.value,
+            priority=3,
+        )
+        self.todo_manager.add_todo(
+            content="提交医生审批",
+            category=TaskCategory.APPROVAL.value,
+            priority=5,
+        )
+
+    def _format_plan_for_llm(self) -> str:
+        """将当前任务计划格式化为 LLM 可读上下文"""
+        if not self.planner_enabled:
+            return ""
+
+        lines = ["\n[当前工作流进度]"]
+        for task in self.todo_manager.get_todo_list(sort_by_priority=True):
+            if task.status == "completed":
+                marker = "[已完成]"
+            elif task.status == "in_progress":
+                marker = "[进行中]"
+            elif task.status == "blocked":
+                marker = "[已阻塞]"
+            else:
+                marker = "[待处理]"
+            lines.append(f"  {marker} {task.content}")
+        return "\n".join(lines)
+
     def run(
         self, user_message: str, patient_id: Optional[str] = None
     ) -> Tuple[str, List[Dict]]:
@@ -171,7 +240,10 @@ class MedicalAgent:
             workflow.mark_step_completed(WorkflowStep.DRUG_QUERY_FAILED, {"reason": "no_drugs_found"})
             return msg, steps
 
-        # 3. 由提取的症状信息增强用户消息
+        # 3. 创建工作流任务计划
+        self._create_workflow_plan(symptoms, len(drug_list))
+
+        # 4. 由提取的症状信息增强用户消息
         symptoms_text = "、".join(symptoms)
         severity_text = ""
         if structured_info.severity:
@@ -205,13 +277,8 @@ class MedicalAgent:
             f"{drug_summary}\n"
             f"\n请根据上述药品列表为患者筛选药品、检查过敏、计算剂量。如果列表中有适合的药品，直接进行后续步骤（过敏检查→剂量计算→生成建议→提交审批）。"
         )
+        enhanced_message += self._format_plan_for_llm()
         self.message_manager.add_message("user", enhanced_message)
-
-        # 4. 获取当前待办事项
-        todo_list = self.todo_manager.get_todo_list()
-        if todo_list:
-            todo_prompt = f"\n当前待办任务: {todo_list}\n请按顺序完成。"
-            self.message_manager.add_message("user", todo_prompt)
 
         # 5. Agent循环（简化版）
         max_iterations = Config.MAX_ITERATIONS
@@ -294,7 +361,7 @@ class MedicalAgent:
                             )
                         self.workflow_completed = True
 
-                    self._update_workflow_for_tool(tool_name, tool_result)
+                    self._update_workflow_and_todo(tool_name, tool_result)
                 continue  # 有工具调用就继续循环
 
             # 没有工具调用，纯文本回复
@@ -332,6 +399,24 @@ class MedicalAgent:
             step = tool_to_step[tool_name]
             data = {"tool_result": tool_result}
             self.workflow_manager.update_workflow_step(self.patient_id, step, data)
+
+    def _update_workflow_and_todo(self, tool_name: str, tool_result: str) -> None:
+        """根据工具调用更新工作流状态和任务进度"""
+        self._update_workflow_for_tool(tool_name, tool_result)
+
+        if not self.planner_enabled:
+            return
+
+        tool_to_category = {
+            "check_allergy": TaskCategory.CHECK.value,
+            "calc_dosage": TaskCategory.DOSAGE.value,
+            "generate_advice": TaskCategory.OTHER.value,
+            "submit_approval": TaskCategory.APPROVAL.value,
+        }
+        category = tool_to_category.get(tool_name)
+        if category:
+            for task in self.todo_manager.get_tasks_by_category(category):
+                self.todo_manager.mark_completed(task.id)
 
     def reset(self) -> None:
         """重置对话（新会话）"""
