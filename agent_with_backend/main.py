@@ -202,7 +202,7 @@ if os.environ.get("WERKZEUG_RUN_MAIN") == "true":
 
 if __name__ == "__main__":
     if not os.path.exists(Config.DATABASE_PATH):
-        print("请先运行: python3 init_db.py")
+        print("请先运行: python3 -m database.scripts.init_db && python3 -m database.scripts.seed_drugs")
         exit(1)
     _debug = True
     _use_reloader = _debug
