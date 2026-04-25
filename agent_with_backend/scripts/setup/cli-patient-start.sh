@@ -7,10 +7,10 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 cd "$PROJECT_ROOT"
 
-# 新增：加载 P1/.env 文件（如果存在）
-ENV_FILE="$PROJECT_ROOT/P1/.env"
+# 加载 .env 文件（如果存在）
+ENV_FILE="$PROJECT_ROOT/.env"
 if [ -f "$ENV_FILE" ]; then
-    echo "✓ 从 P1/.env 文件加载环境变量: $ENV_FILE"
+    echo "✓ 从 .env 文件加载环境变量: $ENV_FILE"
     # 安全地加载环境变量（避免执行代码）
     while IFS='=' read -r key value; do
         # 跳过注释和空行
@@ -22,14 +22,14 @@ if [ -f "$ENV_FILE" ]; then
         fi
     done < "$ENV_FILE"
 else
-    echo "⚠ 未找到 P1/.env 文件，使用环境变量或默认值"
+    echo "⚠ 未找到 .env 文件，使用环境变量或默认值"
 fi
 
 # Set Python path to include project root for module resolution
 export PYTHONPATH="$PROJECT_ROOT:$PYTHONPATH"
 
 # Add ROS2 workspace for task_msgs support
-export ROS2_WS_PATH="$PROJECT_ROOT/ros-todo/ros_workspace"
+export ROS2_WS_PATH="$(cd "$PROJECT_ROOT/.." && pwd)/ros-todo/ros_workspace"
 if [ -d "$ROS2_WS_PATH" ]; then
     # Add task_msgs Python package to PYTHONPATH
     export PYTHONPATH="$ROS2_WS_PATH/install/task_msgs/lib/python3.12/site-packages:$PYTHONPATH"
@@ -74,7 +74,7 @@ BACKEND_STARTED_BY_ME=false
 if curl -s http://localhost:8001/api/health > /dev/null 2>&1; then
     echo "✓ Backend is already running on port 8001, reusing it"
     # Try to find the backend process PID
-    BACKEND_PID=$(pgrep -f "python.*backend" | head -1)
+    BACKEND_PID=$(pgrep -f "python.*main" | head -1)
     if [ -n "$BACKEND_PID" ]; then
         echo "  Using existing backend process (PID: $BACKEND_PID)"
     else
@@ -92,11 +92,11 @@ if curl -s http://localhost:8001/api/health > /dev/null 2>&1; then
 else
     # Check and initialize database if needed
     echo "Checking database..."
-    DB_PATH="$(dirname "$0")/../backend/pharmacy.db"
+    DB_PATH="$PROJECT_ROOT/pharmacy.db"
     if [ ! -f "$DB_PATH" ]; then
         echo "Database not found, initializing..."
         cd "$PROJECT_ROOT"
-        venv/bin/python3 -m backend.init_db
+        venv/bin/python3 -m init_db
         if [ $? -eq 0 ]; then
             echo "✓ Database initialized successfully"
         else
@@ -109,7 +109,7 @@ else
 
     # Start backend
     echo "Starting backend on port 8001..."
-    venv/bin/python3 -m backend.main &
+    venv/bin/python3 main.py &
     BACKEND_PID=$!
     BACKEND_STARTED_BY_ME=true
 
@@ -146,7 +146,7 @@ else
     fi
 fi
 
-# Set environment for P1
+# Set environment for backend API
 if [ -z "$PHARMACY_BASE_URL" ]; then
     export PHARMACY_BASE_URL=http://localhost:8001
 fi
@@ -191,7 +191,7 @@ if [ "$ENABLE_LLM_SYMPTOM_EXTRACTION" = "true" ]; then
         elif [ "$LLM_PROVIDER" = "openai" ]; then
             export LLM_MODEL="gpt-4"
         else
-            export LLM_MODEL="deepseek-chhat"
+            export LLM_MODEL="deepseek-chat"
         fi
     fi
     echo "  LLM提供商: $LLM_PROVIDER"
@@ -207,9 +207,9 @@ else
     echo "✗ LLM症状提取已禁用 (使用规则提取模式)"
 fi
 
-# Start P1 Patient CLI
+# Start Patient CLI
 echo ""
-echo "Starting P1 Patient CLI..."
+echo "Starting Patient CLI..."
 if [ "$BACKEND_STARTED_BY_ME" = true ]; then
     echo "Backend PID: $BACKEND_PID (started by this script)"
     echo "PHARMACY_BASE_URL: $PHARMACY_BASE_URL"
@@ -224,7 +224,7 @@ fi
 echo "Press Ctrl+C to exit CLI"
 echo ""
 # 保持在项目根目录，使用模块方式运行
-venv/bin/python3 -m P1.cli.patient_cli
+venv/bin/python3 -m cli.patient_cli
 
 # Cleanup on exit
 if [ "$BACKEND_STARTED_BY_ME" = true ] && [ $BACKEND_PID -ne 0 ]; then

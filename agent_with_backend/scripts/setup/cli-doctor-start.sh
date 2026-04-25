@@ -9,6 +9,21 @@ cd "$PROJECT_ROOT"
 # Set Python path to include project root for module resolution
 export PYTHONPATH="$PROJECT_ROOT:$PYTHONPATH"
 
+# 加载 .env 文件（如果存在）
+ENV_FILE="$PROJECT_ROOT/.env"
+if [ -f "$ENV_FILE" ]; then
+    echo "✓ 从 .env 文件加载环境变量: $ENV_FILE"
+    while IFS='=' read -r key value; do
+        if [[ ! "$key" =~ ^[[:space:]]*# ]] && [[ -n "$key" ]] && [[ -n "$value" ]]; then
+            key=$(echo "$key" | tr -d '[:space:]')
+            value=$(echo "$value" | tr -d '[:space:]' | sed -e "s/^['\"]//" -e "s/['\"]$//")
+            export "$key"="$value"
+        fi
+    done < "$ENV_FILE"
+else
+    echo "⚠ 未找到 .env 文件，使用环境变量或默认值"
+fi
+
 # Lock file for backend coordination
 LOCK_FILE="$(dirname "$0")/backend.lock"
 SCRIPT_PID=$$
@@ -38,7 +53,7 @@ BACKEND_STARTED_BY_ME=false
 if curl -s http://localhost:8001/api/health > /dev/null 2>&1; then
     echo "✓ Backend is already running on port 8001, reusing it"
     # Try to find the backend process PID
-    BACKEND_PID=$(pgrep -f "python.*backend" | head -1)
+    BACKEND_PID=$(pgrep -f "python.*main" | head -1)
     if [ -n "$BACKEND_PID" ]; then
         echo "  Using existing backend process (PID: $BACKEND_PID)"
     else
@@ -56,7 +71,7 @@ if curl -s http://localhost:8001/api/health > /dev/null 2>&1; then
 else
     # Start backend
     echo "Starting backend on port 8001..."
-    venv/bin/python3 -m backend.main &
+    venv/bin/python3 main.py &
     BACKEND_PID=$!
     BACKEND_STARTED_BY_ME=true
 
@@ -93,12 +108,12 @@ else
     fi
 fi
 
-# Set environment for P1
+# Set environment for backend API
 export PHARMACY_BASE_URL=http://localhost:8001
 
-# Start P1 Doctor CLI
+# Start Doctor CLI
 echo ""
-echo "Starting P1 Doctor CLI..."
+echo "Starting Doctor CLI..."
 if [ "$BACKEND_STARTED_BY_ME" = true ]; then
     echo "Backend PID: $BACKEND_PID (started by this script)"
     echo "PHARMACY_BASE_URL: $PHARMACY_BASE_URL"
@@ -112,7 +127,7 @@ else
 fi
 echo "Press Ctrl+C to exit CLI"
 echo ""
-venv/bin/python3 -m P1.cli.doctor_cli
+venv/bin/python3 -m cli.doctor_cli
 
 # Cleanup on exit
 if [ "$BACKEND_STARTED_BY_ME" = true ] && [ $BACKEND_PID -ne 0 ]; then
