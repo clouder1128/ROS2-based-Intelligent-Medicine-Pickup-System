@@ -20,6 +20,7 @@ class WorkflowStep(Enum):
     USER_FEEDBACK = "user_feedback"
     TERMINATED_WITHOUT_APPROVAL = "terminated_without_approval"
     SYMPTOM_CORRECTION = "symptom_correction"
+    DRUG_QUERY_FAILED = "drug_query_failed"
 
 
 @dataclass

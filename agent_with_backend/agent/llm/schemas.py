@@ -8,11 +8,14 @@ class LLMMessage:
     role: str
     content: str
     tool_call_id: Optional[str] = None
+    tool_calls: Optional[List[Dict]] = None
 
     def to_dict(self) -> Dict[str, Any]:
         result = {"role": self.role, "content": self.content}
         if self.tool_call_id:
             result["tool_call_id"] = self.tool_call_id
+        if self.tool_calls:
+            result["tool_calls"] = self.tool_calls
         return result
 
     @classmethod
@@ -21,6 +24,7 @@ class LLMMessage:
             role=data["role"],
             content=data["content"],
             tool_call_id=data.get("tool_call_id"),
+            tool_calls=data.get("tool_calls"),
         )
 
 
@@ -29,13 +33,21 @@ class ToolCall:
     """工具调用数据类"""
     name: str
     input: Dict[str, Any]
+    id: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
-        return {"name": self.name, "input": self.input}
+        result = {"name": self.name, "input": self.input}
+        if self.id:
+            result["id"] = self.id
+        return result
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "ToolCall":
-        return cls(name=data["name"], input=data["input"])
+        return cls(
+            name=data["name"],
+            input=data["input"],
+            id=data.get("id"),
+        )
 
 
 @dataclass

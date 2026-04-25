@@ -1,4 +1,5 @@
 import json
+import re
 import logging
 from typing import List, Dict, Any, Optional
 
@@ -61,8 +62,31 @@ class OpenAIProvider:
         if message.tool_calls:
             for tc in message.tool_calls:
                 tool_calls.append(
-                    ToolCall(name=tc.function.name, input=json.loads(tc.function.arguments))
+                    ToolCall(
+                        id=tc.id,
+                        name=tc.function.name,
+                        input=json.loads(tc.function.arguments),
+                    )
                 )
+
+        # Fallback: detect tool calls in content for models that return raw SSE JSON
+        if not tool_calls and content:
+            tc_match = re.search(r'"tool_calls"\s*:\s*(\[[\s\S]*?\])\s*\}', content)
+            if tc_match:
+                try:
+                    raw_tcs = json.loads(tc_match.group(1))
+                    for raw in raw_tcs:
+                        fn = raw.get("function", {})
+                        tool_calls.append(
+                            ToolCall(
+                                id=raw.get("id"),
+                                name=fn.get("name", ""),
+                                input=json.loads(fn.get("arguments", "{}")),
+                            )
+                        )
+                    content = re.sub(r'\s*\{"index".*', "", content).strip()
+                except (json.JSONDecodeError, KeyError):
+                    pass
 
         usage = None
         if hasattr(response, "usage"):

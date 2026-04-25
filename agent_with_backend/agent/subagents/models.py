@@ -40,6 +40,7 @@ class PatientInfo:
 class StructuredSymptoms:
     chief_complaint: str
     symptoms: List[str] = field(default_factory=list)
+    severity: Dict[str, str] = field(default_factory=dict)
     signs: Dict[str, Any] = field(default_factory=dict)
     patient_info: PatientInfo = field(default_factory=PatientInfo)
     medical_history: Optional[Dict[str, Any]] = None
@@ -48,6 +49,7 @@ class StructuredSymptoms:
         return {
             "chief_complaint": self.chief_complaint,
             "symptoms": self.symptoms,
+            "severity": self.severity,
             "signs": self.signs,
             "patient_info": self.patient_info.to_dict(),
             "medical_history": self.medical_history
@@ -58,6 +60,7 @@ class StructuredSymptoms:
         return cls(
             chief_complaint=data.get("chief_complaint", ""),
             symptoms=data.get("symptoms", []),
+            severity=data.get("severity", {}),
             signs=data.get("signs", {}),
             patient_info=PatientInfo.from_dict(data.get("patient_info", {})),
             medical_history=data.get("medical_history")

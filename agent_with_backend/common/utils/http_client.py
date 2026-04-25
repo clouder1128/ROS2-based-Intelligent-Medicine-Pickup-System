@@ -106,17 +106,19 @@ class PharmacyHTTPClient:
 
     # ========== Drug API ==========
 
-    async def get_drugs_async(self, name_filter: Optional[str] = None) -> List[Dict[str, Any]]:
+    async def get_drugs_async(self, name_filter: Optional[str] = None, symptom_filter: Optional[str] = None) -> List[Dict[str, Any]]:
         params = {}
         if name_filter:
             params["name"] = name_filter
+        if symptom_filter:
+            params["symptom"] = symptom_filter
         result = await self._make_request("GET", "/api/drugs", params=params)
         if result and result.get("success") and "drugs" in result:
             return result["drugs"]
         return []
 
-    def get_drugs(self, name_filter: Optional[str] = None) -> List[Dict[str, Any]]:
-        return self._run_async(self.get_drugs_async(name_filter))
+    def get_drugs(self, name_filter: Optional[str] = None, symptom_filter: Optional[str] = None) -> List[Dict[str, Any]]:
+        return self._run_async(self.get_drugs_async(name_filter, symptom_filter))
 
     async def get_drug_by_id_async(self, drug_id: int) -> Optional[Dict[str, Any]]:
         result = await self._make_request("GET", f"/api/drugs/{drug_id}")

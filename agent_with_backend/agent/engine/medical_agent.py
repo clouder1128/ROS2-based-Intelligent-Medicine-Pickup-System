@@ -5,6 +5,7 @@ import logging
 import pickle
 import os
 import time
+import json
 from typing import List, Dict, Any, Tuple, Optional
 
 from common.config import Config
@@ -19,16 +20,13 @@ from agent.engine.workflows import WorkflowManager, WorkflowStep
 logger = logging.getLogger(__name__)
 
 
-# ==================== 与P3的集成占位 ====================
+# ==================== P3集成占位 ====================
 class _PlaceholderTodoManager:
     """P3的TodoManager占位，P3实现后替换"""
-
     def get_todo_list(self) -> List[str]:
         return []
-
     def update_todo(self, task: str, status: str) -> bool:
         return True
-
     def add_todo(self, task: str, priority: int = 0) -> None:
         pass
 
@@ -38,7 +36,6 @@ def _placeholder_extract_symptoms(user_input: str) -> Dict[str, Any]:
     return {"symptoms": user_input, "age": None, "weight": None}
 
 
-# 尝试导入P3的真实模块，如果失败则使用占位
 try:
     from agent.planner.models import TodoManager
     TodoManager
@@ -54,41 +51,32 @@ except ImportError as e:
 
 
 # ==================== 系统提示词 ====================
-SYSTEM_PROMPT = """你是一个医疗用药助手，必须严格遵循以下自动工作流程：
+SYSTEM_PROMPT = """你是一个医疗用药助手。请按以下流程工作：
 
-自动工作流程（严格按照此顺序执行，不要添加任何额外解释）：
-1. 收集患者信息：症状、年龄、体重、过敏史。
-   - 如果患者已提供明确的过敏史信息（包括"无过敏历史"、"没有过敏史"等表述），则直接进入下一步
-   - 只有当患者完全没有提到过敏史时，才需要询问一次
-2. 立即调用 query_drug 查询与症状相关的药物（使用症状关键词）。
-3. 立即调用 check_allergy 确认患者对推荐药物无过敏风险。
-4. 立即调用 calc_dosage 计算合适的剂量。
-5. 立即调用 generate_advice，使用 calc_dosage 结果中的 "drug_name" 和 "dosage" 字段。
-6. 立即调用 submit_approval，使用 generate_advice 结果中的 "advice_text" 作为 advice 参数。
+[药品查询]
+- 注意：如果系统消息中已经提供了匹配的药品列表，则跳过 query_drug 直接进入筛选步骤
+- 如果需要自行调用 query_drug(symptom) 且返回空列表 (status="not_found")：
+  - 换个相近的症状词汇重新查询，最多尝试 3 次
+  - 示例：轻度头疼→头痛→偏头痛
+- 如果 3 次都未找到：告知患者当前症状未找到匹配药品，建议就医，终止流程
 
-强制规则（必须遵守）：
-1. 工作流是自动的，一旦开始就连续执行所有步骤，不要停顿
-2. 如果患者已提供过敏史，不要重复询问
-3. 每次只调用一个工具，等待结果后再继续
-4. 严格按照顺序：query_drug → check_allergy → calc_dosage → generate_advice → submit_approval
-5. 不要添加任何文本解释，直接调用工具
-6. 完成 submit_approval 后，向用户显示审批ID和后续步骤
+[药品筛选与决策]
+- 从药品列表中根据患者症状选出合适的药品
+- 对每种候选药品调用 check_allergy 检查过敏风险
+- 对通过过敏检查的药品调用 calc_dosage 计算剂量
+- 可根据需要选择多种药品联用（重复过敏检查和剂量计算）
 
-工作流示例：
-用户：老王,30岁,60kg,偏头痛,无过敏历史
-助手：调用 query_drug(症状="偏头痛")
-[工具返回结果]
-助手：调用 check_allergy(patient_allergies="无", drug_name="布洛芬")
-[工具返回结果]
-助手：调用 calc_dosage(drug_name="布洛芬", age=30, weight_kg=60, condition_severity="轻")
-[工具返回结果]
-助手：调用 generate_advice(drug_name="布洛芬", dosage="成人剂量：200-400mg，每4-6小时一次")
-[工具返回结果]
-助手：调用 submit_approval(patient_name="老王", advice="[advice_text内容]", patient_age=30, patient_weight=60, symptoms="偏头痛", drug_name="布洛芬")
-[工具返回结果]
-助手：审批已提交，审批ID: AP-20260415-XXXX。请等待医生审批。
+[提交审批]
+- 调用 generate_advice 生成用药建议
+- 调用 submit_approval 将建议提交给医生审批
 
-记住：工作流一旦启动，必须连续执行到 submit_approval 完成。
+重要规则：
+- 如果系统中已经提供了药品列表，不要重复调用 query_drug
+- 如果药品列表为空，不要重复调用 query_drug 超过 3 次
+- 3 次失败后直接建议就医并结束
+- 回复保持简洁，不要多余的叙述，不要输出思考过程
+- 已提供的患者信息不要重复询问
+- 每次只调用一个工具，等待结果后再继续
 """
 
 
@@ -109,6 +97,54 @@ class MedicalAgent:
         self.last_steps: List[Dict] = []
         self.workflow_completed: bool = False
 
+    def _query_drugs_with_retry(self, symptoms: List[str], llm_client) -> List[Dict]:
+        """尝试用不同关键词查询药品，支持 LLM 生成同义词重试"""
+        from database.pharmacy_client import query_drugs_by_symptom, query_drug_by_name
+
+        tried_keywords = set()
+        max_retries = 3
+
+        # 第一轮：用提取到的所有症状关键词查询
+        for symptom in symptoms:
+            if symptom in tried_keywords:
+                continue
+            tried_keywords.add(symptom)
+            drugs = query_drugs_by_symptom(symptom)
+            if drugs:
+                return drugs
+
+        # 第二轮：尝试按药品名称查询（兼容直接输入药名的情况）
+        if symptoms:
+            drug = query_drug_by_name(symptoms[0])
+            if drug:
+                return [drug]
+
+        # 第三轮：让 LLM 生成同义词来重试
+        retry_count = 0
+        while retry_count < max_retries:
+            # 让 LLM 生成一个相近的症状关键词
+            prompt = (
+                f"患者描述了症状：{'、'.join(symptoms[:3])}。"
+                f"已尝试过关键词：{'、'.join(tried_keywords)}，均未找到匹配药品。"
+                f"请生成一个相近的医学症状关键词来重新搜索（只回复关键词本身，不要其他内容）："
+            )
+            try:
+                resp = llm_client.chat([
+                    {"role": "user", "content": prompt}
+                ])
+                new_keyword = resp.get("content", "").strip()
+                if not new_keyword or new_keyword in tried_keywords:
+                    break  # LLM 词穷了
+                tried_keywords.add(new_keyword)
+                drugs = query_drugs_by_symptom(new_keyword)
+                if drugs:
+                    return drugs
+            except Exception:
+                pass
+            retry_count += 1
+
+        return []  # 全部失败
+
     def run(
         self, user_message: str, patient_id: Optional[str] = None
     ) -> Tuple[str, List[Dict]]:
@@ -121,31 +157,55 @@ class MedicalAgent:
         # 1. 调用子代理提取症状
         structured_info = extract_symptoms(user_message, self.llm_client)
 
-        # 2. 由提取的症状信息增强用户消息
-        if structured_info.symptoms and structured_info.symptoms != [user_message]:
-            symptoms_text = "、".join(structured_info.symptoms)
-            patient_info = structured_info.patient_info
+        # 2. 后端批量查询药品（带重试）
+        symptoms = structured_info.symptoms or [user_message]
+        drug_list = self._query_drugs_with_retry(symptoms, self.llm_client)
 
-            allergies_text = '无'
-            if patient_info.allergies:
-                if isinstance(patient_info.allergies, list):
-                    allergies_text = '、'.join(patient_info.allergies) if patient_info.allergies else '无'
-                else:
-                    allergies_text = str(patient_info.allergies)
+        if not drug_list:
+            # 所有重试都失败，建议就医
+            msg = "已尝试多种关键词查询，未找到与您症状匹配的药品。建议您尽快就医，由医生进行专业诊断。"
+            self.message_manager.add_message("assistant", msg)
+            self.workflow_completed = True
+            steps.append({"step": 0, "type": "assistant", "content": msg, "duration_ms": 0})
+            self.last_steps = steps
+            workflow.mark_step_completed(WorkflowStep.DRUG_QUERY_FAILED, {"reason": "no_drugs_found"})
+            return msg, steps
 
-            enhanced_message = (
-                f"[患者描述] {user_message}\n"
-                f"[系统提取信息]\n"
-                f"- 症状: {symptoms_text}\n"
-                f"- 年龄: {patient_info.age or '未提供'}岁\n"
-                f"- 体重: {patient_info.weight or '未提供'}kg\n"
-                f"- 过敏史: {allergies_text}\n"
-                f"- 主诉: {structured_info.chief_complaint}"
+        # 3. 由提取的症状信息增强用户消息
+        symptoms_text = "、".join(symptoms)
+        severity_text = ""
+        if structured_info.severity:
+            severity_text = "，".join(
+                f"{symptom}({degree})" for symptom, degree in structured_info.severity.items()
             )
-            user_message = enhanced_message
+        patient_info = structured_info.patient_info
+        allergies_text = '无'
+        if patient_info.allergies:
+            if isinstance(patient_info.allergies, list):
+                allergies_text = '、'.join(patient_info.allergies) if patient_info.allergies else '无'
+            else:
+                allergies_text = str(patient_info.allergies)
 
-        # 3. 将用户消息添加到消息历史
-        self.message_manager.add_message("user", user_message)
+        # 构建包含药品列表的增强消息
+        drug_summary = "\n".join(
+            f"  - {d['name']}（{d.get('retail_price', '?')}元）适应症：{'、'.join(d.get('indications', ['未知']))}"
+            for d in drug_list[:20]  # 限制显示数量
+        )
+
+        enhanced_message = (
+            f"[患者描述] {user_message}\n"
+            f"[系统提取信息]\n"
+            f"- 症状: {symptoms_text}\n"
+            f"- 程度: {severity_text or '未指定'}\n"
+            f"- 年龄: {patient_info.age or '未提供'}岁\n"
+            f"- 体重: {patient_info.weight or '未提供'}kg\n"
+            f"- 过敏史: {allergies_text}\n"
+            f"- 主诉: {structured_info.chief_complaint}\n"
+            f"\n[系统中匹配的药品列表（共{len(drug_list)}种）—— 已查询完毕，无需再调用 query_drug]\n"
+            f"{drug_summary}\n"
+            f"\n请根据上述药品列表为患者筛选药品、检查过敏、计算剂量。如果列表中有适合的药品，直接进行后续步骤（过敏检查→剂量计算→生成建议→提交审批）。"
+        )
+        self.message_manager.add_message("user", enhanced_message)
 
         # 4. 获取当前待办事项
         todo_list = self.todo_manager.get_todo_list()
@@ -153,66 +213,61 @@ class MedicalAgent:
             todo_prompt = f"\n当前待办任务: {todo_list}\n请按顺序完成。"
             self.message_manager.add_message("user", todo_prompt)
 
-        # 5. Agent循环
+        # 5. Agent循环（简化版）
         max_iterations = Config.MAX_ITERATIONS
         last_tool_called = None
-        tools_called = []
 
         for i in range(max_iterations):
             step_start = time.time()
             messages = self.message_manager.get_full_messages()
-
-            if i >= 3 and len(tools_called) > 0 and not self.workflow_completed:
-                expected_workflow = ["query_drug", "check_allergy", "calc_dosage", "generate_advice", "submit_approval"]
-                current_progress = len([t for t in tools_called if t in expected_workflow])
-
-                if current_progress >= 3 and last_tool_called == "generate_advice":
-                    logger.warning(f"工作流可能停滞在 {last_tool_called}，添加提示继续")
-                    self.message_manager.add_message(
-                        "user", "工作流下一步：请立即调用 submit_approval 提交审批"
-                    )
 
             with log_duration(logger, f"Iteration {i} LLM call"):
                 response = self.llm_client.chat(
                     messages=messages, tools=TOOLS, temperature=Config.LLM_TEMPERATURE
                 )
 
-            if response.get("content"):
-                assistant_reply = response["content"]
-                self.message_manager.add_message("assistant", assistant_reply)
-                steps.append({
-                    "step": i,
-                    "type": "assistant",
-                    "content": assistant_reply,
-                    "duration_ms": int((time.time() - step_start) * 1000),
-                })
-                if not response.get("tool_calls"):
-                    if self.workflow_completed:
-                        self.last_steps = steps
-                        return assistant_reply, steps
-
-                    if self._needs_user_input(assistant_reply):
-                        self.last_steps = steps
-                        return assistant_reply, steps
-
-                    self.message_manager.add_message(
-                        "user", "请根据工作流继续执行下一步。"
-                    )
-                    continue
-
             tool_calls = response.get("tool_calls")
             if tool_calls:
+                # 构建 OpenAI 格式的 tool_calls 列表（用于消息历史）
+                openai_tc_list = []
+                for tc in tool_calls:
+                    tc_id = tc.get("id") or f"call_{int(time.time()*1000)}"
+                    openai_tc_list.append({
+                        "id": tc_id,
+                        "type": "function",
+                        "function": {
+                            "name": tc["name"],
+                            "arguments": json.dumps(tc.get("input", {}), ensure_ascii=False)
+                        }
+                    })
+
+                # 单条 assistant 消息：content + tool_calls 合并
+                assistant_content = response.get("content") or ""
+                self.message_manager.add_message(
+                    "assistant", assistant_content, tool_calls=openai_tc_list
+                )
+
+                if assistant_content:
+                    steps.append({
+                        "step": i,
+                        "type": "assistant",
+                        "content": assistant_content,
+                        "duration_ms": int((time.time() - step_start) * 1000),
+                    })
+
+                # 逐个执行工具
                 for tc in tool_calls:
                     tool_name = tc["name"]
                     last_tool_called = tool_name
-                    tools_called.append(tool_name)
-
                     tool_input = tc["input"]
+                    tool_call_id = tc.get("id") or f"call_{int(time.time()*1000)}"
+
                     step_record = {
                         "step": i,
                         "type": "tool_call",
                         "tool": tool_name,
                         "input": tool_input,
+                        "tool_call_id": tool_call_id,
                         "duration_ms": 0,
                     }
 
@@ -227,12 +282,8 @@ class MedicalAgent:
                     step_record["duration_ms"] = int((time.time() - tool_start) * 1000)
                     steps.append(step_record)
 
-                    self.message_manager.add_message(
-                        "assistant", f"调用工具 {tool_name}"
-                    )
-                    self.message_manager.add_message(
-                        "user", f"工具 {tool_name} 返回结果: {tool_result}"
-                    )
+                    # tool role 格式：role=tool，带 tool_call_id
+                    self.message_manager.add_tool_result(tool_call_id, tool_result)
 
                     if tool_name == "submit_approval":
                         data = extract_json_from_text(tool_result)
@@ -244,9 +295,22 @@ class MedicalAgent:
                         self.workflow_completed = True
 
                     self._update_workflow_for_tool(tool_name, tool_result)
-                continue
+                continue  # 有工具调用就继续循环
 
-            break
+            # 没有工具调用，纯文本回复
+            if response.get("content"):
+                assistant_reply = response["content"]
+                self.message_manager.add_message("assistant", assistant_reply)
+                steps.append({
+                    "step": i,
+                    "type": "assistant",
+                    "content": assistant_reply,
+                    "duration_ms": int((time.time() - step_start) * 1000),
+                })
+                self.last_steps = steps
+                return assistant_reply, steps
+
+            break  # 没有工具调用也没有内容，退出
 
         final_msg = "处理超时，请稍后重试。"
         self.message_manager.add_message("assistant", final_msg)
@@ -257,7 +321,6 @@ class MedicalAgent:
         """根据工具调用更新工作流状态"""
         if not self.patient_id:
             return
-
         tool_to_step = {
             "query_drug": WorkflowStep.QUERY_DRUG,
             "check_allergy": WorkflowStep.CHECK_ALLERGY,
@@ -265,52 +328,10 @@ class MedicalAgent:
             "generate_advice": WorkflowStep.GENERATE_ADVICE,
             "submit_approval": WorkflowStep.SUBMIT_APPROVAL,
         }
-
         if tool_name in tool_to_step:
             step = tool_to_step[tool_name]
             data = {"tool_result": tool_result}
             self.workflow_manager.update_workflow_step(self.patient_id, step, data)
-
-    def _needs_user_input(self, text: str) -> bool:
-        """判断LLM的响应是否需要用户输入"""
-        if not text:
-            return False
-
-        workflow_actions = [
-            "调用 query_drug", "调用 check_allergy", "调用 calc_dosage",
-            "调用 generate_advice", "调用 submit_approval",
-            "请根据工作流继续执行下一步", "正在执行工作流",
-            "工作流下一步", "请立即调用", "使用默认药品"
-        ]
-
-        for action in workflow_actions:
-            if action in text:
-                return False
-
-        if "审批已提交" in text or "审批ID:" in text:
-            return False
-
-        question_indicators = [
-            "？", "?", "请问", "请提供", "请告诉我", "需要您", "您是否",
-            "您有", "您能", "吗？", "吗?", "什么", "如何", "怎样", "能否"
-        ]
-
-        text_lower = text.lower()
-        for indicator in question_indicators:
-            if indicator in text_lower:
-                if "过敏" in text and "已提供" in text:
-                    continue
-                return True
-
-        if text.strip().endswith(("？", "?")):
-            return True
-
-        input_requests = ["请回答", "请回复", "请告知", "请说明", "请描述"]
-        for request in input_requests:
-            if request in text:
-                return True
-
-        return False
 
     def reset(self) -> None:
         """重置对话（新会话）"""
@@ -346,16 +367,12 @@ class MedicalAgent:
         if not target_id:
             logger.warning("无法查询审批状态：未提供审批ID且无上次提交的审批ID")
             return None
-
         try:
             from common.utils.http_client import PharmacyHTTPClient
-
             client = PharmacyHTTPClient()
             result = client.get_approval(target_id)
-
             if result and result.get("success"):
                 approval_data = result.get("approval", {})
-
                 status = approval_data.get("status", "unknown")
                 order_info = None
                 if status == "approved":
@@ -370,7 +387,6 @@ class MedicalAgent:
                                 break
                     except Exception as e:
                         logger.debug(f"获取订单信息失败: {e}")
-
                 return {
                     "success": True,
                     "approval_id": target_id,

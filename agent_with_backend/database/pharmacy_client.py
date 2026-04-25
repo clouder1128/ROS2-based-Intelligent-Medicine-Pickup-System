@@ -24,46 +24,30 @@ def _get_client() -> PharmacyHTTPClient:
     return _client
 
 
-def _filter_drugs_by_symptom(drugs: List[Dict[str, Any]], symptom: str) -> List[Dict[str, Any]]:
-    if not symptom:
-        return drugs
-    symptom_lower = symptom.lower()
-    matched_drugs = []
-    symptom_keywords = {
-        "headache": ["ibuprofen", "paracetamol", "aspirin"],
-        "fever": ["ibuprofen", "paracetamol"],
-        "cough": ["cephalosporin", "dextromethorphan", "codeine"],
-        "allergy": ["loratadine", "cetirizine"],
-        "infection": ["amoxicillin", "cephalosporin", "azithromycin"],
-    }
-    matched_keywords = []
-    for chinese_symptom, keywords in symptom_keywords.items():
-        if chinese_symptom in symptom_lower:
-            matched_keywords.extend(keywords)
-    if not matched_keywords:
-        logger.warning(f"No predefined matching found for symptom '{symptom}'")
-        return []
-    for drug in drugs:
-        drug_name_lower = drug.get("name", "").lower()
-        if any(keyword in drug_name_lower for keyword in matched_keywords):
-            matched_drugs.append(drug)
-    return matched_drugs
-
-
 def query_drugs_by_symptom(symptom: str) -> List[Dict[str, Any]]:
+    """根据症状从后端API查询相关药品（含同义词扩展）"""
     logger.info(f"Querying drugs by symptom: {symptom}")
     try:
         client = _get_client()
-        all_drugs = client.get_drugs()
-        if not all_drugs:
-            logger.warning("No drugs retrieved from backend")
+        drugs = client.get_drugs(symptom_filter=symptom)
+        if not drugs:
+            logger.info(f"No drugs found for symptom '{symptom}'")
             return []
-        filtered_drugs = _filter_drugs_by_symptom(all_drugs, symptom)
-        logger.info(f"Found {len(filtered_drugs)} matching drugs (total {len(all_drugs)})")
-        return filtered_drugs
+        logger.info(f"Found {len(drugs)} matching drugs for symptom '{symptom}'")
+        return drugs
     except Exception as e:
         logger.error(f"Failed to query drugs by symptom: {str(e)}")
         return []
+
+
+def get_drugs_by_symptom_or_name(query: str) -> List[Dict[str, Any]]:
+    """先用症状查询，失败后用名称查询（供 query_drug 工具使用）"""
+    drugs = query_drugs_by_symptom(query)
+    if drugs:
+        return drugs
+    # 症状查询无结果，尝试按药品名称查询
+    drug = query_drug_by_name(query)
+    return [drug] if drug else []
 
 
 def query_drug_by_name(name: str) -> Optional[Dict[str, Any]]:

@@ -15,6 +15,9 @@ logger = logging.getLogger(__name__)
 class SymptomExtractor:
     """症状提取核心类 - 支持两种提取模式：规则提取和LLM提取"""
 
+    DEGREE_WORDS = ["轻度", "中度", "重度", "轻微", "严重", "剧烈",
+                    "偶尔", "持续性", "阵发性", "反复", "间断性"]
+
     def __init__(self, llm_client=None, use_llm: bool = True):
         self.llm_client = llm_client
         self.use_llm = use_llm and llm_client is not None
@@ -76,6 +79,7 @@ class SymptomExtractor:
             response = self.llm_client.chat(messages)
             json_text = self._extract_json_from_response(response.get("content", ""))
             result = json.loads(json_text)
+            result["symptoms"] = self._clean_symptoms(result.get("symptoms", []))
             return StructuredSymptoms.from_dict(result)
         except Exception as e:
             logger.error(f"LLM提取失败，降级为规则提取: {e}")
@@ -214,6 +218,19 @@ class SymptomExtractor:
         return True, None
 
     @staticmethod
+    def _clean_symptoms(symptoms: List[str]) -> List[str]:
+        """从症状列表中剥离程度词"""
+        cleaned = []
+        for s in symptoms:
+            for degree in SymptomExtractor.DEGREE_WORDS:
+                if s.startswith(degree):
+                    s = s[len(degree):].strip()
+            s = s.strip()
+            if s:
+                cleaned.append(s)
+        return cleaned
+
+    @staticmethod
     def _build_extraction_prompt(text: str) -> str:
         return f"""请分析患者的症状描述，提取结构化的医学信息。
 
@@ -224,6 +241,7 @@ class SymptomExtractor:
 {{
     "chief_complaint": "主诉（主要症状）",
     "symptoms": ["症状1", "症状2", ...],
+    "severity": {{"症状名": "程度"}},
     "signs": {{
         "体征名称": "值",
         ...
@@ -239,6 +257,11 @@ class SymptomExtractor:
         ...
     }} 或null
 }}
+
+注意：
+- symptoms 列表中的每一项只写症状名称，不要包含"轻度""中度""重度"等程度修饰词
+- 程度信息（如"轻度""中度""重度"）请填写到 severity 字段中，如 {{"头疼": "轻度"}}
+- 如果没有程度信息，severity 返回空对象
 
 只返回JSON，不要其他内容。"""
 

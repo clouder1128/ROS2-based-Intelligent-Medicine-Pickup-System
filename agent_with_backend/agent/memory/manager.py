@@ -19,9 +19,16 @@ class MessageManager:
         if system_prompt:
             self.messages.append({"role": "system", "content": system_prompt})
 
-    def add_message(self, role: str, content: str) -> None:
+    def add_message(self, role: str, content: str,
+                    tool_call_id: Optional[str] = None,
+                    tool_calls: Optional[List[Dict]] = None) -> None:
         """添加消息（role: user, assistant, tool）"""
-        self.messages.append({"role": role, "content": content})
+        msg = {"role": role, "content": content}
+        if tool_call_id:
+            msg["tool_call_id"] = tool_call_id
+        if tool_calls:
+            msg["tool_calls"] = tool_calls
+        self.messages.append(msg)
         self._compress_if_needed()
 
     def add_tool_result(self, tool_call_id: str, content: str) -> None:
