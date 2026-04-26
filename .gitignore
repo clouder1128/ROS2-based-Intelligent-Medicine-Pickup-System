@@ -57,3 +57,7 @@ agent_with_backend/backend/pharmacy.db
 agent_with_backend/backend.lock
 agent_with_backend/P1/.env.optimized
 agent_with_backend/scripts/setup/cli-patient-optimized.sh
+agent_with_backend/tasks.db
+
+# Superseded team division docs
+按架构组件分工/智能药品管理系统团队分工方案1-按架构组件分工.md
