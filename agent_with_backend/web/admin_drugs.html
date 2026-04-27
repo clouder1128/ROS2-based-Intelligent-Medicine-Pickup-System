@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>药品管理 - 智能药品管理系统</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="app-layout">
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-brand">
+            <i class="bi bi-capsule"></i>
+            <h2>智能药品管理</h2>
+        </div>
+        <nav class="sidebar-nav" id="sidebarNav"></nav>
+        <div class="sidebar-footer" id="sidebarFooter"></div>
+    </aside>
+
+    <div class="main-content">
+        <div class="top-bar">
+            <button class="btn btn-outline btn-sm menu-toggle" onclick="document.getElementById('sidebar').classList.toggle('open')">
+                <i class="bi bi-list"></i>
+            </button>
+            <h3 id="pageTitle">药品管理</h3>
+            <div class="user-badge" id="topUserBadge"></div>
+        </div>
+
+        <div class="content-area">
+            <!-- Alerts -->
+            <div id="alertsArea" style="margin-bottom:16px;"></div>
+
+            <!-- Toolbar -->
+            <div class="card">
+                <div class="card-body" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+                    <div class="search-bar" style="margin-bottom:0;flex:1;">
+                        <input type="text" id="searchInput" placeholder="搜索药品名称..." onkeydown="if(event.key==='Enter')searchDrugs()">
+                        <button class="btn btn-outline btn-sm" onclick="searchDrugs()"><i class="bi bi-search"></i> 搜索</button>
+                    </div>
+                    <button class="btn btn-primary" onclick="openAddModal()"><i class="bi bi-plus-lg"></i> 添加药品</button>
+                    <button class="btn btn-outline btn-sm" onclick="loadDrugs()"><i class="bi bi-arrow-clockwise"></i> 刷新</button>
+                </div>
+            </div>
+
+            <!-- Drug Table -->
+            <div class="card" style="margin-top:16px;">
+                <div class="card-header">
+                    <span><i class="bi bi-capsule"></i> 药品列表</span>
+                    <span id="drugCount" class="text-muted" style="font-size:13px;"></span>
+                </div>
+                <div class="card-body">
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>名称</th>
+                                    <th>库存</th>
+                                    <th>有效期(天)</th>
+                                    <th>货架ID</th>
+                                    <th>位置 (x,y)</th>
+                                    <th>状态</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="drugTableBody">
+                                <tr><td colspan="8"><div class="empty-state"><div class="spinner" style="margin:0 auto 8px;"></div><p>加载中...</p></div></td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="js/api.js"></script>
+<script src="js/utils.js"></script>
+<script>
+const user = requireAuth('admin');
+if (!user) throw new Error('Auth required');
+
+let allDrugs = [];
+
+// Sidebar
+document.getElementById('sidebarNav').innerHTML = renderSidebar([
+    { label: '管理员功能', items: [
+        { label: '仪表盘', href: 'admin.html', icon: 'bi bi-speedometer2', page: 'dashboard' },
+        { label: '药品管理', href: 'admin_drugs.html', icon: 'bi bi-capsule', page: 'drugs' },
+        { label: '订单记录', href: 'admin_orders.html', icon: 'bi bi-list-ol', page: 'orders' },
+    ]},
+], 'drugs');
+document.getElementById('sidebarFooter').innerHTML = `
+    <div class="user-avatar admin">${user.name[0]}</div>
+    <div class="user-info"><div class="user-name">${user.name}</div><div class="user-role">管理员</div></div>
+    <button class="btn-logout" onclick="doLogout()"><i class="bi bi-box-arrow-right"></i></button>
+`;
+document.getElementById('topUserBadge').innerHTML = `<i class="bi bi-person-circle"></i> ${getUserDisplay(user)}`;
+
+// ===== Load drugs =====
+async function loadDrugs(nameFilter) {
+    const tbody = document.getElementById('drugTableBody');
+    tbody.innerHTML = '<tr><td colspan="8"><div class="empty-state"><div class="spinner" style="margin:0 auto 8px;"></div><p>加载中...</p></div></td></tr>';
+
+    const result = nameFilter ? await ApiClient.getDrugs(nameFilter) : await ApiClient.getDrugs();
+    if (!result.success) {
+        tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state"><i class="bi bi-exclamation-triangle"></i><p>加载失败: ${result.error || '未知'}</p></div></td></tr>`;
+        return;
+    }
+
+    allDrugs = result.drugs || result.data || [];
+    document.getElementById('drugCount').textContent = `共 ${allDrugs.length} 种`;
+
+    // Show alerts for low stock / expiry
+    const expired = allDrugs.filter(d => d.expiry_date <= 0);
+    const expiringSoon = allDrugs.filter(d => d.expiry_date > 0 && d.expiry_date <= 30);
+    const lowStock = allDrugs.filter(d => d.quantity < 10 && d.quantity > 0);
+
+    let alertsHtml = '';
+    if (expired.length > 0) alertsHtml += `<div class="alert alert-danger"><i class="bi bi-x-circle"></i> <strong>${expired.length} 种药品已过期</strong>: ${expired.map(d => d.name).join('、')}</div>`;
+    if (expiringSoon.length > 0) alertsHtml += `<div class="alert alert-warning"><i class="bi bi-hourglass-split"></i> <strong>${expiringSoon.length} 种即将过期</strong>: ${expiringSoon.map(d => d.name).join('、')}</div>`;
+    if (lowStock.length > 0) alertsHtml += `<div class="alert alert-warning"><i class="bi bi-exclamation-triangle"></i> <strong>${lowStock.length} 种库存不足</strong>: ${lowStock.map(d => `${d.name}(${d.quantity}盒)`).join('、')}</div>`;
+    document.getElementById('alertsArea').innerHTML = alertsHtml;
+
+    if (allDrugs.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8"><div class="empty-state"><i class="bi bi-inbox"></i><p>暂无药品数据</p></div></td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = allDrugs.map(d => {
+        let statusBadge = '';
+        if (d.expiry_date <= 0) statusBadge = '<span class="badge badge-danger">已过期</span>';
+        else if (d.expiry_date <= 30) statusBadge = '<span class="badge badge-warning">即将过期</span>';
+        else if (d.quantity === 0) statusBadge = '<span class="badge badge-danger">缺货</span>';
+        else if (d.quantity < 10) statusBadge = '<span class="badge badge-warning">低库存</span>';
+        else statusBadge = '<span class="badge badge-approved">正常</span>';
+
+        return `
+            <tr>
+                <td>${d.drug_id}</td>
+                <td><strong>${d.name}</strong></td>
+                <td>${d.quantity}</td>
+                <td>${d.expiry_date}</td>
+                <td>${d.shelve_id}</td>
+                <td>(${d.shelf_x}, ${d.shelf_y})</td>
+                <td>${statusBadge}</td>
+                <td style="white-space:nowrap;">
+                    <button class="btn btn-sm btn-outline" onclick="openEditModal(${d.drug_id})" title="编辑"><i class="bi bi-pencil"></i></button>
+                    <button class="btn btn-sm btn-danger" onclick="confirmDelete(${d.drug_id}, '${d.name}')" title="删除"><i class="bi bi-trash"></i></button>
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+// ===== Search =====
+window.searchDrugs = function() {
+    const keyword = document.getElementById('searchInput').value.trim();
+    loadDrugs(keyword || undefined);
+};
+
+// ===== Add Drug =====
+window.openAddModal = function() {
+    const body = `
+        <div class="form-row">
+            <div class="form-group"><label>药品名称 *</label><input class="form-control" id="fName" placeholder="如: 阿司匹林"></div>
+            <div class="form-group"><label>库存数量 *</label><input class="form-control" id="fQty" type="number" value="50" min="0"></div>
+        </div>
+        <div class="form-row">
+            <div class="form-group"><label>有效期(剩余天数) *</label><input class="form-control" id="fExpiry" type="number" value="365" min="0"></div>
+            <div class="form-group"><label>货架ID *</label><input class="form-control" id="fShelve" type="number" value="1" min="1"></div>
+        </div>
+        <div class="form-row">
+            <div class="form-group"><label>货架X坐标 *</label><input class="form-control" id="fX" type="number" value="1" min="0"></div>
+            <div class="form-group"><label>货架Y坐标 *</label><input class="form-control" id="fY" type="number" value="1" min="0"></div>
+        </div>
+    `;
+    const footer = `
+        <button class="btn btn-outline" onclick="this.closest('.modal-overlay').remove()">取消</button>
+        <button class="btn btn-primary" onclick="doAddDrug()"><i class="bi bi-plus-lg"></i> 添加</button>
+    `;
+    openModal('添加药品', body, footer);
+};
+
+window.doAddDrug = async function() {
+    const data = {
+        name: document.getElementById('fName').value.trim(),
+        quantity: parseInt(document.getElementById('fQty').value) || 0,
+        expiry_date: parseInt(document.getElementById('fExpiry').value) || 0,
+        shelve_id: parseInt(document.getElementById('fShelve').value) || 0,
+        shelf_x: parseInt(document.getElementById('fX').value) || 0,
+        shelf_y: parseInt(document.getElementById('fY').value) || 0,
+    };
+    if (!data.name) { showToast('请填写药品名称', 'error'); return; }
+
+    document.querySelector('.modal-overlay')?.remove();
+    const result = await ApiClient.createDrug(data);
+    if (result.success) {
+        showToast('药品添加成功', 'success');
+        loadDrugs();
+    } else {
+        showToast(`添加失败: ${result.error || '未知错误'}`, 'error');
+    }
+};
+
+// ===== Edit Drug =====
+window.openEditModal = async function(drugId) {
+    const drug = allDrugs.find(d => d.drug_id === drugId);
+    if (!drug) return;
+
+    const body = `
+        <div class="form-row">
+            <div class="form-group"><label>药品名称 *</label><input class="form-control" id="fName" value="${drug.name}"></div>
+            <div class="form-group"><label>库存数量 *</label><input class="form-control" id="fQty" type="number" value="${drug.quantity}" min="0"></div>
+        </div>
+        <div class="form-row">
+            <div class="form-group"><label>有效期(剩余天数) *</label><input class="form-control" id="fExpiry" type="number" value="${drug.expiry_date}" min="0"></div>
+            <div class="form-group"><label>货架ID *</label><input class="form-control" id="fShelve" type="number" value="${drug.shelve_id}" min="1"></div>
+        </div>
+        <div class="form-row">
+            <div class="form-group"><label>货架X坐标 *</label><input class="form-control" id="fX" type="number" value="${drug.shelf_x}" min="0"></div>
+            <div class="form-group"><label>货架Y坐标 *</label><input class="form-control" id="fY" type="number" value="${drug.shelf_y}" min="0"></div>
+        </div>
+    `;
+    const footer = `
+        <button class="btn btn-outline" onclick="this.closest('.modal-overlay').remove()">取消</button>
+        <button class="btn btn-primary" onclick="doEditDrug(${drugId})"><i class="bi bi-check-lg"></i> 保存</button>
+    `;
+    openModal(`编辑药品 #${drugId}`, body, footer);
+};
+
+window.doEditDrug = async function(drugId) {
+    const data = {
+        name: document.getElementById('fName').value.trim(),
+        quantity: parseInt(document.getElementById('fQty').value) || 0,
+        expiry_date: parseInt(document.getElementById('fExpiry').value) || 0,
+        shelve_id: parseInt(document.getElementById('fShelve').value) || 0,
+        shelf_x: parseInt(document.getElementById('fX').value) || 0,
+        shelf_y: parseInt(document.getElementById('fY').value) || 0,
+    };
+    if (!data.name) { showToast('请填写药品名称', 'error'); return; }
+
+    document.querySelector('.modal-overlay')?.remove();
+    const result = await ApiClient.updateDrug(drugId, data);
+    if (result.success) {
+        showToast('药品更新成功', 'success');
+        loadDrugs();
+    } else {
+        showToast(`更新失败: ${result.error || '未知错误'}`, 'error');
+    }
+};
+
+// ===== Delete Drug =====
+window.confirmDelete = function(drugId, name) {
+    const body = `<p>确定要删除药品 <strong>${name}</strong> (ID: ${drugId}) 吗？此操作不可撤销。</p>`;
+    const footer = `
+        <button class="btn btn-outline" onclick="this.closest('.modal-overlay').remove()">取消</button>
+        <button class="btn btn-danger-solid" onclick="doDeleteDrug(${drugId})"><i class="bi bi-trash"></i> 确认删除</button>
+    `;
+    openModal('确认删除', body, footer);
+};
+
+window.doDeleteDrug = async function(drugId) {
+    document.querySelector('.modal-overlay')?.remove();
+    const result = await ApiClient.deleteDrug(drugId);
+    if (result.success) {
+        showToast(result.message || '药品已删除', 'success');
+        loadDrugs();
+    } else {
+        showToast(`删除失败: ${result.error || '未知错误'}`, 'error');
+    }
+};
+
+// Init
+loadDrugs();
+</script>
+</body>
+</html>

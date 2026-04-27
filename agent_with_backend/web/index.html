@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>智能药品管理系统 - 登录</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="login-container">
+    <div class="login-card">
+        <div class="login-header">
+            <div class="login-icon"><i class="bi bi-capsule"></i></div>
+            <h2>智能药品管理系统</h2>
+            <p>ROS2-based Intelligent Medicine Pickup System</p>
+        </div>
+        <div class="login-body">
+            <div class="role-tabs" id="roleTabs">
+                <button class="role-tab active" data-role="patient" onclick="selectRole('patient', this)">
+                    <i class="bi bi-person"></i> 患者
+                </button>
+                <button class="role-tab" data-role="doctor" onclick="selectRole('doctor', this)">
+                    <i class="bi bi-heart-pulse"></i> 医生
+                </button>
+                <button class="role-tab" data-role="admin" onclick="selectRole('admin', this)">
+                    <i class="bi bi-shield-lock"></i> 管理员
+                </button>
+            </div>
+
+            <div class="form-group">
+                <label>用户名</label>
+                <select class="form-control" id="username" onchange="onUserChange()">
+                    <option value="">-- 选择账号 --</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>密码</label>
+                <input type="password" class="form-control" id="password" placeholder="输入密码（默认: 123456）" value="123456">
+            </div>
+            <div id="loginHint" class="alert alert-info" style="display:none;"></div>
+            <button class="btn btn-primary btn-lg" style="width:100%;" onclick="handleLogin()">
+                <i class="bi bi-box-arrow-in-right"></i> 登 录
+            </button>
+        </div>
+        <div class="login-footer">
+            演示账号 | 患者: patient1 / 医生: doctor1 / 管理员: admin1 | 密码: 123456
+        </div>
+    </div>
+</div>
+
+<script src="js/utils.js"></script>
+<script>
+let selectedRole = 'patient';
+
+const accountsByRole = {
+    patient: [
+        { id: 'patient1', name: '张患者 (patient1)' },
+        { id: 'patient2', name: '李患者 (patient2)' },
+    ],
+    doctor: [
+        { id: 'doctor1', name: '王医生 (doctor1)' },
+        { id: 'doctor2', name: '赵医生 (doctor2)' },
+    ],
+    admin: [
+        { id: 'admin1', name: '陈管理员 (admin1)' },
+    ],
+};
+
+function selectRole(role, btn) {
+    selectedRole = role;
+    document.querySelectorAll('.role-tab').forEach(t => t.classList.remove('active'));
+    btn.classList.add('active');
+    populateUsers(role);
+    document.getElementById('password').value = '123456';
+    document.getElementById('loginHint').style.display = 'none';
+}
+
+function populateUsers(role) {
+    const select = document.getElementById('username');
+    select.innerHTML = '<option value="">-- 选择账号 --</option>';
+    for (const u of accountsByRole[role]) {
+        select.innerHTML += `<option value="${u.id}">${u.name}</option>`;
+    }
+    select.value = accountsByRole[role][0]?.id || '';
+}
+
+function onUserChange() {
+    document.getElementById('loginHint').style.display = 'none';
+}
+
+function handleLogin() {
+    const username = document.getElementById('username').value;
+    const password = document.getElementById('password').value;
+    if (!username) {
+        document.getElementById('loginHint').style.display = 'block';
+        document.getElementById('loginHint').textContent = '请选择账号';
+        return;
+    }
+    const user = doLogin(username, password);
+    if (!user) {
+        document.getElementById('loginHint').style.display = 'block';
+        document.getElementById('loginHint').textContent = '密码错误，请重试（默认密码: 123456）';
+        return;
+    }
+    const pages = { patient: 'patient.html', doctor: 'doctor.html', admin: 'admin.html' };
+    window.location.href = pages[user.role];
+}
+
+// 初始化
+populateUsers('patient');
+</script>
+</body>
+</html>

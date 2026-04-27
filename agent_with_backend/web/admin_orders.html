@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>订单记录 - 智能药品管理系统</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="app-layout">
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-brand">
+            <i class="bi bi-capsule"></i>
+            <h2>智能药品管理</h2>
+        </div>
+        <nav class="sidebar-nav" id="sidebarNav"></nav>
+        <div class="sidebar-footer" id="sidebarFooter"></div>
+    </aside>
+
+    <div class="main-content">
+        <div class="top-bar">
+            <button class="btn btn-outline btn-sm menu-toggle" onclick="document.getElementById('sidebar').classList.toggle('open')">
+                <i class="bi bi-list"></i>
+            </button>
+            <h3 id="pageTitle">全部订单记录</h3>
+            <div class="user-badge" id="topUserBadge"></div>
+        </div>
+
+        <div class="content-area">
+            <!-- Stats -->
+            <div class="form-row" id="orderStats" style="margin-bottom:16px;"></div>
+
+            <!-- Order Table -->
+            <div class="card">
+                <div class="card-header">
+                    <span><i class="bi bi-list-ol"></i> 订单列表</span>
+                    <div>
+                        <span id="orderCount" class="text-muted" style="font-size:13px;margin-right:8px;"></span>
+                        <button class="btn btn-outline btn-sm" onclick="loadOrders()"><i class="bi bi-arrow-clockwise"></i> 刷新</button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>任务ID</th>
+                                    <th>状态</th>
+                                    <th>药品ID</th>
+                                    <th>药品名称</th>
+                                    <th>数量</th>
+                                    <th>创建时间</th>
+                                </tr>
+                            </thead>
+                            <tbody id="orderTableBody">
+                                <tr><td colspan="6"><div class="empty-state"><div class="spinner" style="margin:0 auto 8px;"></div><p>加载中...</p></div></td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="js/api.js"></script>
+<script src="js/utils.js"></script>
+<script>
+const user = requireAuth('admin');
+if (!user) throw new Error('Auth required');
+
+// Sidebar
+document.getElementById('sidebarNav').innerHTML = renderSidebar([
+    { label: '管理员功能', items: [
+        { label: '仪表盘', href: 'admin.html', icon: 'bi bi-speedometer2', page: 'dashboard' },
+        { label: '药品管理', href: 'admin_drugs.html', icon: 'bi bi-capsule', page: 'drugs' },
+        { label: '订单记录', href: 'admin_orders.html', icon: 'bi bi-list-ol', page: 'orders' },
+    ]},
+], 'orders');
+document.getElementById('sidebarFooter').innerHTML = `
+    <div class="user-avatar admin">${user.name[0]}</div>
+    <div class="user-info"><div class="user-name">${user.name}</div><div class="user-role">管理员</div></div>
+    <button class="btn-logout" onclick="doLogout()"><i class="bi bi-box-arrow-right"></i></button>
+`;
+document.getElementById('topUserBadge').innerHTML = `<i class="bi bi-person-circle"></i> ${getUserDisplay(user)}`;
+
+// ===== Load Orders =====
+async function loadOrders() {
+    const tbody = document.getElementById('orderTableBody');
+    tbody.innerHTML = '<tr><td colspan="6"><div class="empty-state"><div class="spinner" style="margin:0 auto 8px;"></div><p>加载中...</p></div></td></tr>';
+
+    const result = await ApiClient.getOrders();
+    if (!result.success) {
+        tbody.innerHTML = `<tr><td colspan="6"><div class="empty-state"><i class="bi bi-exclamation-triangle"></i><p>加载失败: ${result.error || '未知'}</p></div></td></tr>`;
+        return;
+    }
+
+    const orders = result.data || [];
+    document.getElementById('orderCount').textContent = `共 ${orders.length} 条`;
+
+    // Stats
+    const pending = orders.filter(o => o.status === 'pending').length;
+    const completed = orders.filter(o => o.status === 'completed').length;
+    const failed = orders.filter(o => o.status === 'failed').length;
+    document.getElementById('orderStats').innerHTML = `
+        <div class="stat-card">
+            <div class="stat-icon blue"><i class="bi bi-list-ol"></i></div>
+            <div><div class="stat-value">${orders.length}</div><div class="stat-label">总订单数</div></div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon yellow"><i class="bi bi-hourglass-split"></i></div>
+            <div><div class="stat-value">${pending}</div><div class="stat-label">处理中</div></div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon green"><i class="bi bi-check-circle"></i></div>
+            <div><div class="stat-value">${completed}</div><div class="stat-label">已完成</div></div>
+        </div>
+    `;
+
+    if (orders.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6"><div class="empty-state"><i class="bi bi-inbox"></i><p>暂无订单记录</p></div></td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = orders.map(o => {
+        const statusMap = {
+            'pending': 'badge-pending',
+            'completed': 'badge-approved',
+            'failed': 'badge-danger',
+        };
+        const statusText = {
+            'pending': '处理中',
+            'completed': '已完成',
+            'failed': '失败',
+        };
+        return `
+            <tr>
+                <td><code>${o.task_id}</code></td>
+                <td><span class="badge ${statusMap[o.status] || 'badge-warning'}">${statusText[o.status] || o.status}</span></td>
+                <td>${o.target_drug_id || '-'}</td>
+                <td><strong>${o.drug_name || '-'}</strong></td>
+                <td>${o.quantity}</td>
+                <td>${formatTime(o.created_at)}</td>
+            </tr>
+        `;
+    }).join('');
+}
+
+// Init
+loadOrders();
+</script>
+</body>
+</html>

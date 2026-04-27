@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>患者咨询 - 智能药品管理系统</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="app-layout">
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-brand">
+            <i class="bi bi-capsule"></i>
+            <h2>智能药品管理</h2>
+        </div>
+        <nav class="sidebar-nav" id="sidebarNav"></nav>
+        <div class="sidebar-footer" id="sidebarFooter"></div>
+    </aside>
+
+    <!-- Main -->
+    <div class="main-content">
+        <div class="top-bar">
+            <button class="btn btn-outline btn-sm menu-toggle" onclick="document.getElementById('sidebar').classList.toggle('open')">
+                <i class="bi bi-list"></i>
+            </button>
+            <h3 id="pageTitle">AI 医疗咨询</h3>
+            <div class="user-badge" id="topUserBadge"></div>
+        </div>
+
+        <div class="content-area">
+            <!-- Tab navigation -->
+            <div class="tab-nav">
+                <button class="active" onclick="switchTab('consult')">AI 医疗咨询</button>
+                <button onclick="switchTab('status')">取药状态跟踪</button>
+                <button onclick="switchTab('history')">咨询与取药历史</button>
+            </div>
+
+            <!-- Tab: Consultation -->
+            <div id="tab-consult">
+                <div class="consult-layout">
+                    <!-- Left: Chat -->
+                    <div class="chat-container">
+                        <div class="chat-messages" id="chatMessages">
+                            <div class="chat-msg agent">
+                                <div class="msg-avatar"><i class="bi bi-robot"></i></div>
+                                <div class="msg-bubble">
+                                    您好！我是AI医疗助手。<br><br>
+                                    请告诉我您的症状，我会为您推荐合适的药品。<br>
+                                    例如：「头痛、发热，30岁，60kg，无过敏史」
+                                </div>
+                            </div>
+                        </div>
+                        <div class="chat-input-area">
+                            <input type="text" id="chatInput" placeholder="描述您的症状..."
+                                   onkeydown="if(event.key==='Enter')sendMessage()" autocomplete="off">
+                            <button onclick="sendMessage()" id="sendBtn" title="发送">
+                                <i class="bi bi-send"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Right: Results -->
+                    <div class="consult-right" id="resultPanel">
+                        <div class="card">
+                            <div class="card-header"><i class="bi bi-clipboard2-pulse"></i> 症状信息</div>
+                            <div class="card-body" id="symptomInfo">
+                                <div class="empty-state">
+                                    <i class="bi bi-chat-dots"></i>
+                                    <p>等待您输入症状...</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card">
+                            <div class="card-header"><i class="bi bi-capsule"></i> 药品推荐</div>
+                            <div class="card-body" id="drugRecommendations">
+                                <div class="empty-state">
+                                    <i class="bi bi-search"></i>
+                                    <p>分析症状后将显示推荐药品</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card">
+                            <div class="card-header"><i class="bi bi-file-text"></i> 审批状态</div>
+                            <div class="card-body" id="approvalStatusCard">
+                                <div class="empty-state">
+                                    <i class="bi bi-hourglass"></i>
+                                    <p>尚未提交审批</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab: Status Tracking -->
+            <div id="tab-status" style="display:none;">
+                <div class="card">
+                    <div class="card-header">取药状态跟踪</div>
+                    <div class="card-body" id="statusTracking">
+                        <div class="empty-state">
+                            <i class="bi bi-truck"></i>
+                            <p>暂无进行中的取药任务</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab: History -->
+            <div id="tab-history" style="display:none;">
+                <div class="card">
+                    <div class="card-header">咨询记录</div>
+                    <div class="card-body" id="consultHistory">
+                        <div class="empty-state"><i class="bi bi-clock-history"></i><p>暂无咨询记录</p></div>
+                    </div>
+                </div>
+                <div class="card" style="margin-top:16px;">
+                    <div class="card-header">取药历史</div>
+                    <div class="card-body" id="pickupHistory">
+                        <div class="empty-state"><i class="bi bi-box-seam"></i><p>暂无取药记录</p></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="js/api.js"></script>
+<script src="js/utils.js"></script>
+<script>
+// ===== 初始化 =====
+const user = requireAuth('patient');
+if (!user) throw new Error('Auth required');
+
+let conversationState = {
+    step: 'greeting',
+    symptoms: [],
+    extractedInfo: { age: null, weight: null, allergies: null },
+    recommendations: [],
+    currentApprovalId: null,
+};
+
+let consultHistory = JSON.parse(localStorage.getItem(`consultHistory_${user.id}`) || '[]');
+let pickupHistory = JSON.parse(localStorage.getItem(`pickupHistory_${user.id}`) || '[]');
+let activeApprovals = JSON.parse(localStorage.getItem(`activeApprovals_${user.id}`) || '[]');
+
+function saveState() {
+    localStorage.setItem(`consultHistory_${user.id}`, JSON.stringify(consultHistory));
+    localStorage.setItem(`pickupHistory_${user.id}`, JSON.stringify(pickupHistory));
+    localStorage.setItem(`activeApprovals_${user.id}`, JSON.stringify(activeApprovals));
+}
+
+// Sidebar
+document.getElementById('sidebarNav').innerHTML = renderSidebar([
+    { label: '患者功能', items: [
+        { label: 'AI 医疗咨询', href: '#', icon: 'bi bi-robot', page: 'consult' },
+    ]},
+], 'consult');
+document.getElementById('sidebarFooter').innerHTML = `
+    <div class="user-avatar patient">${user.name[0]}</div>
+    <div class="user-info"><div class="user-name">${user.name}</div><div class="user-role">患者</div></div>
+    <button class="btn-logout" onclick="doLogout()" title="退出登录"><i class="bi bi-box-arrow-right"></i></button>
+`;
+document.getElementById('topUserBadge').innerHTML = `<i class="bi bi-person-circle"></i> ${getUserDisplay(user)}`;
+
+// ===== Tab切换 =====
+window.switchTab = function(tab) {
+    document.querySelectorAll('.tab-nav button').forEach(b => b.classList.remove('active'));
+    event.target.classList.add('active');
+    document.getElementById('tab-consult').style.display = tab === 'consult' ? '' : 'none';
+    document.getElementById('tab-status').style.display = tab === 'status' ? '' : 'none';
+    document.getElementById('tab-history').style.display = tab === 'history' ? '' : 'none';
+    if (tab === 'status') refreshStatusTracking();
+    if (tab === 'history') refreshHistory();
+};
+
+// ===== 发送消息 =====
+window.sendMessage = async function() {
+    const input = document.getElementById('chatInput');
+    const text = input.value.trim();
+    if (!text) return;
+    input.value = '';
+    input.disabled = true;
+    document.getElementById('sendBtn').disabled = true;
+
+    addChatMessage('user', text);
+    addChatMessage('system', '🔍 AI 正在分析您的症状...');
+
+    await new Promise(r => setTimeout(r, 800));
+    document.querySelector('#chatMessages .chat-msg:last-child').remove();
+
+    if (conversationState.step === 'greeting' || conversationState.step === 'collecting') {
+        await handleSymptomAnalysis(text);
+    } else if (conversationState.step === 'askAge') {
+        handleAgeResponse(text);
+    } else if (conversationState.step === 'askWeight') {
+        handleWeightResponse(text);
+    } else if (conversationState.step === 'askAllergy') {
+        handleAllergyResponse(text);
+    } else if (conversationState.step === 'done') {
+        conversationState = { step: 'greeting', symptoms: [], extractedInfo: { age: null, weight: null, allergies: null }, recommendations: [], currentApprovalId: null };
+        await handleSymptomAnalysis(text);
+    }
+
+    input.disabled = false;
+    document.getElementById('sendBtn').disabled = false;
+    input.focus();
+};
+
+// ===== 症状分析流程 =====
+async function handleSymptomAnalysis(text) {
+    const symptoms = extractSymptoms(text);
+
+    // 尝试从文本中提取年龄、体重、过敏信息
+    const ageMatch = text.match(/(\d{1,3})\s*岁/);
+    const weightMatch = text.match(/(\d{2,3})\s*(kg|公斤|千克)/i);
+    const noAllergy = /无过敏|没有过敏|不过敏|无药物过敏/.test(text);
+    const allergyMatch = text.match(/过敏[史:]?\s*[:：]?\s*([^,，。.!！\s]+)/);
+    const allergyListMatch = text.match(/过敏[史:]?\s*[:：]?\s*(.+)/);
+
+    if (ageMatch) conversationState.extractedInfo.age = parseInt(ageMatch[1]);
+    if (weightMatch) conversationState.extractedInfo.weight = parseInt(weightMatch[1]);
+    if (noAllergy) conversationState.extractedInfo.allergies = '无';
+    else if (allergyMatch) conversationState.extractedInfo.allergies = allergyMatch[1];
+    else if (allergyListMatch && allergyListMatch[1].length < 30) conversationState.extractedInfo.allergies = allergyListMatch[1];
+
+    if (symptoms.length === 0) {
+        addChatMessage('agent', '我未能识别到明确的症状关键词。请更详细地描述您的症状，例如「头痛」「发热」「咳嗽」等。');
+        return;
+    }
+
+    conversationState.symptoms = symptoms;
+
+    // Check if we need more info
+    if (!conversationState.extractedInfo.age) {
+        conversationState.step = 'askAge';
+        updateSymptomInfoPanel();
+        addChatMessage('agent', `已识别到您的症状: <strong>${symptoms.join('、')}</strong>\n\n为了确保用药安全，请告诉我您的<strong>年龄</strong>？`);
+        return;
+    }
+    if (!conversationState.extractedInfo.weight) {
+        conversationState.step = 'askWeight';
+        updateSymptomInfoPanel();
+        addChatMessage('agent', `已识别到您的症状: <strong>${symptoms.join('、')}</strong>\n\n请告诉我您的<strong>体重</strong>（kg）？这对剂量计算很重要。`);
+        return;
+    }
+    if (conversationState.extractedInfo.allergies === null) {
+        conversationState.step = 'askAllergy';
+        updateSymptomInfoPanel();
+        addChatMessage('agent', `已识别到您的症状: <strong>${symptoms.join('、')}</strong>\n\n请问您有<strong>药物过敏史</strong>吗？（例如：青霉素过敏）如果没有请回复「无」`);
+        return;
+    }
+
+    await proceedToRecommendation();
+}
+
+function handleAgeResponse(text) {
+    const match = text.match(/(\d{1,3})/);
+    if (match) {
+        conversationState.extractedInfo.age = parseInt(match[1]);
+        if (!conversationState.extractedInfo.weight) {
+            conversationState.step = 'askWeight';
+            updateSymptomInfoPanel();
+            addChatMessage('agent', `好的，年龄 ${conversationState.extractedInfo.age} 岁。请告诉我您的<strong>体重</strong>（kg）？`);
+        } else {
+            checkAllergyThenProceed();
+        }
+    } else {
+        addChatMessage('agent', '请告诉我您的年龄数字，例如「30岁」。');
+    }
+}
+
+function handleWeightResponse(text) {
+    const match = text.match(/(\d{2,3})/);
+    if (match) {
+        conversationState.extractedInfo.weight = parseInt(match[1]);
+        checkAllergyThenProceed();
+    } else {
+        addChatMessage('agent', '请告诉我您的体重数字（kg），例如「60kg」。');
+    }
+}
+
+function handleAllergyResponse(text) {
+    if (/无|没有|不过敏|否|no/i.test(text)) {
+        conversationState.extractedInfo.allergies = '无';
+    } else {
+        conversationState.extractedInfo.allergies = text;
+    }
+    proceedToRecommendation();
+}
+
+function checkAllergyThenProceed() {
+    if (conversationState.extractedInfo.allergies === null) {
+        conversationState.step = 'askAllergy';
+        updateSymptomInfoPanel();
+        addChatMessage('agent', `请问您有药物过敏史吗？（例如：青霉素过敏）如果没有请回复「无」`);
+    } else {
+        proceedToRecommendation();
+    }
+}
+
+async function proceedToRecommendation() {
+    conversationState.step = 'done';
+    updateSymptomInfoPanel();
+
+    const drugNames = matchDrugsForSymptoms(conversationState.symptoms);
+
+    if (drugNames.length === 0) {
+        addChatMessage('agent', '⚠ 根据您的症状，系统暂未找到匹配的药品。建议您前往医院就诊，由专业医生诊断后开具处方。');
+        updateDrugPanel([]);
+        return;
+    }
+
+    // Query backend for drug availability
+    const result = await ApiClient.getDrugs();
+    const allDrugs = result.success ? (result.drugs || result.data || []) : [];
+
+    // Filter: match by name, in stock, not expired
+    const available = filterAvailableDrugs(drugNames, allDrugs);
+
+    // Check allergy conflicts (simplified: if patient has penicillin allergy, exclude amoxicillin)
+    const allergies = (conversationState.extractedInfo.allergies || '').toLowerCase();
+    const allergyConflicts = { '青霉素': ['阿莫西林'], '头孢': ['头孢克肟'] };
+    let conflictDrugs = [];
+    for (const [allergen, conflicts] of Object.entries(allergyConflicts)) {
+        if (allergies.includes(allergen)) {
+            conflictDrugs = conflicts;
+        }
+    }
+
+    const safeDrugs = available.filter(d => !conflictDrugs.includes(d.name));
+    conversationState.recommendations = safeDrugs;
+
+    if (safeDrugs.length === 0) {
+        let msg = '⚠ 根据您的症状和库存情况：\n\n';
+        if (available.length > 0 && conflictDrugs.length > 0) {
+            msg += `考虑到您的${conversationState.extractedInfo.allergies}过敏史，现有药品可能存在风险。`;
+        } else if (available.length === 0 && drugNames.length > 0) {
+            msg += '匹配的药品库存不足或已过期。';
+        } else {
+            msg += '暂未找到合适的药品。';
+        }
+        msg += '\n\n建议您前往医院就诊。';
+        addChatMessage('agent', msg);
+        updateDrugPanel([]);
+        updateApprovalPanel(null);
+        return;
+    }
+
+    // Show recommendations
+    updateDrugPanel(safeDrugs);
+
+    const drugList = safeDrugs.map(d => d.name).join('、');
+    const advice = generateAdviceText(safeDrugs[0], conversationState.symptoms, conversationState.extractedInfo);
+
+    let msg = `✅ 药物筛选完成！\n\n`;
+    msg += `匹配药品: <strong>${drugList}</strong>\n`;
+    msg += `库存充足，无过敏冲突。\n\n`;
+    msg += `<strong>推荐: ${safeDrugs[0].name}</strong>\n`;
+    msg += `库存: ${safeDrugs[0].quantity}盒 | 剩余有效期: ${safeDrugs[0].expiry_date}天`;
+    addChatMessage('agent', msg);
+
+    // Auto-submit approval
+    addChatMessage('system', '📋 正在自动提交医生审批单...');
+    await submitApprovalAuto(safeDrugs[0], advice);
+}
+
+// ===== 自动提交审批 =====
+async function submitApprovalAuto(drug, adviceText) {
+    const approvalData = {
+        patient_name: user.name,
+        patient_age: conversationState.extractedInfo.age,
+        patient_weight: conversationState.extractedInfo.weight,
+        symptoms: conversationState.symptoms.join('、'),
+        drug_name: drug.name,
+        drug_type: '西药',
+        quantity: 1,
+        advice: adviceText,
+    };
+
+    const result = await ApiClient.createApproval(approvalData);
+    if (result.success) {
+        conversationState.currentApprovalId = result.approval_id;
+
+        // Save to active approvals
+        activeApprovals.push({
+            approval_id: result.approval_id,
+            drug_name: drug.name,
+            symptoms: conversationState.symptoms.join('、'),
+            created_at: result.created_at || new Date().toISOString(),
+            status: 'pending',
+        });
+        saveState();
+
+        // Save to consult history
+        consultHistory.unshift({
+            date: new Date().toISOString(),
+            symptoms: conversationState.symptoms.join('、'),
+            drug: drug.name,
+            approval_id: result.approval_id,
+            advice: adviceText,
+        });
+        saveState();
+
+        document.querySelector('#chatMessages .chat-msg:last-child').remove();
+        addChatMessage('system', `✅ 审批单已自动提交！\n\n审批ID: <strong>${result.approval_id}</strong>\n请等待医生审批。您可以在「取药状态跟踪」标签页查看进度。`);
+        updateApprovalPanel({ approval_id: result.approval_id, status: 'pending', drug_name: drug.name });
+
+        // Start polling for approval status
+        startApprovalPolling(result.approval_id);
+    } else {
+        document.querySelector('#chatMessages .chat-msg:last-child').remove();
+        addChatMessage('system', `⚠ 审批提交失败: ${result.error || '未知错误'}`);
+        updateApprovalPanel(null);
+    }
+}
+
+// ===== 审批轮询 =====
+let pollingTimers = {};
+
+function startApprovalPolling(approvalId) {
+    if (pollingTimers[approvalId]) clearInterval(pollingTimers[approvalId]);
+
+    pollingTimers[approvalId] = setInterval(async () => {
+        const result = await ApiClient.getApproval(approvalId);
+        if (!result.success) return;
+
+        const approval = result.approval;
+        // Update active approvals
+        const idx = activeApprovals.findIndex(a => a.approval_id === approvalId);
+        if (idx >= 0) {
+            activeApprovals[idx].status = approval.status;
+            if (approval.status === 'approved') {
+                activeApprovals[idx].approved_at = approval.approved_at;
+                // Check for orders
+                const orderRes = await ApiClient.getOrders();
+                if (orderRes.success && orderRes.data) {
+                    const relatedOrder = orderRes.data.find(o =>
+                        o.drug_name === approval.drug_name && o.status === 'pending'
+                    );
+                    if (relatedOrder) {
+                        activeApprovals[idx].task_id = relatedOrder.task_id;
+                        // Simulate robot status progression
+                        simulateRobotStatus(approvalId, relatedOrder.task_id, approval.drug_name);
+                    }
+                }
+            }
+            saveState();
+        }
+
+        // Update UI if on status tab
+        if (document.getElementById('tab-status').style.display !== 'none') {
+            refreshStatusTracking();
+        }
+        updateApprovalPanel(approval);
+
+        if (approval.status !== 'pending') {
+            clearInterval(pollingTimers[approvalId]);
+            delete pollingTimers[approvalId];
+        }
+    }, 3000);
+}
+
+// ===== Simulate Robot/Cart Status =====
+function simulateRobotStatus(approvalId, taskId, drugName) {
+    const stages = [
+        { delay: 2000,  title: '机器人已启动', desc: 'AGV小车正在前往货架...', icon: 'bi-truck' },
+        { delay: 5000,  title: '正在取药', desc: `机械臂正在从货架取出: ${drugName}`, icon: 'bi-grip-horizontal' },
+        { delay: 8000,  title: '运输中', desc: 'AGV小车正在前往取药台...', icon: 'bi-truck-flatbed' },
+        { delay: 11000, title: '已到达取药台', desc: '请前往取药台领取药品', icon: 'bi-box-arrow-down' },
+        { delay: 14000, title: '等待取药', desc: '药品已就位，请尽快取走', icon: 'bi-hand-index' },
+    ];
+
+    // Save initial state
+    const idx = activeApprovals.findIndex(a => a.approval_id === approvalId);
+    if (idx >= 0) {
+        activeApprovals[idx].robotStages = stages.map((s, i) => ({
+            ...s, completed: false, active: false,
+        }));
+        activeApprovals[idx].robotStages[0].active = true;
+        saveState();
+    }
+
+    let cumulativeDelay = 0;
+    stages.forEach((stage, i) => {
+        cumulativeDelay += stage.delay - (i > 0 ? stages[i-1].delay : 0);
+        setTimeout(() => {
+            const idx = activeApprovals.findIndex(a => a.approval_id === approvalId);
+            if (idx >= 0 && activeApprovals[idx].robotStages) {
+                activeApprovals[idx].robotStages.forEach((s, j) => {
+                    if (j < i) { s.completed = true; s.active = false; }
+                    else if (j === i) { s.active = true; s.completed = false; }
+                    else { s.active = false; s.completed = false; }
+                });
+                if (i === stages.length - 1) {
+                    // Pickup ready
+                    activeApprovals[idx].pickupReady = true;
+                    // Add to pickup history
+                    pickupHistory.unshift({
+                        date: new Date().toISOString(),
+                        drug_name: drugName,
+                        task_id: taskId,
+                        status: 'waiting_pickup',
+                    });
+                    saveState();
+                }
+                saveState();
+                if (document.getElementById('tab-status').style.display !== 'none') {
+                    refreshStatusTracking();
+                }
+            }
+        }, cumulativeDelay);
+    });
+}
+
+// ===== UI Updates =====
+function addChatMessage(type, text) {
+    const container = document.getElementById('chatMessages');
+    const div = document.createElement('div');
+    div.className = `chat-msg ${type}`;
+    const icons = { user: 'bi-person', agent: 'bi-robot', system: 'bi-info-circle' };
+    div.innerHTML = `
+        <div class="msg-avatar"><i class="bi ${icons[type] || 'bi-chat'}"></i></div>
+        <div class="msg-bubble">${text}</div>
+    `;
+    container.appendChild(div);
+    container.scrollTop = container.scrollHeight;
+}
+
+function updateSymptomInfoPanel() {
+    const info = conversationState.extractedInfo;
+    const panel = document.getElementById('symptomInfo');
+    panel.innerHTML = `
+        <div><strong>症状:</strong> ${conversationState.symptoms.join('、') || '识别中...'}</div>
+        <div class="mt-2"><strong>年龄:</strong> ${info.age ? info.age + '岁' : '<span class="badge badge-warning">待补充</span>'}</div>
+        <div class="mt-2"><strong>体重:</strong> ${info.weight ? info.weight + 'kg' : '<span class="badge badge-warning">待补充</span>'}</div>
+        <div class="mt-2"><strong>过敏史:</strong> ${info.allergies !== null ? info.allergies : '<span class="badge badge-warning">待补充</span>'}</div>
+    `;
+}
+
+function updateDrugPanel(drugs) {
+    const panel = document.getElementById('drugRecommendations');
+    if (!drugs || drugs.length === 0) {
+        panel.innerHTML = '<div class="empty-state"><i class="bi bi-emoji-frown"></i><p>暂无匹配药品，建议就医</p></div>';
+        return;
+    }
+    panel.innerHTML = drugs.map(d => `
+        <div class="drug-recommendation">
+            <div class="drug-rec-header">
+                <span class="drug-rec-name">${d.name}</span>
+                <span class="badge ${d.quantity < 10 ? 'badge-warning' : 'badge-approved'}">库存: ${d.quantity}</span>
+            </div>
+            <div class="drug-rec-details">
+                <span><i class="bi bi-clock"></i> 剩余${d.expiry_date}天</span>
+                <span><i class="bi bi-geo-alt"></i> 货架${d.shelve_id} (${d.shelf_x},${d.shelf_y})</span>
+            </div>
+        </div>
+    `).join('');
+}
+
+function updateApprovalPanel(approval) {
+    const panel = document.getElementById('approvalStatusCard');
+    if (!approval) {
+        panel.innerHTML = '<div class="empty-state"><i class="bi bi-x-circle"></i><p>审批未创建</p></div>';
+        return;
+    }
+    const statusMap = {
+        pending: { cls: 'badge-pending', text: '待审批', icon: 'bi-hourglass-split' },
+        approved: { cls: 'badge-approved', text: '已通过', icon: 'bi-check-circle' },
+        rejected: { cls: 'badge-rejected', text: '已拒绝', icon: 'bi-x-circle' },
+    };
+    const s = statusMap[approval.status] || statusMap.pending;
+    panel.innerHTML = `
+        <div style="font-size:14px;">
+            <div><strong>审批ID:</strong> ${approval.approval_id || '-'}</div>
+            <div class="mt-2"><strong>状态:</strong> <span class="badge ${s.cls}">${s.text}</span></div>
+            ${approval.drug_name ? `<div class="mt-2"><strong>药品:</strong> ${approval.drug_name}</div>` : ''}
+            ${approval.status === 'approved' ? '<div class="alert alert-success mt-2">审批已通过，订单已自动创建！</div>' : ''}
+            ${approval.status === 'rejected' ? `<div class="alert alert-danger mt-2">审批被拒绝: ${approval.reject_reason || '无'}</div>` : ''}
+            ${approval.status === 'pending' ? '<div class="alert alert-info mt-2">等待医生审批中...</div>' : ''}
+        </div>
+    `;
+}
+
+// ===== Status Tracking Tab =====
+function refreshStatusTracking() {
+    const container = document.getElementById('statusTracking');
+    if (activeApprovals.length === 0) {
+        container.innerHTML = '<div class="empty-state"><i class="bi bi-truck"></i><p>暂无进行中的取药任务</p></div>';
+        return;
+    }
+
+    container.innerHTML = activeApprovals.map(a => {
+        const statusHtml = a.robotStages ? `
+            <div class="status-timeline mt-2">
+                ${a.robotStages.map(s => `
+                    <div class="status-step ${s.completed ? 'completed' : s.active ? 'active' : ''}">
+                        <div class="step-dot"><i class="bi ${s.icon}"></i></div>
+                        <div class="step-content">
+                            <div class="step-title">${s.title}</div>
+                            <div class="step-desc">${s.desc}</div>
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+            ${a.pickupReady ? '<div class="pickup-notice mt-2"><i class="bi bi-bell-fill" style="font-size:20px;color:#f59e0b;"></i> <strong>请前往取药台取药！</strong> 您的药品已准备好。</div>' : ''}
+        ` : '<div class="alert alert-info mt-2">等待医生审批...</div>';
+
+        return `
+            <div class="drug-recommendation">
+                <div class="drug-rec-header">
+                    <span class="drug-rec-name">审批: ${a.approval_id}</span>
+                    <span class="badge ${a.status === 'approved' ? 'badge-approved' : a.status === 'rejected' ? 'badge-rejected' : 'badge-pending'}">${a.status === 'approved' ? '已通过' : a.status === 'rejected' ? '已拒绝' : '待审批'}</span>
+                </div>
+                <div class="drug-rec-details">
+                    <span>药品: ${a.drug_name || '-'}</span>
+                    <span>症状: ${a.symptoms || '-'}</span>
+                </div>
+                ${statusHtml}
+            </div>
+        `;
+    }).join('');
+}
+
+// ===== History Tab =====
+function refreshHistory() {
+    // Consult history
+    const consultContainer = document.getElementById('consultHistory');
+    if (consultHistory.length === 0) {
+        consultContainer.innerHTML = '<div class="empty-state"><i class="bi bi-clock-history"></i><p>暂无咨询记录</p></div>';
+    } else {
+        consultContainer.innerHTML = `
+            <div class="table-container">
+                <table>
+                    <thead><tr><th>时间</th><th>症状</th><th>推荐药品</th><th>审批ID</th></tr></thead>
+                    <tbody>
+                        ${consultHistory.map(c => `
+                            <tr>
+                                <td>${formatTime(c.date)}</td>
+                                <td>${c.symptoms}</td>
+                                <td>${c.drug}</td>
+                                <td><code>${c.approval_id}</code></td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            </div>
+        `;
+    }
+
+    // Pickup history
+    const pickupContainer = document.getElementById('pickupHistory');
+    if (pickupHistory.length === 0) {
+        pickupContainer.innerHTML = '<div class="empty-state"><i class="bi bi-box-seam"></i><p>暂无取药记录</p></div>';
+    } else {
+        pickupContainer.innerHTML = `
+            <div class="table-container">
+                <table>
+                    <thead><tr><th>时间</th><th>药品</th><th>任务ID</th><th>状态</th></tr></thead>
+                    <tbody>
+                        ${pickupHistory.map(p => `
+                            <tr>
+                                <td>${formatTime(p.date)}</td>
+                                <td>${p.drug_name}</td>
+                                <td>${p.task_id || '-'}</td>
+                                <td><span class="badge ${p.status === 'waiting_pickup' ? 'badge-warning' : 'badge-completed'}">${p.status === 'waiting_pickup' ? '待取药' : '已完成'}</span></td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            </div>
+        `;
+    }
+}
+
+// ===== 恢复活跃审批的轮询 =====
+activeApprovals.forEach(a => {
+    if (a.status === 'pending') {
+        startApprovalPolling(a.approval_id);
+    }
+});
+
+// Focus input on load
+document.getElementById('chatInput').focus();
+</script>
+</body>
+</html>

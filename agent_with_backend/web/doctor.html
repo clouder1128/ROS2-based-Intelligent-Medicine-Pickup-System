@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>医生审批 - 智能药品管理系统</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="app-layout">
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-brand">
+            <i class="bi bi-capsule"></i>
+            <h2>智能药品管理</h2>
+        </div>
+        <nav class="sidebar-nav" id="sidebarNav"></nav>
+        <div class="sidebar-footer" id="sidebarFooter"></div>
+    </aside>
+
+    <!-- Main -->
+    <div class="main-content">
+        <div class="top-bar">
+            <button class="btn btn-outline btn-sm menu-toggle" onclick="document.getElementById('sidebar').classList.toggle('open')">
+                <i class="bi bi-list"></i>
+            </button>
+            <h3 id="pageTitle">医生审批管理</h3>
+            <div class="user-badge" id="topUserBadge"></div>
+        </div>
+        <div class="content-area">
+            <!-- Tab navigation -->
+            <div class="tab-nav">
+                <button class="active" onclick="switchTab('pending')">待审批列表</button>
+                <button onclick="switchTab('history')">审批历史</button>
+            </div>
+
+            <!-- Pending Approvals -->
+            <div id="tab-pending">
+                <div class="card">
+                    <div class="card-header">
+                        <span><i class="bi bi-list-check"></i> 待审批列表</span>
+                        <button class="btn btn-outline btn-sm" onclick="refreshPending()">
+                            <i class="bi bi-arrow-clockwise"></i> 刷新
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <div id="pendingStats" class="mb-3"></div>
+                        <div class="table-container">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>审批ID</th>
+                                        <th>患者</th>
+                                        <th>症状</th>
+                                        <th>推荐药品</th>
+                                        <th>数量</th>
+                                        <th>创建时间</th>
+                                        <th>操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="pendingTableBody">
+                                    <tr><td colspan="7"><div class="empty-state"><div class="spinner" style="margin:0 auto 8px;"></div><p>加载中...</p></div></td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Approval History -->
+            <div id="tab-history" style="display:none;">
+                <div class="card">
+                    <div class="card-header">
+                        <span><i class="bi bi-clock-history"></i> 审批历史</span>
+                        <button class="btn btn-outline btn-sm" onclick="loadHistory()">
+                            <i class="bi bi-arrow-clockwise"></i> 刷新
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-container">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>审批ID</th>
+                                        <th>患者</th>
+                                        <th>症状</th>
+                                        <th>药品</th>
+                                        <th>状态</th>
+                                        <th>审批时间</th>
+                                        <th>操作人</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="historyTableBody">
+                                    <tr><td colspan="7"><div class="empty-state"><div class="spinner" style="margin:0 auto 8px;"></div><p>加载中...</p></div></td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="js/api.js"></script>
+<script src="js/utils.js"></script>
+<script>
+const user = requireAuth('doctor');
+if (!user) throw new Error('Auth required');
+
+let pendingApprovals = [];
+let historyApprovals = JSON.parse(localStorage.getItem(`approvalHistory_${user.id}`) || '[]');
+
+function saveHistory() {
+    localStorage.setItem(`approvalHistory_${user.id}`, JSON.stringify(historyApprovals));
+}
+
+// Sidebar
+document.getElementById('sidebarNav').innerHTML = renderSidebar([
+    { label: '医生功能', items: [
+        { label: '待审批', href: '#', icon: 'bi bi-list-check', page: 'pending' },
+        { label: '审批历史', href: '#', icon: 'bi bi-clock-history', page: 'history' },
+    ]},
+], 'pending');
+document.getElementById('sidebarFooter').innerHTML = `
+    <div class="user-avatar doctor">${user.name[0]}</div>
+    <div class="user-info"><div class="user-name">${user.name}</div><div class="user-role">医生</div></div>
+    <button class="btn-logout" onclick="doLogout()" title="退出登录"><i class="bi bi-box-arrow-right"></i></button>
+`;
+document.getElementById('topUserBadge').innerHTML = `<i class="bi bi-person-circle"></i> ${getUserDisplay(user)}`;
+
+// ===== Tab 切换 =====
+window.switchTab = function(tab) {
+    document.querySelectorAll('.tab-nav button').forEach(b => b.classList.remove('active'));
+    event.target.classList.add('active');
+    document.getElementById('tab-pending').style.display = tab === 'pending' ? '' : 'none';
+    document.getElementById('tab-history').style.display = tab === 'history' ? '' : 'none';
+    if (tab === 'history') loadHistory();
+};
+
+// ===== 加载待审批 =====
+async function refreshPending() {
+    const tbody = document.getElementById('pendingTableBody');
+    tbody.innerHTML = '<tr><td colspan="7"><div class="empty-state"><div class="spinner" style="margin:0 auto 8px;"></div><p>加载中...</p></div></td></tr>';
+
+    const result = await ApiClient.getPendingApprovals(50);
+    if (!result.success) {
+        tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state"><i class="bi bi-exclamation-triangle"></i><p>加载失败: ${result.error || '未知错误'}</p></div></td></tr>`;
+        return;
+    }
+
+    pendingApprovals = result.approvals || [];
+    document.getElementById('pendingStats').innerHTML = `
+        <div class="stat-card" style="display:inline-flex;margin-right:12px;">
+            <div class="stat-icon yellow"><i class="bi bi-hourglass-split"></i></div>
+            <div><div class="stat-value">${pendingApprovals.length}</div><div class="stat-label">待审批</div></div>
+        </div>
+    `;
+
+    if (pendingApprovals.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7"><div class="empty-state"><i class="bi bi-check-circle"></i><p>暂无待审批单</p></div></td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = pendingApprovals.map(a => `
+        <tr>
+            <td><code>${a.approval_id || a.id || '-'}</code></td>
+            <td>${a.patient_name || '-'}</td>
+            <td>${(a.symptoms || '-').substring(0, 30)}</td>
+            <td><strong>${a.drug_name || '-'}</strong></td>
+            <td>${a.quantity || 1}</td>
+            <td>${formatTime(a.created_at)}</td>
+            <td>
+                <button class="btn btn-sm btn-success" onclick="openApproveModal('${a.approval_id || a.id}')" title="批准">
+                    <i class="bi bi-check-lg"></i> 批准
+                </button>
+                <button class="btn btn-sm btn-danger" onclick="openRejectModal('${a.approval_id || a.id}')" title="拒绝">
+                    <i class="bi bi-x-lg"></i> 拒绝
+                </button>
+                <button class="btn btn-sm btn-outline" onclick="viewApprovalDetail('${a.approval_id || a.id}')" title="详情">
+                    <i class="bi bi-eye"></i>
+                </button>
+            </td>
+        </tr>
+    `).join('');
+}
+
+// ===== 查看审批详情 =====
+window.viewApprovalDetail = async function(approvalId) {
+    const result = await ApiClient.getApproval(approvalId);
+    if (!result.success) {
+        showToast('获取审批详情失败', 'error');
+        return;
+    }
+    const a = result.approval;
+    const body = `
+        <div style="font-size:14px;">
+            <div class="form-row">
+                <div><strong>审批ID:</strong><br>${a.approval_id || a.id}</div>
+                <div><strong>状态:</strong><br><span class="badge badge-pending">待审批</span></div>
+            </div>
+            <hr>
+            <div><strong>患者:</strong> ${a.patient_name || '-'}</div>
+            <div class="mt-2"><strong>年龄:</strong> ${a.patient_age || '未提供'} 岁</div>
+            <div class="mt-2"><strong>体重:</strong> ${a.patient_weight || '未提供'} kg</div>
+            <div class="mt-2"><strong>症状:</strong> ${a.symptoms || '-'}</div>
+            <div class="mt-2"><strong>推荐药品:</strong> ${a.drug_name || '-'}</div>
+            <div class="mt-2"><strong>数量:</strong> ${a.quantity || 1}</div>
+            <hr>
+            <div><strong>用药建议:</strong></div>
+            <div style="white-space:pre-wrap;background:#f8fafc;padding:10px;border-radius:6px;margin-top:4px;">${a.advice || '-'}</div>
+        </div>
+    `;
+    openModal('审批详情', body, '');
+};
+
+// ===== 批准 =====
+window.openApproveModal = function(approvalId) {
+    const body = `
+        <div class="form-group">
+            <label>医生备注 (可选)</label>
+            <textarea class="form-control" id="approveNotes" rows="3" placeholder="可选备注信息..."></textarea>
+        </div>
+        <p class="text-muted" style="font-size:13px;">批准后将自动创建取药订单并发布ROS2任务</p>
+    `;
+    const footer = `
+        <button class="btn btn-outline" onclick="this.closest('.modal-overlay').remove()">取消</button>
+        <button class="btn btn-success" onclick="doApprove('${approvalId}')">
+            <i class="bi bi-check-lg"></i> 确认批准
+        </button>
+    `;
+    openModal('批准审批单', body, footer);
+};
+
+window.doApprove = async function(approvalId) {
+    const notes = document.getElementById('approveNotes')?.value || '';
+    document.querySelector('.modal-overlay')?.remove();
+
+    const result = await ApiClient.approveApproval(approvalId, user.id, notes);
+    if (result.success) {
+        showToast('审批已通过！订单已自动创建', 'success');
+
+        // Save to history
+        const approval = pendingApprovals.find(a => (a.approval_id || a.id) === approvalId);
+        historyApprovals.unshift({
+            approval_id: approvalId,
+            patient_name: approval?.patient_name || '-',
+            symptoms: approval?.symptoms || '-',
+            drug_name: approval?.drug_name || '-',
+            status: 'approved',
+            approved_at: new Date().toISOString(),
+            doctor_name: user.name,
+        });
+        saveHistory();
+        refreshPending();
+    } else {
+        showToast(`批准失败: ${result.error || '未知错误'}`, 'error');
+    }
+};
+
+// ===== 拒绝 =====
+window.openRejectModal = function(approvalId) {
+    const body = `
+        <div class="form-group">
+            <label>拒绝原因 <span style="color:red;">*</span></label>
+            <textarea class="form-control" id="rejectReason" rows="3" placeholder="请填写拒绝原因..." required></textarea>
+        </div>
+    `;
+    const footer = `
+        <button class="btn btn-outline" onclick="this.closest('.modal-overlay').remove()">取消</button>
+        <button class="btn btn-danger-solid" onclick="doReject('${approvalId}')">
+            <i class="bi bi-x-lg"></i> 确认拒绝
+        </button>
+    `;
+    openModal('拒绝审批单', body, footer);
+};
+
+window.doReject = async function(approvalId) {
+    const reason = document.getElementById('rejectReason')?.value.trim();
+    if (!reason) { showToast('请填写拒绝原因', 'error'); return; }
+    document.querySelector('.modal-overlay')?.remove();
+
+    const result = await ApiClient.rejectApproval(approvalId, user.id, reason);
+    if (result.success) {
+        showToast('审批已拒绝', 'info');
+
+        const approval = pendingApprovals.find(a => (a.approval_id || a.id) === approvalId);
+        historyApprovals.unshift({
+            approval_id: approvalId,
+            patient_name: approval?.patient_name || '-',
+            symptoms: approval?.symptoms || '-',
+            drug_name: approval?.drug_name || '-',
+            status: 'rejected',
+            reject_reason: reason,
+            approved_at: new Date().toISOString(),
+            doctor_name: user.name,
+        });
+        saveHistory();
+        refreshPending();
+    } else {
+        showToast(`操作失败: ${result.error || '未知错误'}`, 'error');
+    }
+};
+
+// ===== 加载审批历史 =====
+function loadHistory() {
+    const tbody = document.getElementById('historyTableBody');
+    if (historyApprovals.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7"><div class="empty-state"><i class="bi bi-clock-history"></i><p>暂无审批历史</p></div></td></tr>';
+        return;
+    }
+    tbody.innerHTML = historyApprovals.map(h => `
+        <tr>
+            <td><code>${h.approval_id}</code></td>
+            <td>${h.patient_name}</td>
+            <td>${(h.symptoms || '-').substring(0, 30)}</td>
+            <td>${h.drug_name || '-'}</td>
+            <td><span class="badge ${h.status === 'approved' ? 'badge-approved' : 'badge-rejected'}">${h.status === 'approved' ? '已批准' : '已拒绝'}</span></td>
+            <td>${formatTime(h.approved_at)}</td>
+            <td>${h.doctor_name || '-'}</td>
+        </tr>
+    `).join('');
+}
+
+// Initialize
+refreshPending();
+loadHistory();
+</script>
+</body>
+</html>

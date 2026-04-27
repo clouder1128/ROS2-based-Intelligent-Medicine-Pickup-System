@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>管理员仪表盘 - 智能药品管理系统</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="app-layout">
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-brand">
+            <i class="bi bi-capsule"></i>
+            <h2>智能药品管理</h2>
+        </div>
+        <nav class="sidebar-nav" id="sidebarNav"></nav>
+        <div class="sidebar-footer" id="sidebarFooter"></div>
+    </aside>
+
+    <div class="main-content">
+        <div class="top-bar">
+            <button class="btn btn-outline btn-sm menu-toggle" onclick="document.getElementById('sidebar').classList.toggle('open')">
+                <i class="bi bi-list"></i>
+            </button>
+            <h3 id="pageTitle">管理员仪表盘</h3>
+            <div class="user-badge" id="topUserBadge"></div>
+        </div>
+
+        <div class="content-area">
+            <!-- Health Status -->
+            <div class="card">
+                <div class="card-header"><i class="bi bi-hdd-stack"></i> 系统状态</div>
+                <div class="card-body">
+                    <div class="form-row" id="healthCards">
+                        <div class="stat-card"><div class="spinner"></div><span>加载中...</span></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Inventory Stats -->
+            <div class="card" style="margin-top:20px;">
+                <div class="card-header"><i class="bi bi-capsule"></i> 药品库存概览</div>
+                <div class="card-body">
+                    <div class="form-row" id="drugStatsCards">
+                        <div class="stat-card"><div class="spinner"></div><span>加载中...</span></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Alerts -->
+            <div class="card" style="margin-top:20px;">
+                <div class="card-header"><i class="bi bi-exclamation-triangle"></i> 预警提醒</div>
+                <div class="card-body" id="alertsArea">
+                    <div class="spinner"></div> 加载中...
+                </div>
+            </div>
+
+            <!-- Recent Orders -->
+            <div class="card" style="margin-top:20px;">
+                <div class="card-header"><i class="bi bi-list-ol"></i> 最近订单</div>
+                <div class="card-body">
+                    <div class="table-container">
+                        <table>
+                            <thead><tr><th>任务ID</th><th>状态</th><th>药品</th><th>数量</th><th>时间</th></tr></thead>
+                            <tbody id="recentOrders"><tr><td colspan="5"><div class="spinner"></div></td></tr></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Actions -->
+            <div class="card" style="margin-top:20px;">
+                <div class="card-header"><i class="bi bi-lightning"></i> 快捷操作</div>
+                <div class="card-body" style="display:flex;gap:12px;flex-wrap:wrap;">
+                    <a href="admin_drugs.html" class="btn btn-primary"><i class="bi bi-capsule"></i> 药品管理</a>
+                    <a href="admin_orders.html" class="btn btn-outline"><i class="bi bi-list-ol"></i> 全部订单</a>
+                    <button class="btn btn-outline" onclick="location.reload()"><i class="bi bi-arrow-clockwise"></i> 刷新数据</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="js/api.js"></script>
+<script src="js/utils.js"></script>
+<script>
+const user = requireAuth('admin');
+if (!user) throw new Error('Auth required');
+
+// Sidebar
+document.getElementById('sidebarNav').innerHTML = renderSidebar([
+    { label: '管理员功能', items: [
+        { label: '仪表盘', href: 'admin.html', icon: 'bi bi-speedometer2', page: 'dashboard' },
+        { label: '药品管理', href: 'admin_drugs.html', icon: 'bi bi-capsule', page: 'drugs' },
+        { label: '订单记录', href: 'admin_orders.html', icon: 'bi bi-list-ol', page: 'orders' },
+    ]},
+], 'dashboard');
+document.getElementById('sidebarFooter').innerHTML = `
+    <div class="user-avatar admin">${user.name[0]}</div>
+    <div class="user-info"><div class="user-name">${user.name}</div><div class="user-role">管理员</div></div>
+    <button class="btn-logout" onclick="doLogout()" title="退出"><i class="bi bi-box-arrow-right"></i></button>
+`;
+document.getElementById('topUserBadge').innerHTML = `<i class="bi bi-person-circle"></i> ${getUserDisplay(user)}`;
+
+// Load dashboard
+async function loadDashboard() {
+    const [healthRes, statsRes, ordersRes] = await Promise.all([
+        ApiClient.health(),
+        ApiClient.drugStats(),
+        ApiClient.getOrders(),
+    ]);
+
+    // Health cards
+    const healthOk = healthRes.success && healthRes.status === 'ok';
+    document.getElementById('healthCards').innerHTML = `
+        <div class="stat-card">
+            <div class="stat-icon ${healthOk ? 'green' : 'red'}"><i class="bi ${healthOk ? 'bi-check-circle' : 'bi-x-circle'}"></i></div>
+            <div><div class="stat-value">${healthOk ? '正常' : '异常'}</div><div class="stat-label">后端服务</div></div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon ${healthRes.ros2 ? 'green' : 'yellow'}"><i class="bi bi-robot"></i></div>
+            <div><div class="stat-value">${healthRes.ros2 ? '在线' : '离线'}</div><div class="stat-label">ROS2 桥接</div></div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon blue"><i class="bi bi-database"></i></div>
+            <div><div class="stat-value">运行中</div><div class="stat-label">SQLite 数据库</div></div>
+        </div>
+    `;
+
+    // Drug stats
+    const stats = statsRes.success ? statsRes.stats : {};
+    document.getElementById('drugStatsCards').innerHTML = `
+        <div class="stat-card">
+            <div class="stat-icon blue"><i class="bi bi-capsule"></i></div>
+            <div><div class="stat-value">${stats.total_drugs || 0}</div><div class="stat-label">药品种类</div></div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon green"><i class="bi bi-box-seam"></i></div>
+            <div><div class="stat-value">${stats.total_quantity || 0}</div><div class="stat-label">总库存量</div></div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon yellow"><i class="bi bi-exclamation-triangle"></i></div>
+            <div><div class="stat-value">${stats.low_stock_count || 0}</div><div class="stat-label">低库存预警 (&lt;10)</div></div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon red"><i class="bi bi-clock-history"></i></div>
+            <div><div class="stat-value">${stats.expired_count || 0}</div><div class="stat-label">已过期</div></div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon yellow"><i class="bi bi-hourglass-split"></i></div>
+            <div><div class="stat-value">${stats.expiring_soon_count || 0}</div><div class="stat-label">即将过期 (&le;30天)</div></div>
+        </div>
+    `;
+
+    // Alerts
+    let alertsHtml = '';
+    if (stats.expired_count > 0) {
+        alertsHtml += `<div class="alert alert-danger"><i class="bi bi-x-circle"></i> <strong>${stats.expired_count} 种药品已过期</strong>，请及时清理过期药品。</div>`;
+    }
+    if (stats.expiring_soon_count > 0) {
+        alertsHtml += `<div class="alert alert-warning"><i class="bi bi-hourglass-split"></i> <strong>${stats.expiring_soon_count} 种药品将在30天内过期</strong>，请注意补充库存。</div>`;
+    }
+    if (stats.low_stock_count > 0) {
+        alertsHtml += `<div class="alert alert-warning"><i class="bi bi-exclamation-triangle"></i> <strong>${stats.low_stock_count} 种药品库存不足10盒</strong>，建议尽快补货。</div>`;
+    }
+    if (!alertsHtml) {
+        alertsHtml = '<div class="alert alert-success"><i class="bi bi-check-circle"></i> 系统运行正常，暂无预警。</div>';
+    }
+    document.getElementById('alertsArea').innerHTML = alertsHtml;
+
+    // Recent orders
+    const orders = ordersRes.success ? (ordersRes.data || []) : [];
+    const recent = orders.slice(0, 10);
+    document.getElementById('recentOrders').innerHTML = recent.length === 0
+        ? '<tr><td colspan="5"><div class="empty-state"><p>暂无订单记录</p></div></td></tr>'
+        : recent.map(o => `
+            <tr>
+                <td>${o.task_id}</td>
+                <td><span class="badge ${o.status === 'pending' ? 'badge-pending' : o.status === 'completed' ? 'badge-completed' : 'badge-warning'}">${o.status}</span></td>
+                <td>${o.drug_name || '-'}</td>
+                <td>${o.quantity}</td>
+                <td>${formatTime(o.created_at)}</td>
+            </tr>
+        `).join('');
+}
+
+loadDashboard();
+</script>
+</body>
+</html>

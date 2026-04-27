@@ -173,3 +173,216 @@ def get_drug(drug_id):
     finally:
         if conn:
             conn.close()
+
+
+@drug_bp.route("/drugs", methods=["POST"])
+def create_drug():
+    """Create a new drug in inventory"""
+    data = request.get_json(silent=True)
+    if not data:
+        return (
+            jsonify(
+                {"success": False, "error": "请求体必须为 JSON", "code": "INVALID_JSON"}
+            ),
+            400,
+        )
+
+    required_fields = ["name", "quantity", "expiry_date", "shelf_x", "shelf_y", "shelve_id"]
+    for field in required_fields:
+        if field not in data:
+            return (
+                jsonify(
+                    {"success": False, "error": f"缺少必要字段: {field}", "code": "MISSING_FIELD"}
+                ),
+                400,
+            )
+
+    try:
+        name = str(data["name"])
+        quantity = int(data["quantity"])
+        expiry_date = int(data["expiry_date"])
+        shelf_x = int(data["shelf_x"])
+        shelf_y = int(data["shelf_y"])
+        shelve_id = int(data["shelve_id"])
+    except (TypeError, ValueError):
+        return (
+            jsonify({"success": False, "error": "字段类型错误", "code": "INVALID_TYPE"}),
+            400,
+        )
+
+    if quantity < 0:
+        return (
+            jsonify({"success": False, "error": "库存数量不能为负数", "code": "INVALID_QUANTITY"}),
+            400,
+        )
+
+    conn = None
+    try:
+        conn = get_db_connection()
+        cur = conn.execute("SELECT MAX(drug_id) FROM inventory")
+        row = cur.fetchone()
+        new_id = (row[0] or 0) + 1
+
+        conn.execute(
+            "INSERT INTO inventory (drug_id, name, quantity, expiry_date, shelf_x, shelf_y, shelve_id) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (new_id, name, quantity, expiry_date, shelf_x, shelf_y, shelve_id),
+        )
+        conn.commit()
+
+        drug = {
+            "drug_id": new_id, "name": name, "quantity": quantity,
+            "expiry_date": expiry_date, "shelf_x": shelf_x,
+            "shelf_y": shelf_y, "shelve_id": shelve_id,
+        }
+        return jsonify({"success": True, "drug": drug, "message": "药品添加成功"}), 201
+    except Exception as e:
+        print(f"Database error in create_drug: {e}")
+        if conn:
+            conn.rollback()
+        return (
+            jsonify({"success": False, "error": "数据库错误", "code": "DB_ERROR"}),
+            500,
+        )
+    finally:
+        if conn:
+            conn.close()
+
+
+@drug_bp.route("/drugs/<int:drug_id>", methods=["PUT"])
+def update_drug(drug_id):
+    """Update an existing drug"""
+    data = request.get_json(silent=True)
+    if not data:
+        return (
+            jsonify({"success": False, "error": "请求体必须为 JSON", "code": "INVALID_JSON"}),
+            400,
+        )
+
+    allowed_fields = ["name", "quantity", "expiry_date", "shelf_x", "shelf_y", "shelve_id"]
+    updates = {}
+    for key in allowed_fields:
+        if key in data:
+            try:
+                updates[key] = str(data[key]) if key == "name" else int(data[key])
+            except (TypeError, ValueError):
+                return (
+                    jsonify({"success": False, "error": f"字段 {key} 类型错误", "code": "INVALID_TYPE"}),
+                    400,
+                )
+
+    if not updates:
+        return (
+            jsonify({"success": False, "error": "没有需要更新的字段", "code": "NO_UPDATES"}),
+            400,
+        )
+
+    if "quantity" in updates and updates["quantity"] < 0:
+        return (
+            jsonify({"success": False, "error": "库存数量不能为负数", "code": "INVALID_QUANTITY"}),
+            400,
+        )
+
+    conn = None
+    try:
+        conn = get_db_connection()
+        cur = conn.execute("SELECT * FROM inventory WHERE drug_id = ?", (drug_id,))
+        if not cur.fetchone():
+            return (
+                jsonify({"success": False, "error": f"药品不存在: id={drug_id}", "code": "DRUG_NOT_FOUND"}),
+                404,
+            )
+
+        set_clause = ", ".join(f"{k} = ?" for k in updates)
+        conn.execute(f"UPDATE inventory SET {set_clause} WHERE drug_id = ?", list(updates.values()) + [drug_id])
+        conn.commit()
+
+        cur = conn.execute(
+            "SELECT drug_id, name, quantity, expiry_date, shelf_x, shelf_y, shelve_id FROM inventory WHERE drug_id = ?",
+            (drug_id,),
+        )
+        drug = dict(cur.fetchone())
+        return jsonify({"success": True, "drug": drug, "message": "药品更新成功"})
+    except Exception as e:
+        print(f"Database error in update_drug: {e}")
+        if conn:
+            conn.rollback()
+        return (
+            jsonify({"success": False, "error": "数据库错误", "code": "DB_ERROR"}),
+            500,
+        )
+    finally:
+        if conn:
+            conn.close()
+
+
+@drug_bp.route("/drugs/<int:drug_id>", methods=["DELETE"])
+def delete_drug(drug_id):
+    """Delete a drug from inventory"""
+    conn = None
+    try:
+        conn = get_db_connection()
+        cur = conn.execute("SELECT name FROM inventory WHERE drug_id = ?", (drug_id,))
+        existing = cur.fetchone()
+        if not existing:
+            return (
+                jsonify({"success": False, "error": f"药品不存在: id={drug_id}", "code": "DRUG_NOT_FOUND"}),
+                404,
+            )
+
+        drug_name = existing["name"]
+        conn.execute("DELETE FROM inventory WHERE drug_id = ?", (drug_id,))
+        conn.commit()
+        return jsonify({"success": True, "message": f"药品 '{drug_name}' 已删除", "drug_id": drug_id})
+    except Exception as e:
+        print(f"Database error in delete_drug: {e}")
+        if conn:
+            conn.rollback()
+        return (
+            jsonify({"success": False, "error": "数据库错误", "code": "DB_ERROR"}),
+            500,
+        )
+    finally:
+        if conn:
+            conn.close()
+
+
+@drug_bp.route("/drugs/stats", methods=["GET"])
+def drug_stats():
+    """Get drug inventory statistics"""
+    conn = None
+    try:
+        conn = get_db_connection()
+        cur = conn.execute("SELECT COUNT(*) as total, SUM(quantity) as total_qty FROM inventory")
+        row = cur.fetchone()
+        total = row["total"] or 0
+        total_quantity = row["total_qty"] or 0
+
+        cur = conn.execute("SELECT COUNT(*) FROM inventory WHERE expiry_date <= 0")
+        expired = cur.fetchone()[0]
+
+        cur = conn.execute("SELECT COUNT(*) FROM inventory WHERE quantity < 10")
+        low_stock = cur.fetchone()[0]
+
+        cur = conn.execute("SELECT COUNT(*) FROM inventory WHERE expiry_date <= 30 AND expiry_date > 0")
+        expiring_soon = cur.fetchone()[0]
+
+        return jsonify({
+            "success": True,
+            "stats": {
+                "total_drugs": total,
+                "total_quantity": total_quantity,
+                "expired_count": expired,
+                "low_stock_count": low_stock,
+                "expiring_soon_count": expiring_soon,
+            },
+        })
+    except Exception as e:
+        print(f"Database error in drug_stats: {e}")
+        return (
+            jsonify({"success": False, "error": "数据库错误", "code": "DB_ERROR"}),
+            500,
+        )
+    finally:
+        if conn:
+            conn.close()
