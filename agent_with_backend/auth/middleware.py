@@ -121,5 +121,10 @@ def require_permissions(*needed: str) -> Callable[[F], F]:
     return decorator
 
 
+def require_permission(operation_code: str) -> Callable[[F], F]:
+    """单权限装饰器（与分工文档 `require_permission('create:drug')` 用法一致）。"""
+    return require_permissions(operation_code)
+
+
 def user_has_any_permission(perms: Iterable[str], need: Iterable[str]) -> bool:
     return bool(set(need).intersection(set(perms)))

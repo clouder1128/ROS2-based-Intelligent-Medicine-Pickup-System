@@ -10,10 +10,18 @@ from ros_integration.bridge import publish_task
 from common.utils.drug_helpers import validate_and_get_drug, find_drug_id_by_name
 from database.approval_manager import get_approval_manager
 
+from auth.constants import (
+    PERM_APPROVE_APPROVAL,
+    PERM_READ_APPROVAL,
+    PERM_REJECT_APPROVAL,
+)
+from auth.middleware import require_auth, require_permission
+
 approval_bp = Blueprint("approval", __name__, url_prefix="/api")
 
 
 @approval_bp.route("/approvals", methods=["POST"])
+@require_auth
 def create_approval():
     try:
         data = request.get_json(silent=True)
@@ -52,6 +60,7 @@ def create_approval():
 
 
 @approval_bp.route("/approvals/<approval_id>", methods=["GET"])
+@require_permission(PERM_READ_APPROVAL)
 def get_approval(approval_id):
     try:
         manager = get_approval_manager()
@@ -73,6 +82,7 @@ def get_approval(approval_id):
 
 
 @approval_bp.route("/approvals/pending", methods=["GET"])
+@require_permission(PERM_READ_APPROVAL)
 def get_pending_approvals():
     try:
         manager = get_approval_manager()
@@ -97,6 +107,7 @@ def get_pending_approvals():
 
 
 @approval_bp.route("/approvals/<approval_id>/approve", methods=["POST"])
+@require_permission(PERM_APPROVE_APPROVAL)
 def approve_approval(approval_id):
     try:
         data = request.get_json()
@@ -179,6 +190,7 @@ def approve_approval(approval_id):
 
 
 @approval_bp.route("/approvals/<approval_id>/reject", methods=["POST"])
+@require_permission(PERM_REJECT_APPROVAL)
 def reject_approval(approval_id):
     try:
         data = request.get_json()

@@ -8,6 +8,16 @@ from datetime import datetime, timezone
 
 from flask import Blueprint, jsonify, request
 
+from auth.constants import (
+    PERM_BATCH_DRUG,
+    PERM_CREATE_DRUG,
+    PERM_DELETE_DRUG,
+    PERM_READ_DRUG,
+    PERM_READ_INVENTORY,
+    PERM_UPDATE_DRUG,
+    PERM_UPDATE_INVENTORY,
+)
+from auth.middleware import require_permission
 from common.utils.database import get_db_connection
 
 drug_bp = Blueprint("drug", __name__, url_prefix="/api")
@@ -109,6 +119,7 @@ def _pagination_dict(page: int, limit: int, total: int):
 
 
 @drug_bp.route("/drugs", methods=["GET"])
+@require_permission(PERM_READ_DRUG)
 def list_drugs():
     name_filter = request.args.get("name")
     symptom_filter = request.args.get("symptom")
@@ -280,7 +291,20 @@ def list_drugs():
             conn.close()
 
 
+@drug_bp.route("/inventory", methods=["GET"])
+@require_permission(PERM_READ_INVENTORY)
+def list_inventory():
+    return list_drugs()
+
+
+@drug_bp.route("/drugs/search", methods=["GET"])
+@require_permission(PERM_READ_DRUG)
+def search_drugs():
+    return list_drugs()
+
+
 @drug_bp.route("/drugs/<int:drug_id>", methods=["GET"])
+@require_permission(PERM_READ_DRUG)
 def get_drug(drug_id):
     conn = None
     try:
@@ -328,6 +352,7 @@ def _replace_indications(conn, drug_id: int, indications):
 
 
 @drug_bp.route("/drugs", methods=["POST"])
+@require_permission(PERM_CREATE_DRUG)
 def create_drug():
     data = request.get_json(silent=True)
     if not data or not isinstance(data, dict):
@@ -486,6 +511,7 @@ def _int_safe(v, default):
 
 
 @drug_bp.route("/drugs/<int:drug_id>", methods=["PUT"])
+@require_permission(PERM_UPDATE_DRUG)
 def update_drug(drug_id):
     data = request.get_json(silent=True)
     if not data or not isinstance(data, dict):
@@ -557,6 +583,7 @@ def update_drug(drug_id):
 
 
 @drug_bp.route("/drugs/<int:drug_id>", methods=["DELETE"])
+@require_permission(PERM_DELETE_DRUG)
 def delete_drug(drug_id):
     conn = None
     try:
@@ -591,179 +618,143 @@ def delete_drug(drug_id):
             conn.close()
 
 
-@drug_bp.route("/drugs", methods=["POST"])
-def create_drug():
-    """Create a new drug in inventory"""
-    data = request.get_json(silent=True)
-    if not data:
-        return (
-            jsonify(
-                {"success": False, "error": "请求体必须为 JSON", "code": "INVALID_JSON"}
-            ),
-            400,
-        )
-
-    required_fields = ["name", "quantity", "expiry_date", "shelf_x", "shelf_y", "shelve_id"]
-    for field in required_fields:
-        if field not in data:
-            return (
-                jsonify(
-                    {"success": False, "error": f"缺少必要字段: {field}", "code": "MISSING_FIELD"}
-                ),
-                400,
-            )
-
-    try:
-        name = str(data["name"])
-        quantity = int(data["quantity"])
-        expiry_date = int(data["expiry_date"])
-        shelf_x = int(data["shelf_x"])
-        shelf_y = int(data["shelf_y"])
-        shelve_id = int(data["shelve_id"])
-    except (TypeError, ValueError):
-        return (
-            jsonify({"success": False, "error": "字段类型错误", "code": "INVALID_TYPE"}),
-            400,
-        )
-
-    if quantity < 0:
-        return (
-            jsonify({"success": False, "error": "库存数量不能为负数", "code": "INVALID_QUANTITY"}),
-            400,
-        )
-
+@drug_bp.route("/drugs/<int:drug_id>/adjust", methods=["POST"])
+@require_permission(PERM_UPDATE_INVENTORY)
+def adjust_drug_inventory(drug_id):
+    """库存数量调整：JSON `quantity`（绝对值）或 `delta`（增量）。"""
+    data = request.get_json(silent=True) or {}
     conn = None
     try:
         conn = get_db_connection()
-        cur = conn.execute("SELECT MAX(drug_id) FROM inventory")
-        row = cur.fetchone()
-        new_id = (row[0] or 0) + 1
-
-        conn.execute(
-            "INSERT INTO inventory (drug_id, name, quantity, expiry_date, shelf_x, shelf_y, shelve_id) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?)",
-            (new_id, name, quantity, expiry_date, shelf_x, shelf_y, shelve_id),
-        )
-        conn.commit()
-
-        drug = {
-            "drug_id": new_id, "name": name, "quantity": quantity,
-            "expiry_date": expiry_date, "shelf_x": shelf_x,
-            "shelf_y": shelf_y, "shelve_id": shelve_id,
-        }
-        return jsonify({"success": True, "drug": drug, "message": "药品添加成功"}), 201
-    except Exception as e:
-        print(f"Database error in create_drug: {e}")
-        if conn:
-            conn.rollback()
-        return (
-            jsonify({"success": False, "error": "数据库错误", "code": "DB_ERROR"}),
-            500,
-        )
-    finally:
-        if conn:
-            conn.close()
-
-
-@drug_bp.route("/drugs/<int:drug_id>", methods=["PUT"])
-def update_drug(drug_id):
-    """Update an existing drug"""
-    data = request.get_json(silent=True)
-    if not data:
-        return (
-            jsonify({"success": False, "error": "请求体必须为 JSON", "code": "INVALID_JSON"}),
-            400,
-        )
-
-    allowed_fields = ["name", "quantity", "expiry_date", "shelf_x", "shelf_y", "shelve_id"]
-    updates = {}
-    for key in allowed_fields:
-        if key in data:
-            try:
-                updates[key] = str(data[key]) if key == "name" else int(data[key])
-            except (TypeError, ValueError):
-                return (
-                    jsonify({"success": False, "error": f"字段 {key} 类型错误", "code": "INVALID_TYPE"}),
-                    400,
-                )
-
-    if not updates:
-        return (
-            jsonify({"success": False, "error": "没有需要更新的字段", "code": "NO_UPDATES"}),
-            400,
-        )
-
-    if "quantity" in updates and updates["quantity"] < 0:
-        return (
-            jsonify({"success": False, "error": "库存数量不能为负数", "code": "INVALID_QUANTITY"}),
-            400,
-        )
-
-    conn = None
-    try:
-        conn = get_db_connection()
-        cur = conn.execute("SELECT * FROM inventory WHERE drug_id = ?", (drug_id,))
-        if not cur.fetchone():
-            return (
-                jsonify({"success": False, "error": f"药品不存在: id={drug_id}", "code": "DRUG_NOT_FOUND"}),
-                404,
-            )
-
-        set_clause = ", ".join(f"{k} = ?" for k in updates)
-        conn.execute(f"UPDATE inventory SET {set_clause} WHERE drug_id = ?", list(updates.values()) + [drug_id])
-        conn.commit()
-
         cur = conn.execute(
-            "SELECT drug_id, name, quantity, expiry_date, shelf_x, shelf_y, shelve_id FROM inventory WHERE drug_id = ?",
+            "SELECT drug_id, quantity, is_deleted FROM inventory WHERE drug_id = ?",
             (drug_id,),
         )
-        drug = dict(cur.fetchone())
-        return jsonify({"success": True, "drug": drug, "message": "药品更新成功"})
+        row = cur.fetchone()
+        if row is None or row["is_deleted"]:
+            return _error(f"Drug not found: id={drug_id}", "DRUG_NOT_FOUND", 404)
+
+        now = _utc_now_iso()
+        if "quantity" in data:
+            try:
+                q = int(data["quantity"])
+            except (TypeError, ValueError):
+                return _error("quantity must be an integer", "INVALID_TYPE", 400)
+            if q < 0:
+                return _error("quantity must be >= 0", "INVALID_INPUT", 400)
+            conn.execute(
+                "UPDATE inventory SET quantity = ?, updated_at = ? WHERE drug_id = ?",
+                (q, now, drug_id),
+            )
+        elif "delta" in data:
+            try:
+                d = int(data["delta"])
+            except (TypeError, ValueError):
+                return _error("delta must be an integer", "INVALID_TYPE", 400)
+            cur = conn.execute(
+                """
+                UPDATE inventory
+                SET quantity = quantity + ?, updated_at = ?
+                WHERE drug_id = ? AND quantity + ? >= 0
+                """,
+                (d, now, drug_id, d),
+            )
+            if cur.rowcount == 0:
+                return _error("Insufficient quantity for delta adjustment", "INVALID_ADJUST", 400)
+        else:
+            return _error("Provide quantity or delta", "MISSING_FIELDS", 400)
+
+        conn.commit()
+        cur = conn.execute(
+            "SELECT quantity FROM inventory WHERE drug_id = ?", (drug_id,)
+        )
+        qrow = cur.fetchone()
+        return jsonify(
+            {
+                "success": True,
+                "ok": True,
+                "drug_id": drug_id,
+                "quantity": qrow["quantity"] if qrow else None,
+            }
+        )
     except Exception as e:
-        print(f"Database error in update_drug: {e}")
+        print(f"Database error in adjust_drug_inventory: {e}")
         if conn:
             conn.rollback()
-        return (
-            jsonify({"success": False, "error": "数据库错误", "code": "DB_ERROR"}),
-            500,
-        )
+        return _error("Database error while adjusting inventory", "DB_ERROR", 500)
     finally:
         if conn:
             conn.close()
 
 
-@drug_bp.route("/drugs/<int:drug_id>", methods=["DELETE"])
-def delete_drug(drug_id):
-    """Delete a drug from inventory"""
+@drug_bp.route("/drugs/batch-import", methods=["POST"])
+@require_permission(PERM_BATCH_DRUG)
+def batch_import_drugs():
+    """批量创建药品（每项字段与简化 POST /drugs 一致）。"""
+    items = request.get_json(silent=True)
+    if not isinstance(items, list) or not items:
+        return _error("Request body must be a non-empty JSON array", "INVALID_JSON", 400)
+
+    required_fields = ["name", "quantity", "expiry_date", "shelf_x", "shelf_y", "shelve_id"]
     conn = None
     try:
         conn = get_db_connection()
-        cur = conn.execute("SELECT name FROM inventory WHERE drug_id = ?", (drug_id,))
-        existing = cur.fetchone()
-        if not existing:
-            return (
-                jsonify({"success": False, "error": f"药品不存在: id={drug_id}", "code": "DRUG_NOT_FOUND"}),
-                404,
-            )
+        created_ids: list[int] = []
+        for idx, data in enumerate(items):
+            if not isinstance(data, dict):
+                return _error(f"Item {idx} must be an object", "INVALID_TYPE", 400)
+            for field in required_fields:
+                if field not in data:
+                    return _error(
+                        f"Item {idx} missing field: {field}", "MISSING_FIELDS", 400
+                    )
+            try:
+                name = str(data["name"])
+                quantity = int(data["quantity"])
+                expiry_date = int(data["expiry_date"])
+                shelf_x = int(data["shelf_x"])
+                shelf_y = int(data["shelf_y"])
+                shelve_id = int(data["shelve_id"])
+            except (TypeError, ValueError):
+                return _error(f"Item {idx} has invalid field types", "INVALID_TYPE", 400)
 
-        drug_name = existing["name"]
-        conn.execute("DELETE FROM inventory WHERE drug_id = ?", (drug_id,))
+            if quantity < 0:
+                return _error(
+                    f"Item {idx}: quantity cannot be negative", "INVALID_QUANTITY", 400
+                )
+
+            new_id = _next_drug_id(conn)
+            conn.execute(
+                "INSERT INTO inventory (drug_id, name, quantity, expiry_date, shelf_x, shelf_y, shelve_id) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (new_id, name, quantity, expiry_date, shelf_x, shelf_y, shelve_id),
+            )
+            created_ids.append(new_id)
+
         conn.commit()
-        return jsonify({"success": True, "message": f"药品 '{drug_name}' 已删除", "drug_id": drug_id})
+        return (
+            jsonify(
+                {
+                    "success": True,
+                    "ok": True,
+                    "drug_ids": created_ids,
+                    "count": len(created_ids),
+                }
+            ),
+            201,
+        )
     except Exception as e:
-        print(f"Database error in delete_drug: {e}")
+        print(f"Database error in batch_import_drugs: {e}")
         if conn:
             conn.rollback()
-        return (
-            jsonify({"success": False, "error": "数据库错误", "code": "DB_ERROR"}),
-            500,
-        )
+        return _error("Database error during batch import", "DB_ERROR", 500)
     finally:
         if conn:
             conn.close()
 
 
 @drug_bp.route("/drugs/stats", methods=["GET"])
+@require_permission(PERM_READ_INVENTORY)
 def drug_stats():
     """Get drug inventory statistics"""
     conn = None

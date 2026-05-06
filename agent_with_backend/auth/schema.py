@@ -8,6 +8,8 @@ import sqlite3
 from werkzeug.security import generate_password_hash
 
 from auth.constants import (
+    ALL_PERMISSION_CODES,
+    PERMISSION_DESCRIPTIONS,
     ROLE_ADMIN,
     ROLE_DOCTOR,
     ROLE_PATIENT,
@@ -105,6 +107,7 @@ def ensure_auth_schema(conn: sqlite3.Connection | None = None) -> None:
         conn.commit()
         _migrate_legacy_auth(conn)
         _seed_rbac_if_empty(conn)
+        _sync_permissions_and_role_mappings(conn)
         _ensure_default_admin_if_configured(conn)
     finally:
         if own:
@@ -159,6 +162,53 @@ def _migrate_legacy_auth(conn: sqlite3.Connection) -> None:
     conn.commit()
 
 
+def _sync_permissions_and_role_mappings(conn: sqlite3.Connection) -> None:
+    """补齐权限码并按 ROLE_PERMISSION_MAP 同步角色—权限（与分工文档矩阵一致）。"""
+    c = conn.cursor()
+    for code in ALL_PERMISSION_CODES:
+        desc = PERMISSION_DESCRIPTIONS.get(code, code)
+        c.execute(
+            "INSERT OR IGNORE INTO auth_permissions (code, description) VALUES (?, ?)",
+            (code, desc),
+        )
+    conn.commit()
+
+    code_to_pid = {
+        r[0]: r[1] for r in c.execute("SELECT code, id FROM auth_permissions").fetchall()
+    }
+
+    for role_code, perm_codes in ROLE_PERMISSION_MAP.items():
+        row = c.execute(
+            "SELECT id FROM auth_roles WHERE code = ?", (role_code,)
+        ).fetchone()
+        if not row:
+            continue
+        rid = row[0]
+        want_pids = []
+        for pc in perm_codes:
+            pid = code_to_pid.get(pc)
+            if pid is not None:
+                want_pids.append(pid)
+        want_set = set(want_pids)
+
+        existing = c.execute(
+            "SELECT permission_id FROM auth_role_permissions WHERE role_id = ?",
+            (rid,),
+        ).fetchall()
+        for (epid,) in existing:
+            if epid not in want_set:
+                c.execute(
+                    "DELETE FROM auth_role_permissions WHERE role_id = ? AND permission_id = ?",
+                    (rid, epid),
+                )
+        for pid in want_pids:
+            c.execute(
+                "INSERT OR IGNORE INTO auth_role_permissions (role_id, permission_id) VALUES (?, ?)",
+                (rid, pid),
+            )
+    conn.commit()
+
+
 def _seed_rbac_if_empty(conn: sqlite3.Connection) -> None:
     c = conn.cursor()
     c.execute("SELECT COUNT(*) FROM auth_roles")
@@ -176,15 +226,7 @@ def _seed_rbac_if_empty(conn: sqlite3.Connection) -> None:
     )
 
     perm_rows = [
-        ("read:drug", "读取药品"),
-        ("create:drug", "创建药品"),
-        ("update:drug", "更新药品"),
-        ("delete:drug", "删除药品"),
-        ("read:inventory", "读取库存"),
-        ("update:inventory", "调整库存"),
-        ("read:users", "查询用户"),
-        ("write:users", "维护用户"),
-        ("read:audit", "审计日志"),
+        (code, PERMISSION_DESCRIPTIONS[code]) for code in ALL_PERMISSION_CODES
     ]
     c.executemany(
         "INSERT INTO auth_permissions (code, description) VALUES (?, ?)",

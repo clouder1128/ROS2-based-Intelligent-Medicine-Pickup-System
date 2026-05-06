@@ -2,21 +2,27 @@
 
 from auth.blueprint import auth_bp
 from auth.constants import (
+    PERM_APPROVE_APPROVAL,
+    PERM_BATCH_DRUG,
     PERM_CREATE_DRUG,
     PERM_DELETE_DRUG,
+    PERM_READ_APPROVAL,
     PERM_READ_AUDIT,
     PERM_READ_DRUG,
     PERM_READ_INVENTORY,
+    PERM_READ_ORDER,
     PERM_READ_USERS,
+    PERM_REJECT_APPROVAL,
     PERM_UPDATE_DRUG,
     PERM_UPDATE_INVENTORY,
     PERM_WRITE_USERS,
 )
-from auth.middleware import require_auth, require_permissions
+from auth.middleware import require_auth, require_permission, require_permissions
 
 __all__ = [
     "auth_bp",
     "require_auth",
+    "require_permission",
     "require_permissions",
     "PERM_READ_DRUG",
     "PERM_CREATE_DRUG",
@@ -24,6 +30,11 @@ __all__ = [
     "PERM_DELETE_DRUG",
     "PERM_READ_INVENTORY",
     "PERM_UPDATE_INVENTORY",
+    "PERM_BATCH_DRUG",
+    "PERM_READ_APPROVAL",
+    "PERM_APPROVE_APPROVAL",
+    "PERM_REJECT_APPROVAL",
+    "PERM_READ_ORDER",
     "PERM_READ_USERS",
     "PERM_WRITE_USERS",
     "PERM_READ_AUDIT",

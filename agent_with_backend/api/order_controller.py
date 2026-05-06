@@ -8,6 +8,9 @@ from common.utils.database import get_db_connection
 from ros_integration.bridge import publish_task
 from common.utils.drug_helpers import validate_and_get_drug, find_drug_id_by_name
 
+from auth.middleware import require_auth, require_permission
+from auth.constants import PERM_READ_ORDER
+
 order_bp = Blueprint("order", __name__, url_prefix="/api")
 
 
@@ -36,11 +39,14 @@ def create_order_for_drug(
         return None, f"创建订单失败: {str(e)}"
 
 
-@order_bp.route("/order", methods=["POST", "OPTIONS"])
-def order():
-    if request.method == "OPTIONS":
-        return "", 204
+@order_bp.route("/order", methods=["OPTIONS"])
+def order_options():
+    return "", 204
 
+
+@order_bp.route("/order", methods=["POST"])
+@require_auth
+def order():
     data = request.get_json(silent=True)
     if not data:
         return (jsonify({"success": False, "ok": False, "error": "请求体必须为 JSON", "code": "INVALID_JSON"}), 400)
@@ -96,6 +102,7 @@ def order():
 
 
 @order_bp.route("/pickup", methods=["POST"])
+@require_auth
 def pickup():
     data = request.get_json(silent=True)
     if not data:
@@ -136,6 +143,7 @@ def pickup():
 
 
 @order_bp.route("/dispense", methods=["POST"])
+@require_auth
 def dispense():
     data = request.get_json(silent=True)
     if not data:
@@ -206,6 +214,7 @@ def dispense():
 
 
 @order_bp.route("/orders", methods=["GET"])
+@require_permission(PERM_READ_ORDER)
 def list_orders():
     conn = None
     try:
