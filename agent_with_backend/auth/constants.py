@@ -6,7 +6,7 @@ from __future__ import annotations
 ROLE_ADMIN = "admin"
 ROLE_PHARMACIST = "pharmacist"
 ROLE_DOCTOR = "doctor"
-ROLE_USER = "user"
+ROLE_PATIENT = "patient"
 
 # 权限 code（与接口清单细粒度一致）
 PERM_READ_DRUG = "read:drug"
@@ -43,5 +43,5 @@ ROLE_PERMISSION_MAP: dict[str, frozenset[str]] = {
         }
     ),
     ROLE_DOCTOR: frozenset({PERM_READ_DRUG}),
-    ROLE_USER: frozenset({PERM_READ_DRUG}),
+    ROLE_PATIENT: frozenset({PERM_READ_DRUG}),
 }

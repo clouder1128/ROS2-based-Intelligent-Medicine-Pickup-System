@@ -10,9 +10,9 @@ from werkzeug.security import generate_password_hash
 from auth.constants import (
     ROLE_ADMIN,
     ROLE_DOCTOR,
+    ROLE_PATIENT,
     ROLE_PHARMACIST,
     ROLE_PERMISSION_MAP,
-    ROLE_USER,
 )
 from auth.db import get_db_connection
 
@@ -60,6 +60,7 @@ def ensure_auth_schema(conn: sqlite3.Connection | None = None) -> None:
                 username TEXT UNIQUE NOT NULL COLLATE NOCASE,
                 email TEXT COLLATE NOCASE,
                 password_hash TEXT NOT NULL,
+                display_name TEXT NOT NULL DEFAULT '',
                 role_id INTEGER NOT NULL,
                 status TEXT NOT NULL DEFAULT 'active',
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -102,11 +103,60 @@ def ensure_auth_schema(conn: sqlite3.Connection | None = None) -> None:
             "CREATE INDEX IF NOT EXISTS idx_audit_created ON auth_audit_logs(created_at)"
         )
         conn.commit()
+        _migrate_legacy_auth(conn)
         _seed_rbac_if_empty(conn)
         _ensure_default_admin_if_configured(conn)
     finally:
         if own:
             conn.close()
+
+
+def _migrate_legacy_auth(conn: sqlite3.Connection) -> None:
+    """兼容旧库：补 display_name；角色 code user→patient；文档对齐视图 users。"""
+    c = conn.cursor()
+    cols = {r[1] for r in c.execute("PRAGMA table_info(auth_users)").fetchall()}
+    if "display_name" not in cols:
+        c.execute(
+            "ALTER TABLE auth_users ADD COLUMN display_name TEXT NOT NULL DEFAULT ''"
+        )
+        conn.commit()
+    c.execute(
+        """
+        UPDATE auth_users
+        SET display_name = username
+        WHERE display_name IS NULL OR trim(display_name) = ''
+        """
+    )
+    row = c.execute(
+        "SELECT id FROM auth_roles WHERE code = ?", ("user",)
+    ).fetchone()
+    if row:
+        c.execute(
+            """
+            UPDATE auth_roles
+            SET code = ?, name = ?, description = ?
+            WHERE code = 'user'
+            """,
+            (ROLE_PATIENT, "患者", "患者/普通用户"),
+        )
+        conn.commit()
+    c.execute("DROP VIEW IF EXISTS users")
+    c.execute(
+        """
+        CREATE VIEW users AS
+        SELECT
+            u.id AS id,
+            u.username AS username,
+            u.password_hash AS password_hash,
+            r.code AS role,
+            u.display_name AS display_name,
+            u.created_at AS created_at
+        FROM auth_users u
+        JOIN auth_roles r ON r.id = u.role_id
+        WHERE r.code IN ('admin', 'doctor', 'pharmacist', 'patient')
+        """
+    )
+    conn.commit()
 
 
 def _seed_rbac_if_empty(conn: sqlite3.Connection) -> None:
@@ -119,7 +169,7 @@ def _seed_rbac_if_empty(conn: sqlite3.Connection) -> None:
         (ROLE_ADMIN, "管理员", "系统管理员，全部权限"),
         (ROLE_PHARMACIST, "药剂师", "药品与库存维护"),
         (ROLE_DOCTOR, "医生", "药品查询"),
-        (ROLE_USER, "普通用户", "基础查询"),
+        (ROLE_PATIENT, "患者", "患者/普通用户"),
     ]
     c.executemany(
         "INSERT INTO auth_roles (code, name, description) VALUES (?, ?, ?)", roles
@@ -176,13 +226,17 @@ def _ensure_default_admin_if_configured(conn: sqlite3.Connection) -> None:
         return
     c.execute(
         """
-        INSERT INTO auth_users (username, email, password_hash, role_id, status)
-        VALUES (?, ?, ?, ?, 'active')
+        INSERT INTO auth_users (username, email, password_hash, display_name, role_id, status)
+        VALUES (?, ?, ?, ?, ?, 'active')
         """,
         (
             os.environ.get("AUTH_DEFAULT_ADMIN_USER", "admin"),
             os.environ.get("AUTH_DEFAULT_ADMIN_EMAIL", "admin@local"),
             generate_password_hash(pwd),
+            (
+                os.environ.get("AUTH_DEFAULT_ADMIN_DISPLAY_NAME", "").strip()
+                or os.environ.get("AUTH_DEFAULT_ADMIN_USER", "admin")
+            ),
             row[0],
         ),
     )

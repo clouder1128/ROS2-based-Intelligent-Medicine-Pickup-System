@@ -11,9 +11,19 @@ from flask import Blueprint, jsonify, request
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from auth.audit import write_audit
-from auth.constants import PERM_READ_AUDIT, PERM_READ_USERS, PERM_WRITE_USERS
+from auth.constants import (
+    PERM_READ_AUDIT,
+    PERM_READ_USERS,
+    PERM_WRITE_USERS,
+    ROLE_PATIENT,
+)
 from auth.db import get_db_connection
-from auth.middleware import get_bearer_token, require_auth, require_permissions
+from auth.middleware import (
+    get_bearer_token,
+    get_current_user_from_token,
+    require_auth,
+    require_permissions,
+)
 from auth.schema import ensure_auth_schema, permission_codes_for_user
 from auth.tokens import (
     ACCESS_TTL_SECONDS,
@@ -92,6 +102,30 @@ def _issue_tokens(user_row: Any) -> tuple[str, str, list[str]]:
         conn.close()
 
 
+def _user_info(conn: Any, user_id: int) -> Optional[dict[str, Any]]:
+    row = conn.execute(
+        """
+        SELECT u.id, u.username, u.email, u.display_name, u.status, r.code AS role
+        FROM auth_users u
+        JOIN auth_roles r ON r.id = u.role_id
+        WHERE u.id = ?
+        """,
+        (user_id,),
+    ).fetchone()
+    if not row or row["status"] != "active":
+        return None
+    disp = (row["display_name"] or "").strip() or row["username"]
+    perms = permission_codes_for_user(conn, user_id)
+    return {
+        "id": int(row["id"]),
+        "username": row["username"],
+        "email": row["email"],
+        "display_name": disp,
+        "role": row["role"],
+        "permissions": perms,
+    }
+
+
 @auth_bp.route("/auth/register", methods=["POST"])
 def register():
     ensure_auth_schema()
@@ -99,6 +133,7 @@ def register():
     username = (data.get("username") or "").strip()
     password = data.get("password") or ""
     email = (data.get("email") or "").strip() or None
+    display_name = (data.get("display_name") or "").strip() or username
     if not username or len(username) < 2:
         return (
             jsonify(
@@ -136,16 +171,16 @@ def register():
                 409,
             )
         role = conn.execute(
-            "SELECT id FROM auth_roles WHERE code = 'user'"
+            "SELECT id FROM auth_roles WHERE code = ?", (ROLE_PATIENT,)
         ).fetchone()
         if not role:
             return jsonify({"success": False, "error_code": "AUTH_500", "message": "角色未初始化"}), 500
         conn.execute(
             """
-            INSERT INTO auth_users (username, email, password_hash, role_id, status)
-            VALUES (?, ?, ?, ?, 'active')
+            INSERT INTO auth_users (username, email, password_hash, display_name, role_id, status)
+            VALUES (?, ?, ?, ?, ?, 'active')
             """,
-            (username, email, generate_password_hash(password), role["id"]),
+            (username, email, generate_password_hash(password), display_name, role["id"]),
         )
         conn.commit()
         uid = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
@@ -182,7 +217,7 @@ def login():
     try:
         row = conn.execute(
             """
-            SELECT u.id, u.username, u.email, u.password_hash, u.role_id, u.status, r.code AS role_code
+            SELECT u.id, u.username, u.email, u.display_name, u.password_hash, u.role_id, u.status, r.code AS role_code
             FROM auth_users u
             JOIN auth_roles r ON r.id = u.role_id
             WHERE u.username = ? COLLATE NOCASE
@@ -226,10 +261,12 @@ def login():
                 401,
             )
         access, refresh, perms = _issue_tokens(row)
+        disp = (row["display_name"] or "").strip() or row["username"]
         user_info = {
             "id": int(row["id"]),
             "username": row["username"],
             "email": row["email"],
+            "display_name": disp,
             "role": row["role_code"],
             "permissions": perms,
         }
@@ -252,6 +289,86 @@ def login():
                 "user_info": user_info,
             }
         )
+    finally:
+        conn.close()
+
+
+@auth_bp.route("/auth/verify", methods=["POST"])
+def verify_token():
+    """校验 JWT，供前端刷新/路由守卫使用。"""
+    ensure_auth_schema()
+    data = request.get_json(silent=True) or {}
+    tok = (
+        get_bearer_token(request)
+        or (data.get("token") or data.get("access_token") or "").strip()
+    )
+    if not tok:
+        return (
+            jsonify(
+                {
+                    "success": False,
+                    "valid": False,
+                    "error_code": "AUTH_001",
+                    "message": "未提供访问令牌",
+                }
+            ),
+            401,
+        )
+    user = get_current_user_from_token(tok)
+    if not user:
+        return (
+            jsonify(
+                {
+                    "success": False,
+                    "valid": False,
+                    "error_code": "AUTH_002",
+                    "message": "令牌无效或已过期",
+                }
+            ),
+            401,
+        )
+    conn = get_db_connection()
+    try:
+        info = _user_info(conn, int(user["id"]))
+        if not info:
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "valid": False,
+                        "error_code": "AUTH_003",
+                        "message": "用户不可用",
+                    }
+                ),
+                401,
+            )
+        return jsonify({"success": True, "valid": True, "user": info})
+    finally:
+        conn.close()
+
+
+@auth_bp.route("/auth/profile", methods=["GET"])
+@require_auth
+def profile():
+    """当前登录用户信息（需 Bearer access token）。"""
+    ensure_auth_schema()
+    actor = request.auth_user  # type: ignore[attr-defined]
+    uid = int(actor["id"])
+    conn = get_db_connection()
+    try:
+        info = _user_info(conn, uid)
+        if not info:
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "error_code": "AUTH_003",
+                        "message": "用户不可用",
+                    }
+                ),
+                401,
+            )
+        return jsonify({"success": True, "user": info})
     finally:
         conn.close()
 
@@ -349,7 +466,7 @@ def refresh():
         row = conn.execute(
             """
             SELECT rt.id, rt.revoked, rt.expires_at, u.id AS uid, u.username,
-                u.email, u.role_id, u.status, r.code AS role_code
+                u.email, u.display_name, u.role_id, u.status, r.code AS role_code
             FROM auth_refresh_tokens rt
             JOIN auth_users u ON u.id = rt.user_id
             JOIN auth_roles r ON r.id = u.role_id
@@ -407,6 +524,8 @@ def refresh():
                     "id": user_id,
                     "username": row["username"],
                     "email": row["email"],
+                    "display_name": (row["display_name"] or "").strip()
+                    or row["username"],
                     "role": row["role_code"],
                     "permissions": perms,
                 },
@@ -441,7 +560,7 @@ def list_users():
         ).fetchone()[0]
         rows = conn.execute(
             f"""
-            SELECT u.id, u.username, u.email, u.status, u.created_at, r.code AS role
+            SELECT u.id, u.username, u.email, u.display_name, u.status, u.created_at, r.code AS role
             FROM auth_users u
             JOIN auth_roles r ON r.id = u.role_id
             WHERE {where_sql}
@@ -485,7 +604,7 @@ def get_user(user_id: int):
             )
         row = conn.execute(
             """
-            SELECT u.id, u.username, u.email, u.status, u.created_at, u.updated_at, r.code AS role
+            SELECT u.id, u.username, u.email, u.display_name, u.status, u.created_at, u.updated_at, r.code AS role
             FROM auth_users u
             JOIN auth_roles r ON r.id = u.role_id
             WHERE u.id = ?
@@ -548,6 +667,12 @@ def update_user(user_id: int):
         updates: dict[str, Any] = {}
         if "email" in data:
             updates["email"] = data.get("email")
+        if "display_name" in data and (
+            user_id == actor_id or is_admin
+        ):
+            dn = (data.get("display_name") or "").strip()
+            if dn:
+                updates["display_name"] = dn
         if "status" in data and is_admin:
             updates["status"] = data.get("status")
         if "role" in data and is_admin:
