@@ -9,10 +9,15 @@
 import sqlite3
 import random
 import itertools
-from datetime import date
+from datetime import date, datetime, timezone
+
 from common.config import Config
 
 DB_PATH = Config.DATABASE_PATH
+
+
+def _utc_now_iso() -> str:
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 # ==================== 药品数据定义 ====================
 
@@ -790,6 +795,7 @@ def seed_database():
 
     drug_id = 0
     total_drugs = 0
+    seed_ts = _utc_now_iso()
 
     for category_info in DRUG_CATEGORIES:
         category = category_info["category"]
@@ -800,16 +806,70 @@ def seed_database():
             quantity = random.randint(drug["min_stock"], drug["max_stock"])
             expiry_date = random.randint(365, 800)  # 一年以上有效期
             is_prescription = 1 if drug["is_prescription"] else 0
+            price = float(drug["price"])
+            indications = drug.get("indications") or []
+            first_ind = indications[0] if indications else ""
+            description = (
+                f"适用于{first_ind}等相关症状的常用药品，请按说明书或医嘱使用。"
+                if first_ind
+                else "请按说明书或医嘱使用。"
+            )
+            cost_price = round(price * 0.65, 2)
+            min_stock_alert = max(5, drug["min_stock"] // 2)
 
-            c.execute("""
-                INSERT INTO inventory
-                    (drug_id, name, quantity, expiry_date, shelf_x, shelf_y, shelve_id,
-                     category, is_prescription, retail_price)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (
-                drug_id, drug["name"], quantity, expiry_date,
-                x, y, z, category, is_prescription, drug["price"],
-            ))
+            c.execute(
+                """
+                INSERT INTO inventory (
+                    drug_id, name, quantity, expiry_date, shelf_x, shelf_y, shelve_id,
+                    category, is_prescription, retail_price, stock,
+                    generic_name, description, manufacturer, specification, dosage_form,
+                    unit, pack_size, approval_number, barcode, storage_condition,
+                    usage_dosage, contraindications, side_effects, interaction_warning,
+                    pregnancy_category, pediatric_caution, supplier, country_of_origin,
+                    cost_price, min_stock_alert, image_url,
+                    is_deleted, created_at, updated_at
+                ) VALUES (
+                    ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?
+                )
+                """,
+                (
+                    drug_id,
+                    drug["name"],
+                    quantity,
+                    expiry_date,
+                    x,
+                    y,
+                    z,
+                    category,
+                    is_prescription,
+                    price,
+                    0,
+                    "",
+                    description,
+                    "",
+                    "",
+                    "",
+                    "盒",
+                    "",
+                    "",
+                    "",
+                    "密封，置阴凉干燥处",
+                    "口服，详见说明书或遵医嘱。",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    cost_price,
+                    min_stock_alert,
+                    "",
+                    0,
+                    seed_ts,
+                    seed_ts,
+                ),
+            )
 
             for indication in drug["indications"]:
                 c.execute("""

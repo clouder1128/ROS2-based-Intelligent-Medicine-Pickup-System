@@ -8,7 +8,17 @@ import sqlite3
 import threading
 import time
 from datetime import date
+from pathlib import Path
+import sys
 from flask import Flask
+
+# 组件4 权限认证：auth 包在仓库根 agent_with_backend/auth
+_pkg_root = Path(__file__).resolve().parent.parent
+if str(_pkg_root) not in sys.path:
+    sys.path.insert(0, str(_pkg_root))
+
+from auth import auth_bp
+from auth.schema import ensure_auth_schema
 
 # Configuration
 from common.config import Config
@@ -78,6 +88,13 @@ app.register_blueprint(health_bp)
 app.register_blueprint(drug_bp)
 app.register_blueprint(order_bp)
 app.register_blueprint(approval_bp)
+app.register_blueprint(auth_bp)
+
+# 确保 RBAC 表存在（可安全重复调用）
+try:
+    ensure_auth_schema()
+except Exception as e:
+    print(f"[Main] Auth schema initialization warning: {e}")
 
 # Expiry sweep functionality
 _expiry_sweep_lock = threading.Lock()
