@@ -88,6 +88,13 @@ class Drug:
     is_deleted: bool = False
     created_at: str = ""
     updated_at: str = ""
+    # 第一周：药品表扩展字段
+    strength: str = ""
+    drug_interactions: str = "[]"
+    age_restrictions: str = "{}"
+    min_stock_level: int = 10
+    max_stock_level: int = 500
+    purchase_price: float = 0.0
 
     indications: List[str] = field(default_factory=list)
 
@@ -131,6 +138,13 @@ class Drug:
             is_deleted=_bool_field(data, "is_deleted"),
             created_at=_str_field(data, "created_at"),
             updated_at=_str_field(data, "updated_at"),
+            # 第一周：药品表扩展字段
+            strength=_str_field(data, "strength"),
+            drug_interactions=_str_field(data, "drug_interactions", "[]"),
+            age_restrictions=_str_field(data, "age_restrictions", "{}"),
+            min_stock_level=_int_field(data, "min_stock_level", 10),
+            max_stock_level=_int_field(data, "max_stock_level", 500),
+            purchase_price=_float_field(data, "purchase_price"),
             indications=list(data.get("indications") or []),
         )
 
@@ -171,6 +185,13 @@ class Drug:
             "is_deleted": self.is_deleted,
             "created_at": self.created_at,
             "updated_at": self.updated_at,
+            # 第一周：药品表扩展字段
+            "strength": self.strength,
+            "drug_interactions": self.drug_interactions,
+            "age_restrictions": self.age_restrictions,
+            "min_stock_level": self.min_stock_level,
+            "max_stock_level": self.max_stock_level,
+            "purchase_price": self.purchase_price,
             "indications": self.indications,
         }
 

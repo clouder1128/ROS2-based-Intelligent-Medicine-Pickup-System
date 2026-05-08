@@ -113,8 +113,8 @@ class PharmacyHTTPClient:
         if symptom_filter:
             params["symptom"] = symptom_filter
         result = await self._make_request("GET", "/api/drugs", params=params)
-        if result and result.get("success") and "drugs" in result:
-            return result["drugs"]
+        if result and result.get("success"):
+            return result.get("data") or []
         return []
 
     def get_drugs(self, name_filter: Optional[str] = None, symptom_filter: Optional[str] = None) -> List[Dict[str, Any]]:

@@ -74,6 +74,13 @@ def init_database() -> None:
     _add_column_if_not_exists(conn, "inventory", "is_deleted", "INTEGER DEFAULT 0")
     _add_column_if_not_exists(conn, "inventory", "created_at", "TEXT DEFAULT ''")
     _add_column_if_not_exists(conn, "inventory", "updated_at", "TEXT DEFAULT ''")
+    # 第一周：药品表扩展字段迁移
+    _add_column_if_not_exists(conn, "inventory", "strength", "TEXT DEFAULT ''")
+    _add_column_if_not_exists(conn, "inventory", "drug_interactions", "TEXT DEFAULT '[]'")
+    _add_column_if_not_exists(conn, "inventory", "age_restrictions", "TEXT DEFAULT '{}'")
+    _add_column_if_not_exists(conn, "inventory", "min_stock_level", "INTEGER DEFAULT 10")
+    _add_column_if_not_exists(conn, "inventory", "max_stock_level", "INTEGER DEFAULT 500")
+    _add_column_if_not_exists(conn, "inventory", "purchase_price", "REAL DEFAULT 0.0")
 
     # --- drug_indications（药品适应症） ---
     cursor.execute("""
@@ -101,6 +108,50 @@ def init_database() -> None:
     """)
     _add_index_if_not_exists(conn, "idx_ss_synonym",
         "CREATE INDEX idx_ss_synonym ON symptom_synonyms(synonym)")
+
+    # --- categories（药品分类，树形结构） ---
+    # name 与 inventory.category 字段的字符串值保持一致，JOIN 条件为 inventory.category = categories.name
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS categories (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            name        TEXT    NOT NULL UNIQUE,
+            description TEXT    DEFAULT '',
+            parent_id   INTEGER DEFAULT NULL,
+            sort_order  INTEGER DEFAULT 0,
+            created_at  TEXT    DEFAULT '',
+            FOREIGN KEY (parent_id) REFERENCES categories(id)
+        )
+    """)
+    _add_index_if_not_exists(conn, "idx_categories_name",
+        "CREATE INDEX idx_categories_name ON categories(name)")
+    _add_index_if_not_exists(conn, "idx_categories_parent_id",
+        "CREATE INDEX idx_categories_parent_id ON categories(parent_id)")
+    # 迁移：已有数据库补 description 列
+    _add_column_if_not_exists(conn, "categories", "description", "TEXT DEFAULT ''")
+
+    # --- inventory_transactions（库存调整审计记录） ---
+    # 组件1 第2周：记录每次库存变化，供组件2的库存调整API写入
+    # transaction_type: 'in'=入库, 'out'=出库, 'adjust'=手动调整, 'expire'=过期报废
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS inventory_transactions (
+            transaction_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            drug_id INTEGER NOT NULL,
+            quantity_change INTEGER NOT NULL,
+            transaction_type TEXT NOT NULL DEFAULT 'adjust',
+            before_quantity INTEGER DEFAULT 0,
+            after_quantity INTEGER DEFAULT 0,
+            reason TEXT DEFAULT '',
+            operator TEXT DEFAULT '',
+            created_at TEXT DEFAULT '',
+            FOREIGN KEY (drug_id) REFERENCES inventory(drug_id)
+        )
+    """)
+    _add_index_if_not_exists(conn, "idx_inv_tx_drug_id",
+        "CREATE INDEX idx_inv_tx_drug_id ON inventory_transactions(drug_id)")
+    _add_index_if_not_exists(conn, "idx_inv_tx_created_at",
+        "CREATE INDEX idx_inv_tx_created_at ON inventory_transactions(created_at)")
+    _add_index_if_not_exists(conn, "idx_inv_tx_transaction_type",
+        "CREATE INDEX idx_inv_tx_transaction_type ON inventory_transactions(transaction_type)")
 
     # --- order_log（订单日志） ---
     cursor.execute("""

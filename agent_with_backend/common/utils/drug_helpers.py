@@ -8,12 +8,16 @@ from common.utils.database import get_db_connection
 
 
 def query_drug(drug_id: int) -> dict | None:
-    """Query a single drug by ID"""
+    """Query a single drug by ID（排除软删除，与列表接口一致）"""
     conn = None
     try:
         conn = get_db_connection()
         cur = conn.execute(
-            "SELECT drug_id, name, quantity, expiry_date, shelf_x, shelf_y, shelve_id FROM inventory WHERE drug_id = ?",
+            """
+            SELECT drug_id, name, quantity, expiry_date, shelf_x, shelf_y, shelve_id
+            FROM inventory
+            WHERE drug_id = ? AND COALESCE(is_deleted, 0) = 0
+            """,
             (drug_id,),
         )
         row = cur.fetchone()
@@ -59,7 +63,8 @@ def find_drug_id_by_name(drug_name: str) -> int | None:
         conn = get_db_connection()
         # 1. Exact match
         cur = conn.execute(
-            "SELECT drug_id FROM inventory WHERE name = ?", (normalized,)
+            "SELECT drug_id FROM inventory WHERE name = ? AND COALESCE(is_deleted, 0) = 0",
+            (normalized,),
         )
         row = cur.fetchone()
         if row:
@@ -67,7 +72,9 @@ def find_drug_id_by_name(drug_name: str) -> int | None:
 
         # 2. Normalized match
         if cleaned and cleaned != normalized:
-            cur = conn.execute("SELECT drug_id, name FROM inventory")
+            cur = conn.execute(
+                "SELECT drug_id, name FROM inventory WHERE COALESCE(is_deleted, 0) = 0"
+            )
             rows = cur.fetchall()
             for r in rows:
                 db_name = r["name"]
@@ -77,7 +84,11 @@ def find_drug_id_by_name(drug_name: str) -> int | None:
 
         # 3. Fuzzy match
         cur = conn.execute(
-            "SELECT drug_id FROM inventory WHERE name LIKE ?", (f"%{normalized}%",)
+            """
+            SELECT drug_id FROM inventory
+            WHERE name LIKE ? AND COALESCE(is_deleted, 0) = 0
+            """,
+            (f"%{normalized}%",),
         )
         row = cur.fetchone()
         return row["drug_id"] if row else None
