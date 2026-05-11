@@ -74,6 +74,13 @@ def init_db():
     _add_column_if_not_exists(conn, "inventory", "is_deleted", "INTEGER DEFAULT 0")
     _add_column_if_not_exists(conn, "inventory", "created_at", "TEXT DEFAULT ''")
     _add_column_if_not_exists(conn, "inventory", "updated_at", "TEXT DEFAULT ''")
+    # 第一周：药品表扩展字段迁移
+    _add_column_if_not_exists(conn, "inventory", "strength", "TEXT DEFAULT ''")
+    _add_column_if_not_exists(conn, "inventory", "drug_interactions", "TEXT DEFAULT '[]'")
+    _add_column_if_not_exists(conn, "inventory", "age_restrictions", "TEXT DEFAULT '{}'")
+    _add_column_if_not_exists(conn, "inventory", "min_stock_level", "INTEGER DEFAULT 10")
+    _add_column_if_not_exists(conn, "inventory", "max_stock_level", "INTEGER DEFAULT 500")
+    _add_column_if_not_exists(conn, "inventory", "purchase_price", "REAL DEFAULT 0.0")
 
     c.execute("""
         CREATE TABLE IF NOT EXISTS drug_indications (
@@ -99,6 +106,69 @@ def init_db():
     """)
     _add_index_if_not_exists(conn, "idx_ss_synonym",
         "CREATE INDEX idx_ss_synonym ON symptom_synonyms(synonym)")
+
+    # --- categories（药品分类，树形结构） ---
+    # name 与 inventory.category 字段的字符串值保持一致，JOIN 条件为 inventory.category = categories.name
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS categories (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            name        TEXT    NOT NULL UNIQUE,
+            description TEXT    DEFAULT '',
+            parent_id   INTEGER DEFAULT NULL,
+            sort_order  INTEGER DEFAULT 0,
+            created_at  TEXT    DEFAULT '',
+            FOREIGN KEY (parent_id) REFERENCES categories(id)
+        )
+    """)
+    _add_index_if_not_exists(conn, "idx_categories_name",
+        "CREATE INDEX idx_categories_name ON categories(name)")
+    _add_index_if_not_exists(conn, "idx_categories_parent_id",
+        "CREATE INDEX idx_categories_parent_id ON categories(parent_id)")
+    # 迁移：已有数据库补 description 列
+    _add_column_if_not_exists(conn, "categories", "description", "TEXT DEFAULT ''")
+
+    # --- inventory_transactions（库存调整审计记录） ---
+    # transaction_type: 'in'=入库, 'out'=出库, 'adjust'=手动调整, 'expire'=过期报废
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS inventory_transactions (
+            transaction_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            drug_id INTEGER NOT NULL,
+            quantity_change INTEGER NOT NULL,
+            transaction_type TEXT NOT NULL DEFAULT 'adjust',
+            before_quantity INTEGER DEFAULT 0,
+            after_quantity INTEGER DEFAULT 0,
+            reason TEXT DEFAULT '',
+            operator TEXT DEFAULT '',
+            created_at TEXT DEFAULT '',
+            FOREIGN KEY (drug_id) REFERENCES inventory(drug_id)
+        )
+    """)
+    _add_index_if_not_exists(conn, "idx_inv_tx_drug_id",
+        "CREATE INDEX idx_inv_tx_drug_id ON inventory_transactions(drug_id)")
+    _add_index_if_not_exists(conn, "idx_inv_tx_created_at",
+        "CREATE INDEX idx_inv_tx_created_at ON inventory_transactions(created_at)")
+    _add_index_if_not_exists(conn, "idx_inv_tx_transaction_type",
+        "CREATE INDEX idx_inv_tx_transaction_type ON inventory_transactions(transaction_type)")
+
+    # --- approvals（处方审批） ---
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS approvals (
+            id TEXT PRIMARY KEY,
+            patient_name TEXT NOT NULL,
+            patient_age INTEGER,
+            patient_weight REAL,
+            symptoms TEXT,
+            advice TEXT NOT NULL,
+            drug_name TEXT,
+            drug_type TEXT,
+            quantity INTEGER DEFAULT 1,
+            status TEXT NOT NULL,
+            doctor_id TEXT,
+            reject_reason TEXT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            approved_at DATETIME
+        )
+    """)
 
     c.execute("""
         CREATE TABLE IF NOT EXISTS order_log (
@@ -195,6 +265,31 @@ def init_db():
             base_synonyms
         )
         conn.commit()
+
+    # 基础分类（与 inventory.category 字段值完全对齐）
+    # INSERT OR IGNORE：重复运行安全，不会破坏已有数据
+    base_categories = [
+        # (name, parent_id, sort_order)
+        ('解热镇痛抗炎药',  None, 1),
+        ('抗生素抗感染药',  None, 2),
+        ('消化系统药',      None, 3),
+        ('心血管药',        None, 4),
+        ('呼吸系统药',      None, 5),
+        ('神经系统药',      None, 6),
+        ('维生素矿物质',    None, 7),
+        ('外用药皮肤科',    None, 8),
+        ('内分泌代谢药',    None, 9),
+        ('抗过敏药',        None, 10),
+        ('中成药感冒类',    None, 11),
+        ('其他专科药',      None, 12),
+        # init_db.py base seed 中阿莫西林用的是'抗生素'，单独保留以兼容旧数据
+        ('抗生素',          None, 13),
+    ]
+    c.executemany(
+        "INSERT OR IGNORE INTO categories (name, parent_id, sort_order) VALUES (?, ?, ?)",
+        base_categories
+    )
+    conn.commit()
 
     # ========== app_meta ==========
 

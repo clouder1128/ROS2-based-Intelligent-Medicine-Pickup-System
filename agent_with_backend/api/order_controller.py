@@ -216,24 +216,76 @@ def dispense():
 @order_bp.route("/orders", methods=["GET"])
 @require_permission(PERM_READ_ORDER)
 def list_orders():
+    """
+    GET /api/orders
+    支持分页：?page=1&limit=20
+    不传 page/limit 时向后兼容旧行为（返回最近 50 条）
+    """
+    use_pagination = (
+        request.args.get("page") is not None or request.args.get("limit") is not None
+    )
+
+    if use_pagination:
+        try:
+            page  = max(1, int(request.args.get("page", 1)))
+        except (TypeError, ValueError):
+            page = 1
+        try:
+            limit = min(100, max(1, int(request.args.get("limit", 20))))
+        except (TypeError, ValueError):
+            limit = 20
+        offset = (page - 1) * limit
+    else:
+        page, limit, offset = 1, 50, 0   # 旧行为：最近 50 条
+
     conn = None
     try:
         conn = get_db_connection()
-        cur = conn.execute("""
+
+        total = conn.execute("SELECT COUNT(*) FROM order_log").fetchone()[0]
+
+        cur = conn.execute(
+            """
             SELECT o.task_id, o.status, o.target_drug_id, o.quantity, o.created_at, i.name
             FROM order_log o
             LEFT JOIN inventory i ON o.target_drug_id = i.drug_id
             ORDER BY o.task_id DESC
-            LIMIT 50
-        """)
-        rows = cur.fetchall()
-        orders = []
-        for r in rows:
-            orders.append({"task_id": r[0], "status": r[1], "target_drug_id": r[2], "quantity": r[3], "created_at": r[4], "drug_name": r[5]})
-        return jsonify({"success": True, "ok": True, "data": orders})
+            LIMIT ? OFFSET ?
+            """,
+            (limit, offset),
+        )
+        orders = [
+            {
+                "task_id":       r[0],
+                "status":        r[1],
+                "target_drug_id": r[2],
+                "quantity":      r[3],
+                "created_at":    r[4],
+                "drug_name":     r[5],
+            }
+            for r in cur.fetchall()
+        ]
+
+        resp = {"success": True, "ok": True, "data": orders}
+        if use_pagination:
+            pages = (total + limit - 1) // limit if limit else 0
+            resp["pagination"] = {
+                "page":     page,
+                "limit":    limit,
+                "total":    total,
+                "pages":    pages,
+                "has_next": page < pages,
+                "has_prev": page > 1,
+            }
+        return jsonify(resp)
+
     except Exception as e:
         print(f"Database error in list_orders: {e}")
-        return (jsonify({"success": False, "ok": False, "error": "Database error while fetching orders", "code": "DB_ERROR"}), 500)
+        return (
+            jsonify({"success": False, "ok": False,
+                     "error": "Database error while fetching orders", "code": "DB_ERROR"}),
+            500,
+        )
     finally:
         if conn:
             conn.close()

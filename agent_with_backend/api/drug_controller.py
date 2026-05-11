@@ -3,6 +3,7 @@ Drug Controller
 Handles drug inventory management and queries
 """
 
+import json
 import re
 from datetime import datetime, timezone
 
@@ -19,6 +20,15 @@ from auth.constants import (
 )
 from auth.middleware import require_permission
 from common.utils.database import get_db_connection
+from common.utils.validation import validate_drug
+from common.utils import (
+    success_response,
+    created_response,
+    error_response,
+    not_found_response,
+    bad_request_response,
+    internal_error_response,
+)
 
 drug_bp = Blueprint("drug", __name__, url_prefix="/api")
 
@@ -36,6 +46,8 @@ _SORT_SQL = {
 }
 
 # PUT 允许更新的列（不含 drug_id、stock 按方案 A 不维护）
+# 含组件1 Week1 扩展列：strength、drug_interactions、age_restrictions、
+# min_stock_level、max_stock_level、purchase_price（与 inventory DDL / validate_drug 对齐）
 _UPDATABLE_COLUMNS = {
     "name", "generic_name", "description", "quantity", "expiry_date",
     "shelf_x", "shelf_y", "shelve_id", "category", "is_prescription",
@@ -44,15 +56,14 @@ _UPDATABLE_COLUMNS = {
     "usage_dosage", "contraindications", "side_effects", "interaction_warning",
     "pregnancy_category", "pediatric_caution", "supplier", "country_of_origin",
     "cost_price", "min_stock_alert", "image_url",
+    "strength", "drug_interactions", "age_restrictions",
+    "min_stock_level", "max_stock_level", "purchase_price",
 }
 
 
 def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
-
-def _error(message: str, code: str, status: int):
-    return jsonify({"success": False, "ok": False, "error": message, "code": code}), status
 
 
 def _fetch_drugs_with_indications(conn, where_clause: str, params: tuple):
@@ -127,12 +138,10 @@ def list_drugs():
     sort_by = request.args.get("sort_by") or "drug_id"
     sort_order = (request.args.get("order") or "asc").lower()
     if sort_order not in ("asc", "desc"):
-        return _error("order must be asc or desc", "INVALID_INPUT", 400)
+        return bad_request_response("order must be asc or desc")
     if sort_by not in _SORT_SQL:
-        return _error(
-            f"sort_by must be one of: {', '.join(sorted(_SORT_SQL))}",
-            "INVALID_INPUT",
-            400,
+        return bad_request_response(
+            f"sort_by must be one of: {', '.join(sorted(_SORT_SQL))}"
         )
 
     # 未传 page/limit 时保持旧行为：返回全量列表（与 PharmacyHTTPClient 等调用方兼容）
@@ -142,21 +151,21 @@ def list_drugs():
     if use_pagination:
         paginated = _parse_pagination()
         if paginated is None:
-            return _error("page and limit must be integers", "INVALID_INPUT", 400)
+            return bad_request_response("page and limit must be integers")
         page, limit, offset = paginated
     else:
         page, limit, offset = 1, 20, 0
 
     if name_filter is not None and len(name_filter) > 100:
-        return _error("Name filter too long (max 100 characters)", "INVALID_INPUT", 400)
+        return bad_request_response("Name filter too long (max 100 characters)")
     if symptom_filter is not None and len(symptom_filter) > 100:
-        return _error("Symptom filter too long (max 100 characters)", "INVALID_INPUT", 400)
+        return bad_request_response("Symptom filter too long (max 100 characters)")
     if category_filter is not None and len(category_filter) > 200:
-        return _error("category filter too long", "INVALID_INPUT", 400)
+        return bad_request_response("category filter too long")
 
     for f in [name_filter, symptom_filter, category_filter]:
         if f is not None and re.search(r'[;\\\'"`]', f):
-            return _error("Invalid characters in filter", "INVALID_INPUT", 400)
+            return bad_request_response("Invalid characters in filter")
 
     order_sql = f"ORDER BY {_SORT_SQL[sort_by]} {sort_order.upper()}"
 
@@ -207,8 +216,6 @@ def list_drugs():
 
             out = {
                 "success": True,
-                "ok": True,
-                "drugs": drugs,
                 "data": drugs,
                 "count": len(drugs),
                 "filters": {
@@ -218,9 +225,9 @@ def list_drugs():
                     "sort_by": sort_by,
                     "order": sort_order,
                 },
+                "pagination": _pagination_dict(page, limit, total) if use_pagination else None,
+                "error": None,
             }
-            if use_pagination:
-                out["pagination"] = _pagination_dict(page, limit, total)
             return jsonify(out)
 
         where_parts = ["is_deleted = 0"]
@@ -268,8 +275,6 @@ def list_drugs():
 
         out = {
             "success": True,
-            "ok": True,
-            "drugs": drugs,
             "data": drugs,
             "count": len(drugs),
             "filters": {
@@ -278,14 +283,14 @@ def list_drugs():
                 "sort_by": sort_by,
                 "order": sort_order,
             },
+            "pagination": _pagination_dict(page, limit, total) if use_pagination else None,
+            "error": None,
         }
-        if use_pagination:
-            out["pagination"] = _pagination_dict(page, limit, total)
         return jsonify(out)
 
     except Exception as e:
         print(f"Database error in list_drugs: {e}")
-        return _error("Database error while fetching drugs", "DB_ERROR", 500)
+        return internal_error_response("Database error while fetching drugs")
     finally:
         if conn:
             conn.close()
@@ -312,19 +317,19 @@ def get_drug(drug_id):
         cur = conn.execute("SELECT * FROM inventory WHERE drug_id = ?", (drug_id,))
         row = cur.fetchone()
         if row is None:
-            return _error(f"Drug not found: id={drug_id}", "DRUG_NOT_FOUND", 404)
+            return not_found_response(f"Drug not found: id={drug_id}")
         drug = dict(row)
         if drug.get("is_deleted"):
-            return _error(f"Drug not found: id={drug_id}", "DRUG_NOT_FOUND", 404)
+            return not_found_response(f"Drug not found: id={drug_id}")
 
         cur = conn.execute(
             "SELECT indication FROM drug_indications WHERE drug_id = ?", (drug_id,))
         drug["indications"] = [r["indication"] for r in cur.fetchall()]
 
-        return jsonify({"success": True, "drug": drug})
+        return success_response(drug)
     except Exception as e:
         print(f"Database error in get_drug: {e}")
-        return _error("Database error while fetching drug", "DB_ERROR", 500)
+        return internal_error_response("Database error while fetching drug")
     finally:
         if conn:
             conn.close()
@@ -333,6 +338,25 @@ def get_drug(drug_id):
 def _next_drug_id(conn) -> int:
     row = conn.execute("SELECT COALESCE(MAX(drug_id), 0) + 1 FROM inventory").fetchone()
     return int(row[0])
+
+
+def _coerce_inventory_json_text(val, *, empty: str, max_len: int = 65535) -> str:
+    """inventory 中与组件1 DDL 对齐的 JSON 文本列（str / list / dict）。"""
+    if val is None:
+        return empty
+    if isinstance(val, str):
+        s = val.strip()
+    elif isinstance(val, (list, dict)):
+        s = json.dumps(val, ensure_ascii=False)
+    else:
+        s = str(val)
+    return s[:max_len] if len(s) > max_len else s
+
+
+def _strength_coerce(val) -> str:
+    if val is None:
+        return ""
+    return str(val).strip()[:100]
 
 
 def _replace_indications(conn, drug_id: int, indications):
@@ -356,36 +380,19 @@ def _replace_indications(conn, drug_id: int, indications):
 def create_drug():
     data = request.get_json(silent=True)
     if not data or not isinstance(data, dict):
-        return _error("Request body must be a JSON object", "INVALID_JSON", 400)
+        return bad_request_response("Request body must be a JSON object")
 
-    required = ["name", "quantity", "expiry_date", "shelf_x", "shelf_y", "shelve_id"]
-    missing = [k for k in required if k not in data]
-    if missing:
-        return _error(f"Missing required fields: {', '.join(missing)}", "MISSING_FIELDS", 400)
+    ok, val_errors = validate_drug(data, is_update=False)
+    if not ok:
+        return error_response("VALIDATION_ERROR", f"参数错误: {val_errors}", 400)
 
-    name = data.get("name")
-    if not isinstance(name, str) or not name.strip():
-        return _error("name must be a non-empty string", "INVALID_INPUT", 400)
-    name = name.strip()
-    if len(name) > 500:
-        return _error("name too long", "INVALID_INPUT", 400)
-
-    try:
-        quantity = int(data["quantity"])
-        expiry_date = int(data["expiry_date"])
-        shelf_x = int(data["shelf_x"])
-        shelf_y = int(data["shelf_y"])
-        shelve_id = int(data["shelve_id"])
-    except (TypeError, ValueError):
-        return _error("quantity, expiry_date, shelf_*, shelve_id must be integers", "INVALID_TYPE", 400)
-
-    if quantity < 0:
-        return _error("quantity must be >= 0", "INVALID_INPUT", 400)
-
-    indications = data.get("indications")
-    if indications is not None and not isinstance(indications, list):
-        return _error("indications must be a list of strings", "INVALID_TYPE", 400)
-    indications = indications or []
+    name = data["name"].strip()
+    quantity = int(data["quantity"])
+    expiry_date = int(data["expiry_date"])
+    shelf_x = int(data["shelf_x"])
+    shelf_y = int(data["shelf_y"])
+    shelve_id = int(data["shelve_id"])
+    indications = data.get("indications") or []
 
     now = _utc_now_iso()
 
@@ -408,6 +415,16 @@ def create_drug():
         "retail_price": _float_safe(data.get("retail_price"), 0.0),
         "cost_price": _float_safe(data.get("cost_price"), 0.0),
         "min_stock_alert": _int_safe(data.get("min_stock_alert"), 0),
+        "strength": _strength_coerce(data.get("strength")),
+        "drug_interactions": _coerce_inventory_json_text(
+            data.get("drug_interactions"), empty="[]"
+        ),
+        "age_restrictions": _coerce_inventory_json_text(
+            data.get("age_restrictions"), empty="{}"
+        ),
+        "min_stock_level": _int_safe(data.get("min_stock_level"), 10),
+        "max_stock_level": _int_safe(data.get("max_stock_level"), 500),
+        "purchase_price": _float_safe(data.get("purchase_price"), 0.0),
     }
     for k, dv in optional_defaults.items():
         if k in ("category",):
@@ -431,9 +448,12 @@ def create_drug():
                 usage_dosage, contraindications, side_effects, interaction_warning,
                 pregnancy_category, pediatric_caution, supplier, country_of_origin,
                 cost_price, min_stock_alert, image_url,
+                strength, drug_interactions, age_restrictions,
+                min_stock_level, max_stock_level, purchase_price,
                 is_deleted, created_at, updated_at
             ) VALUES (
-                ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?
+                ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,
+                ?,?,?,?,?,?,?,?,?
             )
             """,
             (
@@ -469,6 +489,12 @@ def create_drug():
                 row_vals["cost_price"],
                 row_vals["min_stock_alert"],
                 str(data.get("image_url") or "")[:2000],
+                row_vals["strength"],
+                row_vals["drug_interactions"],
+                row_vals["age_restrictions"],
+                row_vals["min_stock_level"],
+                row_vals["max_stock_level"],
+                row_vals["purchase_price"],
                 0,
                 now,
                 now,
@@ -476,17 +502,12 @@ def create_drug():
         )
         _replace_indications(conn, drug_id, indications)
         conn.commit()
-        return jsonify({
-            "success": True,
-            "ok": True,
-            "drug_id": drug_id,
-            "message": "Drug created",
-        }), 201
+        return created_response({"drug_id": drug_id}, "Drug created")
     except Exception as e:
         print(f"Database error in create_drug: {e}")
         if conn:
             conn.rollback()
-        return _error("Database error while creating drug", "DB_ERROR", 500)
+        return internal_error_response("Database error while creating drug")
     finally:
         if conn:
             conn.close()
@@ -515,7 +536,7 @@ def _int_safe(v, default):
 def update_drug(drug_id):
     data = request.get_json(silent=True)
     if not data or not isinstance(data, dict):
-        return _error("Request body must be a JSON object", "INVALID_JSON", 400)
+        return bad_request_response("Request body must be a JSON object")
 
     conn = None
     try:
@@ -525,7 +546,11 @@ def update_drug(drug_id):
         )
         row = cur.fetchone()
         if row is None or row["is_deleted"]:
-            return _error(f"Drug not found: id={drug_id}", "DRUG_NOT_FOUND", 404)
+            return not_found_response(f"Drug not found: id={drug_id}")
+
+        ok, val_errors = validate_drug(data, is_update=True)
+        if not ok:
+            return error_response("VALIDATION_ERROR", f"参数错误: {val_errors}", 400)
 
         sets = []
         params = []
@@ -537,20 +562,36 @@ def update_drug(drug_id):
             if key in ("is_prescription",):
                 sets.append("is_prescription = ?")
                 params.append(1 if val in (True, 1, "1", "true") else 0)
-            elif key in ("quantity", "expiry_date", "shelf_x", "shelf_y", "shelve_id", "min_stock_alert"):
+            elif key in (
+                "quantity",
+                "expiry_date",
+                "shelf_x",
+                "shelf_y",
+                "shelve_id",
+                "min_stock_alert",
+                "min_stock_level",
+                "max_stock_level",
+            ):
                 try:
                     iv = int(val)
                 except (TypeError, ValueError):
-                    return _error(f"Invalid integer for {key}", "INVALID_TYPE", 400)
+                    return bad_request_response(f"Invalid integer for {key}")
                 sets.append(f"{key} = ?")
                 params.append(iv)
-            elif key == "retail_price" or key == "cost_price":
+            elif key in ("retail_price", "cost_price", "purchase_price"):
                 try:
                     fv = float(val)
                 except (TypeError, ValueError):
-                    return _error(f"Invalid float for {key}", "INVALID_TYPE", 400)
+                    return bad_request_response(f"Invalid float for {key}")
                 sets.append(f"{key} = ?")
                 params.append(fv)
+            elif key in ("drug_interactions", "age_restrictions"):
+                sets.append(f"{key} = ?")
+                empty = "[]" if key == "drug_interactions" else "{}"
+                params.append(_coerce_inventory_json_text(val, empty=empty))
+            elif key == "strength":
+                sets.append("strength = ?")
+                params.append(_strength_coerce(val))
             else:
                 sets.append(f"{key} = ?")
                 params.append(str(val) if val is not None else "")
@@ -565,18 +606,15 @@ def update_drug(drug_id):
             conn.execute(sql, tuple(params))
 
         if "indications" in data:
-            inds = data["indications"]
-            if inds is not None and not isinstance(inds, list):
-                return _error("indications must be a list", "INVALID_TYPE", 400)
-            _replace_indications(conn, drug_id, inds or [])
+            _replace_indications(conn, drug_id, data["indications"] or [])
 
         conn.commit()
-        return jsonify({"success": True, "ok": True, "message": "Drug updated"})
+        return success_response(None, "Drug updated")
     except Exception as e:
         print(f"Database error in update_drug: {e}")
         if conn:
             conn.rollback()
-        return _error("Database error while updating drug", "DB_ERROR", 500)
+        return internal_error_response("Database error while updating drug")
     finally:
         if conn:
             conn.close()
@@ -593,13 +631,9 @@ def delete_drug(drug_id):
         )
         row = cur.fetchone()
         if row is None:
-            return _error(f"Drug not found: id={drug_id}", "DRUG_NOT_FOUND", 404)
+            return not_found_response(f"Drug not found: id={drug_id}")
         if row["is_deleted"]:
-            return jsonify({
-                "success": True,
-                "ok": True,
-                "message": "Drug already deleted",
-            })
+            return success_response(None, "Drug already deleted")
 
         now = _utc_now_iso()
         conn.execute(
@@ -607,12 +641,12 @@ def delete_drug(drug_id):
             (now, drug_id),
         )
         conn.commit()
-        return jsonify({"success": True, "ok": True, "message": "Drug soft-deleted"})
+        return success_response(None, "Drug soft-deleted")
     except Exception as e:
         print(f"Database error in delete_drug: {e}")
         if conn:
             conn.rollback()
-        return _error("Database error while deleting drug", "DB_ERROR", 500)
+        return internal_error_response("Database error while deleting drug")
     finally:
         if conn:
             conn.close()
@@ -632,16 +666,20 @@ def adjust_drug_inventory(drug_id):
         )
         row = cur.fetchone()
         if row is None or row["is_deleted"]:
-            return _error(f"Drug not found: id={drug_id}", "DRUG_NOT_FOUND", 404)
+            return error_response(
+                "DRUG_NOT_FOUND", f"Drug not found: id={drug_id}", 404
+            )
 
         now = _utc_now_iso()
         if "quantity" in data:
             try:
                 q = int(data["quantity"])
             except (TypeError, ValueError):
-                return _error("quantity must be an integer", "INVALID_TYPE", 400)
+                return error_response(
+                    "INVALID_TYPE", "quantity must be an integer", 400
+                )
             if q < 0:
-                return _error("quantity must be >= 0", "INVALID_INPUT", 400)
+                return error_response("INVALID_INPUT", "quantity must be >= 0", 400)
             conn.execute(
                 "UPDATE inventory SET quantity = ?, updated_at = ? WHERE drug_id = ?",
                 (q, now, drug_id),
@@ -650,7 +688,7 @@ def adjust_drug_inventory(drug_id):
             try:
                 d = int(data["delta"])
             except (TypeError, ValueError):
-                return _error("delta must be an integer", "INVALID_TYPE", 400)
+                return error_response("INVALID_TYPE", "delta must be an integer", 400)
             cur = conn.execute(
                 """
                 UPDATE inventory
@@ -660,19 +698,21 @@ def adjust_drug_inventory(drug_id):
                 (d, now, drug_id, d),
             )
             if cur.rowcount == 0:
-                return _error("Insufficient quantity for delta adjustment", "INVALID_ADJUST", 400)
+                return error_response(
+                    "INVALID_ADJUST",
+                    "Insufficient quantity for delta adjustment",
+                    400,
+                )
         else:
-            return _error("Provide quantity or delta", "MISSING_FIELDS", 400)
+            return error_response("MISSING_FIELDS", "Provide quantity or delta", 400)
 
         conn.commit()
         cur = conn.execute(
             "SELECT quantity FROM inventory WHERE drug_id = ?", (drug_id,)
         )
         qrow = cur.fetchone()
-        return jsonify(
+        return success_response(
             {
-                "success": True,
-                "ok": True,
                 "drug_id": drug_id,
                 "quantity": qrow["quantity"] if qrow else None,
             }
@@ -681,7 +721,7 @@ def adjust_drug_inventory(drug_id):
         print(f"Database error in adjust_drug_inventory: {e}")
         if conn:
             conn.rollback()
-        return _error("Database error while adjusting inventory", "DB_ERROR", 500)
+        return internal_error_response("Database error while adjusting inventory")
     finally:
         if conn:
             conn.close()
@@ -693,7 +733,11 @@ def batch_import_drugs():
     """批量创建药品（每项字段与简化 POST /drugs 一致）。"""
     items = request.get_json(silent=True)
     if not isinstance(items, list) or not items:
-        return _error("Request body must be a non-empty JSON array", "INVALID_JSON", 400)
+        return error_response(
+            "INVALID_JSON",
+            "Request body must be a non-empty JSON array",
+            400,
+        )
 
     required_fields = ["name", "quantity", "expiry_date", "shelf_x", "shelf_y", "shelve_id"]
     conn = None
@@ -702,11 +746,15 @@ def batch_import_drugs():
         created_ids: list[int] = []
         for idx, data in enumerate(items):
             if not isinstance(data, dict):
-                return _error(f"Item {idx} must be an object", "INVALID_TYPE", 400)
+                return error_response(
+                    "INVALID_TYPE", f"Item {idx} must be an object", 400
+                )
             for field in required_fields:
                 if field not in data:
-                    return _error(
-                        f"Item {idx} missing field: {field}", "MISSING_FIELDS", 400
+                    return error_response(
+                        "MISSING_FIELDS",
+                        f"Item {idx} missing field: {field}",
+                        400,
                     )
             try:
                 name = str(data["name"])
@@ -716,11 +764,15 @@ def batch_import_drugs():
                 shelf_y = int(data["shelf_y"])
                 shelve_id = int(data["shelve_id"])
             except (TypeError, ValueError):
-                return _error(f"Item {idx} has invalid field types", "INVALID_TYPE", 400)
+                return error_response(
+                    "INVALID_TYPE", f"Item {idx} has invalid field types", 400
+                )
 
             if quantity < 0:
-                return _error(
-                    f"Item {idx}: quantity cannot be negative", "INVALID_QUANTITY", 400
+                return error_response(
+                    "INVALID_QUANTITY",
+                    f"Item {idx}: quantity cannot be negative",
+                    400,
                 )
 
             new_id = _next_drug_id(conn)
@@ -732,22 +784,15 @@ def batch_import_drugs():
             created_ids.append(new_id)
 
         conn.commit()
-        return (
-            jsonify(
-                {
-                    "success": True,
-                    "ok": True,
-                    "drug_ids": created_ids,
-                    "count": len(created_ids),
-                }
-            ),
-            201,
+        return created_response(
+            {"drug_ids": created_ids, "count": len(created_ids)},
+            "Batch import completed",
         )
     except Exception as e:
         print(f"Database error in batch_import_drugs: {e}")
         if conn:
             conn.rollback()
-        return _error("Database error during batch import", "DB_ERROR", 500)
+        return internal_error_response("Database error during batch import")
     finally:
         if conn:
             conn.close()
@@ -760,36 +805,39 @@ def drug_stats():
     conn = None
     try:
         conn = get_db_connection()
-        cur = conn.execute("SELECT COUNT(*) as total, SUM(quantity) as total_qty FROM inventory")
+        active = "COALESCE(is_deleted, 0) = 0"
+        cur = conn.execute(
+            f"SELECT COUNT(*) as total, SUM(quantity) as total_qty FROM inventory WHERE {active}"
+        )
         row = cur.fetchone()
         total = row["total"] or 0
         total_quantity = row["total_qty"] or 0
 
-        cur = conn.execute("SELECT COUNT(*) FROM inventory WHERE expiry_date <= 0")
+        cur = conn.execute(
+            f"SELECT COUNT(*) FROM inventory WHERE expiry_date <= 0 AND {active}"
+        )
         expired = cur.fetchone()[0]
 
-        cur = conn.execute("SELECT COUNT(*) FROM inventory WHERE quantity < 10")
+        cur = conn.execute(
+            f"SELECT COUNT(*) FROM inventory WHERE quantity < 10 AND {active}"
+        )
         low_stock = cur.fetchone()[0]
 
-        cur = conn.execute("SELECT COUNT(*) FROM inventory WHERE expiry_date <= 30 AND expiry_date > 0")
+        cur = conn.execute(
+            f"SELECT COUNT(*) FROM inventory WHERE expiry_date <= 30 AND expiry_date > 0 AND {active}"
+        )
         expiring_soon = cur.fetchone()[0]
 
-        return jsonify({
-            "success": True,
-            "stats": {
-                "total_drugs": total,
-                "total_quantity": total_quantity,
-                "expired_count": expired,
-                "low_stock_count": low_stock,
-                "expiring_soon_count": expiring_soon,
-            },
+        return success_response({
+            "total_drugs": total,
+            "total_quantity": total_quantity,
+            "expired_count": expired,
+            "low_stock_count": low_stock,
+            "expiring_soon_count": expiring_soon,
         })
     except Exception as e:
         print(f"Database error in drug_stats: {e}")
-        return (
-            jsonify({"success": False, "error": "数据库错误", "code": "DB_ERROR"}),
-            500,
-        )
+        return internal_error_response("数据库错误")
     finally:
         if conn:
             conn.close()

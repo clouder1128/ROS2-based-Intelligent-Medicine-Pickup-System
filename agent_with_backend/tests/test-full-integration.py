@@ -267,10 +267,10 @@ def test_complete_workflow():
             drugs_response = httpx.get(f'{BACKEND_URL}/api/drugs', timeout=5)
             if drugs_response.status_code == 200:
                 drugs_data = drugs_response.json()
-                if drugs_data.get("drugs") and len(drugs_data["drugs"]) > 0:
+                if drugs_data.get("data") and len(drugs_data["data"]) > 0:
                     # 选择第一个有库存的药品
                     test_drug = None
-                    for drug in drugs_data["drugs"]:
+                    for drug in drugs_data["data"]:
                         if drug.get("quantity", 0) >= 2:  # 至少需要2个用于测试
                             test_drug = drug
                             break
