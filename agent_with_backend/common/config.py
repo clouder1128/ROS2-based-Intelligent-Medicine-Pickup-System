@@ -96,11 +96,13 @@ class Config:
                 f"Invalid LLM provider: {cls.LLM_PROVIDER}, must be 'claude' or 'openai'"
             )
         if cls.LLM_PROVIDER == "claude" and not cls.ANTHROPIC_API_KEY:
-            raise ConfigurationError(
-                "ANTHROPIC_API_KEY or ANTHROPIC_AUTH_TOKEN required for Claude provider"
+            logging.warning(
+                "ANTHROPIC_API_KEY not set — LLM features (consultation) will be unavailable"
             )
         if cls.LLM_PROVIDER == "openai" and not cls.OPENAI_API_KEY:
-            raise ConfigurationError("OPENAI_API_KEY required for OpenAI provider")
+            logging.warning(
+                "OPENAI_API_KEY not set — LLM features (consultation) will be unavailable"
+            )
         if not (1 <= cls.MAX_ITERATIONS <= 50):
             raise ConfigurationError(f"MAX_ITERATIONS must be 1-50, got {cls.MAX_ITERATIONS}")
         if not (0.0 <= cls.LLM_TEMPERATURE <= 2.0):

@@ -289,3 +289,28 @@ def list_orders():
     finally:
         if conn:
             conn.close()
+
+
+@order_bp.route("/orders/<int:task_id>/complete", methods=["POST"])
+@require_auth
+def complete_order(task_id):
+    """
+    POST /api/orders/<task_id>/complete
+    患者确认取药后，标记订单为已完成
+    """
+    conn = None
+    try:
+        conn = get_db_connection()
+        cur = conn.execute(
+            "UPDATE order_log SET status = ? WHERE task_id = ?",
+            ("completed", task_id),
+        )
+        conn.commit()
+        if cur.rowcount == 0:
+            return jsonify({"success": False, "error": "订单不存在", "code": "NOT_FOUND"}), 404
+        return jsonify({"success": True, "message": "订单已标记为已完成", "task_id": task_id})
+    except Exception as e:
+        return jsonify({"success": False, "error": f"更新订单失败: {str(e)}", "code": "DB_ERROR"}), 500
+    finally:
+        if conn:
+            conn.close()

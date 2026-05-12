@@ -20,6 +20,7 @@ from auth.constants import (
 )
 from auth.middleware import require_permission
 from common.utils.database import get_db_connection
+from common.utils.drug_service import query_drugs, get_drug
 from common.utils.validation import validate_drug
 from common.utils import (
     success_response,
@@ -65,41 +66,6 @@ def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-
-def _fetch_drugs_with_indications(conn, where_clause: str, params: tuple):
-    """SELECT * FROM inventory + 拼接 indications"""
-    sql = f"SELECT * FROM inventory {where_clause}"
-    cur = conn.execute(sql, params)
-    drugs = [dict(row) for row in cur.fetchall()]
-
-    drug_ids = [d["drug_id"] for d in drugs]
-    if drug_ids:
-        placeholders = ",".join("?" for _ in drug_ids)
-        cur = conn.execute(
-            f"SELECT drug_id, indication FROM drug_indications WHERE drug_id IN ({placeholders})",
-            drug_ids,
-        )
-        indications_map = {}
-        for row in cur.fetchall():
-            di = row["drug_id"]
-            indications_map.setdefault(di, []).append(row["indication"])
-        for d in drugs:
-            d["indications"] = indications_map.get(d["drug_id"], [])
-    else:
-        for d in drugs:
-            d["indications"] = []
-
-    return drugs
-
-
-def _deduplicate_drugs(drugs):
-    seen = set()
-    result = []
-    for d in drugs:
-        if d["drug_id"] not in seen:
-            seen.add(d["drug_id"])
-            result.append(d)
-    return result
 
 
 def _parse_pagination():
@@ -167,119 +133,27 @@ def list_drugs():
         if f is not None and re.search(r'[;\\\'"`]', f):
             return bad_request_response("Invalid characters in filter")
 
-    order_sql = f"ORDER BY {_SORT_SQL[sort_by]} {sort_order.upper()}"
-
-    conn = None
     try:
-        conn = get_db_connection()
+        drugs = query_drugs(
+            symptom=symptom_filter,
+            name=name_filter,
+            category=category_filter,
+            sort_by=sort_by,
+            sort_order=sort_order,
+        )
 
-        if symptom_filter is not None:
-            base_where = (
-                "WHERE drug_id IN (SELECT DISTINCT drug_id FROM drug_indications WHERE indication LIKE ?) "
-                "AND quantity > 0 AND is_deleted = 0"
-            )
-            drugs = _fetch_drugs_with_indications(conn, base_where, (f"%{symptom_filter}%",))
-
-            if not drugs:
-                cur = conn.execute(
-                    "SELECT DISTINCT standard_term FROM symptom_synonyms WHERE synonym LIKE ?",
-                    (f"%{symptom_filter}%",),
-                )
-                standard_terms = [row["standard_term"] for row in cur.fetchall()]
-                for term in standard_terms:
-                    matched = _fetch_drugs_with_indications(
-                        conn,
-                        base_where,
-                        (f"%{term}%",),
-                    )
-                    drugs.extend(matched)
-                drugs = _deduplicate_drugs(drugs)
-
-            if category_filter:
-                drugs = [d for d in drugs if (d.get("category") or "") == category_filter]
-            if name_filter:
-                drugs = [d for d in drugs if name_filter.lower() in (d.get("name") or "").lower()]
-
-            sort_col = sort_by if sort_by in _SORT_SQL else "drug_id"
-            reverse = sort_order == "desc"
-            if sort_col in ("name", "category"):
-                drugs.sort(
-                    key=lambda d: ((d.get(sort_col) or "").lower(), d["drug_id"]),
-                    reverse=reverse,
-                )
-            else:
-                drugs.sort(key=lambda d: d.get(sort_col, 0), reverse=reverse)
-
-            total = len(drugs)
-            if use_pagination:
-                drugs = drugs[offset : offset + limit]
-
-            out = {
-                "success": True,
-                "data": drugs,
-                "count": len(drugs),
-                "filters": {
-                    "symptom": symptom_filter,
-                    "category": category_filter or "",
-                    "name": name_filter or "",
-                    "sort_by": sort_by,
-                    "order": sort_order,
-                },
-                "pagination": _pagination_dict(page, limit, total) if use_pagination else None,
-                "error": None,
-            }
-            return jsonify(out)
-
-        where_parts = ["is_deleted = 0"]
-        params: list = []
-
-        if category_filter:
-            where_parts.append("category = ?")
-            params.append(category_filter)
-        if name_filter:
-            where_parts.append("name LIKE ?")
-            params.append(f"%{name_filter}%")
-        where_sql = "WHERE " + " AND ".join(where_parts)
-
+        total = len(drugs)
         if use_pagination:
-            cur = conn.execute(
-                f"SELECT COUNT(*) FROM inventory {where_sql}",
-                tuple(params),
-            )
-            total = cur.fetchone()[0]
-        else:
-            total = 0
-
-        if use_pagination:
-            list_sql = f"SELECT * FROM inventory {where_sql} {order_sql} LIMIT ? OFFSET ?"
-            cur = conn.execute(list_sql, tuple(params) + (limit, offset))
-        else:
-            list_sql = f"SELECT * FROM inventory {where_sql} {order_sql}"
-            cur = conn.execute(list_sql, tuple(params))
-        drugs = [dict(row) for row in cur.fetchall()]
-        drug_ids = [d["drug_id"] for d in drugs]
-        if drug_ids:
-            ph = ",".join("?" for _ in drug_ids)
-            cur = conn.execute(
-                f"SELECT drug_id, indication FROM drug_indications WHERE drug_id IN ({ph})",
-                drug_ids,
-            )
-            imap = {}
-            for row in cur.fetchall():
-                imap.setdefault(row["drug_id"], []).append(row["indication"])
-            for d in drugs:
-                d["indications"] = imap.get(d["drug_id"], [])
-        else:
-            for d in drugs:
-                d["indications"] = []
+            drugs = drugs[offset : offset + limit]
 
         out = {
             "success": True,
             "data": drugs,
             "count": len(drugs),
             "filters": {
-                "name": name_filter or "",
+                "symptom": symptom_filter or "",
                 "category": category_filter or "",
+                "name": name_filter or "",
                 "sort_by": sort_by,
                 "order": sort_order,
             },
@@ -291,9 +165,6 @@ def list_drugs():
     except Exception as e:
         print(f"Database error in list_drugs: {e}")
         return internal_error_response("Database error while fetching drugs")
-    finally:
-        if conn:
-            conn.close()
 
 
 @drug_bp.route("/inventory", methods=["GET"])
@@ -311,28 +182,14 @@ def search_drugs():
 @drug_bp.route("/drugs/<int:drug_id>", methods=["GET"])
 @require_permission(PERM_READ_DRUG)
 def get_drug(drug_id):
-    conn = None
     try:
-        conn = get_db_connection()
-        cur = conn.execute("SELECT * FROM inventory WHERE drug_id = ?", (drug_id,))
-        row = cur.fetchone()
-        if row is None:
+        drug = get_drug(drug_id)
+        if drug is None:
             return not_found_response(f"Drug not found: id={drug_id}")
-        drug = dict(row)
-        if drug.get("is_deleted"):
-            return not_found_response(f"Drug not found: id={drug_id}")
-
-        cur = conn.execute(
-            "SELECT indication FROM drug_indications WHERE drug_id = ?", (drug_id,))
-        drug["indications"] = [r["indication"] for r in cur.fetchall()]
-
         return success_response(drug)
     except Exception as e:
         print(f"Database error in get_drug: {e}")
         return internal_error_response("Database error while fetching drug")
-    finally:
-        if conn:
-            conn.close()
 
 
 def _next_drug_id(conn) -> int:
