@@ -145,10 +145,10 @@
 
 | 接口/能力                             | 用途                | 当前状态   |
 | --------------------------------- | ----------------- | ------ |
-| JWT 认证中间件                         | 验证每个请求的 token     | 🔴 未实现 |
-| `GET /api/users/{id}/permissions` | 检查用户是否有药品 CRUD 权限 | 🔴 未实现 |
-| 权限装饰器                             | 在 API 端点上添加权限检查   | 🔴 未实现 |
-| RBAC 角色检查                         | 区分管理员/医生/药剂师/普通用户 | 🔴 未实现 |
+| JWT 认证、`require_permission`           | 路由级鉴权      | ✅（见 `auth`；各组需对齐 token 与权限码） |
+| `GET /api/users/{id}/permissions`（若使用） | 动态拉权限 | ⚠ 按需；当前以 JWT 内嵌 role/权限为主 |
+| 权限装饰器                                | 后端统一装饰      | ✅ |
+| RBAC 角色检查                             | 角色映射到权限码 | ✅（`ROLE_PERMISSION_MAP`） |
 
 
 ## 五、组件2提供给外部的 API
@@ -160,7 +160,7 @@
 | ----------------------- | ------------------------- | ---------------------------------------- |
 | `GET /api/drugs`        | 获取药品列表（含筛选）               | ✅ 已实现，支持 name/symptom/category 筛选 + 分页排序 |
 | `GET /api/drugs/{id}`   | 获取单个药品详情                  | ✅ 已实现                                    |
-| `GET /api/drugs/search` | 综合搜索药品（keyword + filters） | 🔴 未实现                                   |
+| `GET /api/drugs/search` | 综合搜索（keyword/q + filters） | ✅ 已实现 |
 
 
 ### 提供给组件5（前端界面）
@@ -173,27 +173,27 @@
 | `POST /api/drugs`              | POST   | 创建新药品          | ✅ 已实现  |
 | `PUT /api/drugs/{id}`          | PUT    | 更新药品信息         | ✅ 已实现  |
 | `DELETE /api/drugs/{id}`       | DELETE | 软删除药品          | ✅ 已实现  |
-| `GET /api/inventory`           | GET    | 库存信息展示         | 🔴 未实现 |
-| `POST /api/drugs/{id}/adjust`  | POST   | 库存调整           | 🔴 未实现 |
-| `GET /api/categories`          | GET    | 分类列表           | 🔴 未实现 |
-| `POST /api/categories`         | POST   | 创建分类           | 🔴 未实现 |
-| `GET /api/drugs/search`        | GET    | 综合搜索           | 🔴 未实现 |
-| `POST /api/drugs/batch-import` | POST   | 批量导入           | 🔴 未实现 |
-| `GET /api/drugs/export`        | GET    | 批量导出           | 🔴 未实现 |
+| `GET /api/inventory` | GET | 拣货/库区视图（收窄字段 + 运营布尔标记，`read:inventory`） | ✅ 已实现 |
+| `POST /api/drugs/{id}/adjust` | POST | 库存调整，写流水 | ✅ 已实现 |
+| `GET /api/categories` | GET | 分类列表（`tree`/分页/`drug_count`） | ✅ 已实现 |
+| `POST /api/categories` | POST | 创建分类 | ✅ 已实现 |
+| `GET /api/drugs/search` | GET | keyword/q 综合搜索 | ✅ 已实现 |
+| `POST /api/drugs/batch-import` | POST | JSON 批量导入 | ✅ 已实现 |
+| `GET /api/drugs/export` | GET | 导出 JSON/CSV | ✅ 已实现 |
 
 
 ### 权限访问控制矩阵（需组件4 配合）
 
 
-| 资源                             | 操作权限码              | 角色要求    |
-| ------------------------------ | ------------------ | ------- |
-| `GET /api/drugs`               | `read:drug`        | 所有角色    |
-| `POST /api/drugs`              | `create:drug`      | 管理员、药剂师 |
-| `PUT /api/drugs/{id}`          | `update:drug`      | 管理员、药剂师 |
-| `DELETE /api/drugs/{id}`       | `delete:drug`      | 管理员     |
-| `GET /api/inventory`           | `read:inventory`   | 管理员、药剂师 |
-| `POST /api/drugs/{id}/adjust`  | `update:inventory` | 管理员、药剂师 |
-| `POST /api/drugs/batch-import` | `batch:drug`       | 管理员     |
+| 资源                             | 操作权限码              | 角色要求   |
+| ------------------------------ | ------------------ | ------ |
+| `GET /api/drugs`               | `read:drug`        | 所有角色   |
+| `POST /api/drugs`              | `create:drug`      | 管理员、医生 |
+| `PUT /api/drugs/{id}`          | `update:drug`      | 管理员、医生 |
+| `DELETE /api/drugs/{id}`       | `delete:drug`      | 管理员    |
+| `GET /api/inventory`           | `read:inventory`   | 管理员、医生 |
+| `POST /api/drugs/{id}/adjust`  | `update:inventory` | 管理员、医生 |
+| `POST /api/drugs/batch-import` | `batch:drug`       | 管理员    |
 
 
 ## 六、当前代码与目标差距
@@ -205,12 +205,12 @@
 | `POST /api/drugs`                                        | 创建新药品                           | ✅ 已实现      | 高   |
 | `PUT /api/drugs/{id}`                                    | 更新药品                            | ✅ 已实现      | 高   |
 | `DELETE /api/drugs/{id}`                                 | 删除药品                            | ✅ 已实现（软删除） | 高   |
-| `GET /api/inventory`                                     | 库存查看                            | 🔴 未实现     | 高   |
-| `POST /api/drugs/{id}/adjust`                            | 库存调整                            | 🔴 未实现     | 高   |
-| `GET` / `POST /api/categories`                           | 分类管理                            | 🔴 未实现     | 中   |
-| `GET /api/drugs/search`                                  | 综合搜索                            | 🔴 未实现     | 中   |
-| `POST /api/drugs/batch-import` / `GET /api/drugs/export` | 批量操作                            | 🔴 未实现     | 中   |
-| JWT 认证集成                                                 | 所有 API 加权限验证                    | 🔴 依赖组件4   | 高   |
+| `GET /api/inventory` | 库区 / 拣货 JSON（白名单字段 + 补货/临期布尔） | ✅ 已实现 | 高 |
+| `POST /api/drugs/{id}/adjust` | 库存调整 + `inventory_transactions` | ✅ 已实现 | 高 |
+| `GET` / `POST /api/categories` | 分类管理 | ✅ 已实现 | 中 |
+| `GET /api/drugs/search` | 关键词综合搜索 | ✅ 已实现 | 中 |
+| `POST /api/drugs/batch-import` / `GET /api/drugs/export` | JSON 批量导入 / 导出 | ✅ 已实现 | 中 |
+| JWT + `require_permission` | API 权限 | ✅（见 `auth`） | 高 |
 
 
 ## 七、开发计划
@@ -237,6 +237,16 @@
 - 实现 `GET /api/inventory`、`POST /api/drugs/{id}/adjust`
 - 新建 `database/models/inventory.py`，添加 `inventory_transactions` 表（与组件1 协调落库）
 - 实现 `GET /api/drugs/low-stock`（低库存预警）、`GET /api/drugs/expiring-soon`（过期预警）
+
+  | 优先级 | 需要配合的组                         | 尚未就绪 / 待约定内容                                         | 影响                                             |
+  | --- | ------------------------------ | ---------------------------------------------------- | ---------------------------------------------- |
+  | 高   | **组件1**                        | **缓存层**（热点键、失效策略、是否包装 `get_db_connection` 查询）        | 列表压测前难以承诺延迟；第四～五周「缓存集成」仍 blocked               |
+  | 高   | **组件1**                        | **文件上传 / 对象存储**（若产品要求「导入＝上传 CSV 文件」而非 JSON 体）        | 当前仅 JSON 导入；要接 multipart/对象存储需组件1 接口与鉴权        |
+  | 高 | **组件3 / 5 / 产品** | 若条目需并入 **工单/灯号等业务字段**，或条目内嵌 **流水摘要**：需再行约定扩展字段（当前已提供库区白名单视图 + 补货 / 临期布尔标记） | 增强而非阻塞 |
+  | 高   | **订单 / 取药责任方**（若属组件1 或独立「订单组」） | **出库/发药是否统一写 `inventory_transactions`**、幂等与回滚        | 若仅 `adjust` 记流水、订单扣库不写表，则审计链断裂                 |
+  | 中   | **全员**                         | **统一错误码与响应 envelope**                                | `low-stock` / `expiring-soon` 等新端点若解析不一致，联调成本高 |
+  | 中   | **组件5**                        | 预警 UI 是否与 `threshold`/`days` 暴露一致、是否要配置中心收口          | ✅ 后端已支持查询参数默认与 `/drugs/stats` 对齐；按需再上会         |
+
 
 **第 4–5 周：搜索增强 + 集成联调**
 
@@ -354,8 +364,36 @@
 
 - **组件3 / 组件5**：`GET /api/drugs` 不传 `page`/`limit` 时行为与之前完全相同（全量返回），**已有调用无需改动**；若想分页请加 `?page=1&limit=20`。
 - **组件1**：`inventory` 表已有 35 列，迁移通过 `_add_column_if_not_exists` 进行，**不会破坏已有数据**。新环境初始化请运行 `python3 -m database.scripts.init_db`。
-- **组件4**：当前 API **无鉴权**，所有端点开放；待组件4 提供 JWT 中间件 / 权限装饰器后组件2 将挂载。
+- **组件4**：药品与分类等业务路由已挂载 `require_permission`；前端需在请求头带 `Authorization: Bearer <token>`；角色与权限默认值见代码 `ROLE_PERMISSION_MAP`（与矩阵表若有出入例会统一）。
 - **软删除**：`DELETE` 不物理删除行，`is_deleted=1` 的记录在列表/详情中不返回，但数据仍在库中。适应症表 `drug_indications` 当前未随之删除。
+
+## 第二周进展（2026-05-13）
+
+### 完成状态
+
+
+| 序号 | 任务 | 涉及文件 | 状态 |
+| --- | --- | --- | --- |
+| 1 | `POST /api/drugs/batch-import`（请求体为非空 JSON 数组，每项字段与单条 POST 对齐） | `api/drug_controller.py` | ✅ 完成 |
+| 2 | `GET /api/drugs/export`（未软删全量；默认 JSON；`format=csv` 或 `Accept: text/csv` 导出 CSV） | `api/drug_controller.py` | ✅ 完成 |
+| 3 | `POST /api/drugs/{id}/adjust` + 写入 `inventory_transactions`（支持规范式 `quantity_change`+`transaction_type` 或与旧版兼容字段） | `api/drug_controller.py`（表结构见组件1 DDL） | ✅ 完成 |
+| 4 | `GET /api/drugs/search`（`keyword`/`q`；多字段与子串 LIKE；无关键词时等同 `GET /api/drugs`） | `api/drug_controller.py` | ✅ 完成 |
+| 5 | `GET /api/categories`、`POST /api/categories`（可选 `tree=1`、分页、`drug_count`）；`database/models/category.py` 模型 | `api/category_controller.py`、`database/models/category.py` | ✅ 完成 |
+| 6 | `main.py` 注册 `category_bp`，药品与分类等与鉴权链路一致 | `main.py`、`auth` | ✅ 完成 |
+| 7 | `GET /api/inventory` **拣货向视图**：收窄字段、`location_label` 及 `needs_restock` / `expiring_soon` 等布尔标记（非 `GET /api/drugs` 全字段） | `api/drug_controller.py` | ✅ 完成 |
+| 8 | `GET /api/drugs/low-stock`、`GET /api/drugs/expiring-soon`（与 `GET /api/drugs/stats` 计数规则对齐；可调 `threshold`/`days`，可选分页） | `api/drug_controller.py` | ✅ 完成 |
+
+
+### API 行为说明（摘）
+
+- **`POST /api/drugs/batch-import`**：请求体为药品对象数组；逐条 `validate_drug`，经 `_insert_drug_row` 写库并同步适应症；需 `batch:drug`。
+- **`GET /api/drugs/export`**：仅含未软删记录；CSV 时对 `indications` 等复杂字段做可导入的文本化拼接；需 `read:drug`。
+- **`POST /api/drugs/{id}/adjust`**：更新 `inventory.quantity`；同时插入 `inventory_transactions`；需 `update:inventory`。
+- **`GET /api/drugs/search`**：有关键词时在 `name`、`generic_name`、`description`、适应症等上做模糊检索；支持与列表接口一致的 `category`、排序与分页语义。
+- **`GET/POST /api/categories`**：GET 可按树或扁平列表返回；POST 创建分类，`name` 唯一；权限以 `category_bp` 路由装饰为准。
+- **`GET /api/inventory`**：拣货 / 库区视图，过滤、排序、`page/limit`、`name`、`category`、`symptom` 与 `GET /api/drugs` 对齐；每条为**库区与白名单字段**（位点、条码、单位、剂型、警戒线等），不含全文说明书类长字段；并附带 `location_label`、`needs_restock`（阈值 `threshold`，默认与 `/drugs/stats`）、`expiring_soon`（窗口 `expiring_window`，默认 30 天）、`is_expired_stock`；仍返回 `indications`；需 `read:inventory`。
+- **`GET /api/drugs/low-stock`**：配置了 `min_stock_alert` 的药品判为 `quantity <= min_stock_alert`；未配置的药品与 `/drugs/stats` 的低库存计数一致地使用 `quantity < threshold`（默认 `threshold=10`）；可选分页；需 `read:inventory`。
+- **`GET /api/drugs/expiring-soon`**：筛选 `0 < expiry_date <= days`（默认 `days=30`），与同口径统计对齐；过期（`expiry_date <= 0`）不在本列表内；可选分页；需 `read:inventory`。
 
 ---
 

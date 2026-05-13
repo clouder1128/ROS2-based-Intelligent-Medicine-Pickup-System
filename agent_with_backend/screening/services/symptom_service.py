@@ -48,14 +48,14 @@ class SymptomService:
         self._load_symptoms()
     
     def _load_symptoms(self):
-        \"\"\"从数据库加载症状定义\"\"\"
+        """从数据库加载症状定义"""
         # TODO: 从数据库加载症状
         # 如果提供了db_session，从数据库加载
         # 否则使用内置的示例症状库
         pass
     
     def standardize_symptom(self, symptom_text: str) -> Optional[str]:
-        \"\"\"标准化单个症状
+        """标准化单个症状
         
         将用户输入的症状文本转换为标准症状名称
         
@@ -64,7 +64,7 @@ class SymptomService:
             
         Returns:
             标准症状名称，如果没有匹配则返回None
-        \"\"\"
+        """
         symptom_text = symptom_text.strip().lower()
         
         # 精确匹配
@@ -86,7 +86,7 @@ class SymptomService:
         return best_match
     
     def standardize_symptoms(self, symptom_texts: List[str]) -> Dict[str, any]:
-        \"\"\"标准化多个症状
+        """标准化多个症状
         
         Args:
             symptom_texts: 症状文本列表
@@ -97,7 +97,7 @@ class SymptomService:
                 'unmatched': [...],  # 无法匹配的症状
                 'confidence': float,  # 整体匹配置信度
             }
-        \"\"\"
+        """
         standardized = []
         unmatched = []
         matched_count = 0
@@ -122,18 +122,18 @@ class SymptomService:
         }
     
     def get_synonyms(self, symptom_name: str) -> List[str]:
-        \"\"\"获取症状的所有同义词
+        """获取症状的所有同义词
         
         Args:
             symptom_name: 标准症状名称
             
         Returns:
             同义词列表
-        \"\"\"
+        """
         return self.STANDARD_SYMPTOMS.get(symptom_name, [])
     
     def calculate_symptom_similarity(self, text1: str, text2: str) -> float:
-        \"\"\"计算两个症状文本的相似度
+        """计算两个症状文本的相似度
         
         Args:
             text1: 第一个症状文本
@@ -141,18 +141,18 @@ class SymptomService:
             
         Returns:
             相似度分数（0-1）
-        \"\"\"
+        """
         text1_lower = text1.lower().strip()
         text2_lower = text2.lower().strip()
         
         return SequenceMatcher(None, text1_lower, text2_lower).ratio()
     
     def get_symptom_categories(self) -> Dict[str, List[str]]:
-        \"\"\"获取按分类组织的症状
+        """获取按分类组织的症状
         
         Returns:
             按分类组织的症状字典
-        \"\"\"
+        """
         categories = {}
         
         # 简单分类逻辑
@@ -167,14 +167,14 @@ class SymptomService:
         return category_map
     
     def expand_symptoms_with_synonyms(self, symptoms: List[str]) -> List[str]:
-        \"\"\"使用同义词扩展症状列表
+        """使用同义词扩展症状列表
         
         Args:
             symptoms: 症状列表（标准名称）
             
         Returns:
             扩展后的症状列表（包含同义词）
-        \"\"\"
+        """
         expanded = set()
         
         for symptom in symptoms:
