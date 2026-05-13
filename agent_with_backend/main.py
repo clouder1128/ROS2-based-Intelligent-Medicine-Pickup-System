@@ -32,6 +32,7 @@ from api.category_controller import category_bp
 
 # 组件3：智能筛选（必须用工厂函数创建蓝图）
 from screening.routes import create_screening_blueprint
+from api.ros_state_controller import ros_state_bp
 
 # Utility imports
 from ros_integration.bridge import init_ros2, publish_expiry_removal
@@ -96,6 +97,7 @@ app.register_blueprint(auth_bp)
 app.register_blueprint(category_bp)
 screening_bp = create_screening_blueprint()
 app.register_blueprint(screening_bp)
+app.register_blueprint(ros_state_bp)
 
 # 确保 RBAC 表存在（可安全重复调用）
 try:

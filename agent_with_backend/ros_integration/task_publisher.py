@@ -290,6 +290,75 @@ class TaskPublisher:
             self._error_handler.handle_publish_error(e, task_id=None, retry_strategy="exponential")
             return False
 
+    def publish_return_to_queue(self, car_id: str = "default") -> bool:
+        """
+        发布小车归队指令
+
+        Args:
+            car_id: 小车ID
+
+        Returns:
+            bool: 发布是否成功
+        """
+        if not self._initialized:
+            print("[TaskPublisher] Not initialized, cannot publish return to queue")
+            return False
+
+        try:
+            mode = self._config.INTEGRATION_MODE
+            success = False
+
+            if mode == "new" and self._new_publisher is not None:
+                task_msg = Task()
+                task_msg.task_id = -1  # 特殊 ID 标识归队指令
+                task_msg.car_id = car_id
+                task_msg.status = "return_to_queue"
+                self._new_publisher.publish(task_msg)
+                print(f"[TaskPublisher] Published return_to_queue for car {car_id} to {TopicConfig.TASK_TOPIC_NEW}")
+                success = True
+
+            elif mode == "legacy" and self._legacy_publisher is not None:
+                msg = String()
+                msg.data = json.dumps({
+                    "task_id": -1,
+                    "car_id": car_id,
+                    "status": "return_to_queue",
+                    "type": "return_to_queue",
+                })
+                self._legacy_publisher.publish(msg)
+                print(f"[TaskPublisher] Published return_to_queue for car {car_id} to {TopicConfig.TASK_TOPIC_LEGACY}")
+                success = True
+
+            elif mode == "parallel":
+                if self._new_publisher is not None:
+                    task_msg = Task()
+                    task_msg.task_id = -1
+                    task_msg.car_id = car_id
+                    task_msg.status = "return_to_queue"
+                    self._new_publisher.publish(task_msg)
+                    success = True
+                if self._legacy_publisher is not None:
+                    msg = String()
+                    msg.data = json.dumps({
+                        "task_id": -1,
+                        "car_id": car_id,
+                        "status": "return_to_queue",
+                        "type": "return_to_queue",
+                    })
+                    self._legacy_publisher.publish(msg)
+                    success = True
+
+            if success:
+                print(f"[TaskPublisher] Return-to-queue command published for car {car_id}")
+                return True
+            else:
+                print(f"[TaskPublisher] Failed to publish return_to_queue: no publishers available")
+                return False
+
+        except Exception as e:
+            print(f"[TaskPublisher] Failed to publish return_to_queue: {e}")
+            return False
+
     def _create_legacy_message(self, task_id: int, drug: Dict[str, Any], quantity: int):
         """创建旧格式消息（JSON字符串）"""
         if not STD_MSGS_AVAILABLE:

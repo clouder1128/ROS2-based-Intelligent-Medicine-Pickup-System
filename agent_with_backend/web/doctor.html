@@ -124,8 +124,8 @@ document.getElementById('sidebarNav').innerHTML = renderSidebar([
     ]},
 ], 'pending');
 document.getElementById('sidebarFooter').innerHTML = `
-    <div class="user-avatar doctor">${user.name[0]}</div>
-    <div class="user-info"><div class="user-name">${user.name}</div><div class="user-role">医生</div></div>
+    <div class="user-avatar doctor">${user.display_name[0]}</div>
+    <div class="user-info"><div class="user-name">${user.display_name}</div><div class="user-role">医生</div></div>
     <button class="btn-logout" onclick="doLogout()" title="退出登录"><i class="bi bi-box-arrow-right"></i></button>
 `;
 document.getElementById('topUserBadge').innerHTML = `<i class="bi bi-person-circle"></i> ${getUserDisplay(user)}`;
@@ -250,7 +250,7 @@ window.doApprove = async function(approvalId) {
             drug_name: approval?.drug_name || '-',
             status: 'approved',
             approved_at: new Date().toISOString(),
-            doctor_name: user.name,
+            doctor_name: user.display_name,
         });
         saveHistory();
         refreshPending();
@@ -294,7 +294,7 @@ window.doReject = async function(approvalId) {
             status: 'rejected',
             reject_reason: reason,
             approved_at: new Date().toISOString(),
-            doctor_name: user.name,
+            doctor_name: user.display_name,
         });
         saveHistory();
         refreshPending();
@@ -324,8 +324,17 @@ function loadHistory() {
 }
 
 // Initialize
-refreshPending();
-loadHistory();
+(async function validateHistory() {
+    const valid = [];
+    for (const h of historyApprovals) {
+        const res = await ApiClient.getApproval(h.approval_id);
+        if (res.success) valid.push(h);
+    }
+    historyApprovals = valid;
+    saveHistory();
+    refreshPending();
+    loadHistory();
+})();
 </script>
 </body>
 </html>

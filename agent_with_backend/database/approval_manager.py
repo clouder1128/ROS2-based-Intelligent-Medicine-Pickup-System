@@ -33,6 +33,7 @@ class ApprovalManager:
     STATUS_PENDING = "pending"
     STATUS_APPROVED = "approved"
     STATUS_REJECTED = "rejected"
+    STATUS_COMPLETED = "completed"
 
     def __init__(self, db_path: str | None = None) -> None:
         self.db_path = db_path or os.environ.get("APPROVAL_DB_PATH", _DEFAULT_DB)
@@ -53,12 +54,17 @@ class ApprovalManager:
                 status TEXT NOT NULL,
                 doctor_id TEXT,
                 reject_reason TEXT,
+                task_id TEXT,
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                 approved_at DATETIME
             )
-        """)
+""")
         try:
             conn.execute("ALTER TABLE approvals ADD COLUMN quantity INTEGER DEFAULT 1")
+        except sqlite3.OperationalError:
+            pass
+        try:
+            conn.execute("ALTER TABLE approvals ADD COLUMN task_id TEXT")
         except sqlite3.OperationalError:
             pass
         conn.execute("CREATE INDEX IF NOT EXISTS idx_approvals_status ON approvals(status)")
@@ -164,6 +170,35 @@ class ApprovalManager:
                        WHERE id = ? AND status = ?""",
                     (self.STATUS_REJECTED, doctor_id, reason, _utc_iso(),
                      approval_id, self.STATUS_PENDING),
+                )
+                conn.commit()
+                return cur.rowcount == 1
+            finally:
+                conn.close()
+
+
+    def set_task_id(self, approval_id: str, task_id: str) -> bool:
+        with _lock:
+            conn = self._connect()
+            try:
+                cur = conn.execute(
+                    "UPDATE approvals SET task_id = ? WHERE id = ?",
+                    (task_id, approval_id),
+                )
+                conn.commit()
+                return cur.rowcount == 1
+            finally:
+                conn.close()
+
+    def mark_completed(self, approval_id: str) -> bool:
+        """患者确认取药后标记审批单为已完成"""
+        with _lock:
+            conn = self._connect()
+            try:
+                cur = conn.execute(
+                    """UPDATE approvals SET status = ?
+                       WHERE id = ? AND status = ?""",
+                    (self.STATUS_COMPLETED, approval_id, self.STATUS_APPROVED),
                 )
                 conn.commit()
                 return cur.rowcount == 1

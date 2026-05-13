@@ -106,6 +106,9 @@ class MedicalAgent:
         self.workflow_manager = WorkflowManager()
         self.patient_id: Optional[str] = None
         self.approval_id: Optional[str] = None
+        self.drug_name: Optional[str] = None
+        self.quantity: Optional[int] = None
+        self.patient_display_name: Optional[str] = None
         self.last_steps: List[Dict] = []
         self.workflow_completed: bool = False
 
@@ -329,6 +332,10 @@ class MedicalAgent:
                     tool_input = tc["input"]
                     tool_call_id = tc.get("id") or f"call_{int(time.time()*1000)}"
 
+                    # 强制覆写 patient_name，确保与 auth 系统一致
+                    if tool_name == "submit_approval" and self.patient_display_name:
+                        tool_input["patient_name"] = self.patient_display_name
+
                     step_record = {
                         "step": i,
                         "type": "tool_call",
@@ -353,6 +360,10 @@ class MedicalAgent:
                     self.message_manager.add_tool_result(tool_call_id, tool_result)
 
                     if tool_name == "submit_approval":
+                        if tool_input.get("drug_name"):
+                            self.drug_name = tool_input["drug_name"]
+                        if tool_input.get("quantity"):
+                            self.quantity = tool_input["quantity"]
                         data = extract_json_from_text(tool_result)
                         if data and "approval_id" in data:
                             self.approval_id = data["approval_id"]
@@ -423,6 +434,9 @@ class MedicalAgent:
         self.message_manager.reset(keep_system=True)
         self.patient_id = None
         self.approval_id = None
+        self.drug_name = None
+        self.quantity = None
+        self.patient_display_name = None
         self.last_steps = []
         self.workflow_completed = False
 

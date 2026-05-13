@@ -84,6 +84,7 @@
 
 <script src="js/api.js"></script>
 <script src="js/utils.js"></script>
+
 <script>
 const user = requireAuth('admin');
 if (!user) throw new Error('Auth required');
@@ -94,42 +95,53 @@ document.getElementById('sidebarNav').innerHTML = renderSidebar([
         { label: '仪表盘', href: 'admin.html', icon: 'bi bi-speedometer2', page: 'dashboard' },
         { label: '药品管理', href: 'admin_drugs.html', icon: 'bi bi-capsule', page: 'drugs' },
         { label: '订单记录', href: 'admin_orders.html', icon: 'bi bi-list-ol', page: 'orders' },
+        { label: 'ROS2 监控', href: 'ros_monitor.html', icon: 'bi bi-robot', page: 'ros' },
     ]},
 ], 'dashboard');
 document.getElementById('sidebarFooter').innerHTML = `
-    <div class="user-avatar admin">${user.name[0]}</div>
-    <div class="user-info"><div class="user-name">${user.name}</div><div class="user-role">管理员</div></div>
+    <div class="user-avatar admin">${user.display_name[0]}</div>
+    <div class="user-info"><div class="user-name">${user.display_name}</div><div class="user-role">管理员</div></div>
     <button class="btn-logout" onclick="doLogout()" title="退出"><i class="bi bi-box-arrow-right"></i></button>
 `;
 document.getElementById('topUserBadge').innerHTML = `<i class="bi bi-person-circle"></i> ${getUserDisplay(user)}`;
 
 // Load dashboard
 async function loadDashboard() {
-    const [healthRes, statsRes, ordersRes] = await Promise.all([
+    const [healthRes, statsRes, ordersRes, rosRes] = await Promise.all([
         ApiClient.health(),
         ApiClient.drugStats(),
         ApiClient.getOrders(),
+        ApiClient.getRosStatus(),
     ]);
 
     // Health cards
     const healthOk = healthRes.success && healthRes.status === 'ok';
+    const rosConnected = rosRes.success && rosRes.data?.connected;
+    const rosCars = rosRes.success ? (rosRes.data?.cars || []).length : 0;
+    const rosActiveTasks = rosRes.success ? (rosRes.data?.active_tasks || 0) : 0;
     document.getElementById('healthCards').innerHTML = `
         <div class="stat-card">
             <div class="stat-icon ${healthOk ? 'green' : 'red'}"><i class="bi ${healthOk ? 'bi-check-circle' : 'bi-x-circle'}"></i></div>
             <div><div class="stat-value">${healthOk ? '正常' : '异常'}</div><div class="stat-label">后端服务</div></div>
         </div>
         <div class="stat-card">
-            <div class="stat-icon ${healthRes.ros2 ? 'green' : 'yellow'}"><i class="bi bi-robot"></i></div>
-            <div><div class="stat-value">${healthRes.ros2 ? '在线' : '离线'}</div><div class="stat-label">ROS2 桥接</div></div>
+            <div class="stat-icon ${rosConnected ? 'green' : 'yellow'}"><i class="bi bi-robot"></i></div>
+            <div><div class="stat-value">${rosConnected ? rosCars + '车' : '离线'}</div><div class="stat-label">ROS2 仿真</div></div>
         </div>
         <div class="stat-card">
             <div class="stat-icon blue"><i class="bi bi-database"></i></div>
             <div><div class="stat-value">运行中</div><div class="stat-label">SQLite 数据库</div></div>
         </div>
+        ${rosConnected ? `
+        <div class="stat-card">
+            <div class="stat-icon blue"><i class="bi bi-list-task"></i></div>
+            <div><div class="stat-value">${rosActiveTasks}</div><div class="stat-label">执行中任务</div></div>
+        </div>
+        ` : ''}
     `;
 
     // Drug stats
-    const stats = statsRes.success ? statsRes.stats : {};
+    const stats = statsRes.success ? statsRes.data : {};
     document.getElementById('drugStatsCards').innerHTML = `
         <div class="stat-card">
             <div class="stat-icon blue"><i class="bi bi-capsule"></i></div>

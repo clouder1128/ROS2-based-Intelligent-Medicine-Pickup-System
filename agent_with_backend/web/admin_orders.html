@@ -76,11 +76,12 @@ document.getElementById('sidebarNav').innerHTML = renderSidebar([
         { label: '仪表盘', href: 'admin.html', icon: 'bi bi-speedometer2', page: 'dashboard' },
         { label: '药品管理', href: 'admin_drugs.html', icon: 'bi bi-capsule', page: 'drugs' },
         { label: '订单记录', href: 'admin_orders.html', icon: 'bi bi-list-ol', page: 'orders' },
+        { label: 'ROS2 监控', href: 'ros_monitor.html', icon: 'bi bi-robot', page: 'ros' },
     ]},
 ], 'orders');
 document.getElementById('sidebarFooter').innerHTML = `
-    <div class="user-avatar admin">${user.name[0]}</div>
-    <div class="user-info"><div class="user-name">${user.name}</div><div class="user-role">管理员</div></div>
+    <div class="user-avatar admin">${user.display_name[0]}</div>
+    <div class="user-info"><div class="user-name">${user.display_name}</div><div class="user-role">管理员</div></div>
     <button class="btn-logout" onclick="doLogout()"><i class="bi bi-box-arrow-right"></i></button>
 `;
 document.getElementById('topUserBadge').innerHTML = `<i class="bi bi-person-circle"></i> ${getUserDisplay(user)}`;

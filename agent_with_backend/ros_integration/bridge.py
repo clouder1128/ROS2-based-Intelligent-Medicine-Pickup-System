@@ -134,6 +134,34 @@ def publish_expiry_removal(drug: Dict[str, Any], remove_quantity: int) -> None:
         print(f"[ROS2 Bridge] Expiry removal publish failed: {e}")
 
 
+def publish_return_to_queue(car_id: str = "default") -> None:
+    """通知 ROS2 小车返回初始队列"""
+    global task_publisher_instance, ros2_available
+
+    with ros2_lock:
+        if not ros2_available or task_publisher_instance is None:
+            try:
+                if NEW_MODULES_AVAILABLE:
+                    publisher = TaskPublisher()
+                    task_publisher_instance = publisher
+                    ros2_available = True
+                else:
+                    print("[ROS2 Bridge] Cannot publish return_to_queue: new modules not available")
+                    return
+            except Exception as e:
+                print(f"[ROS2 Bridge] Failed to initialize publisher: {e}")
+                return
+
+    try:
+        success = task_publisher_instance.publish_return_to_queue(car_id)
+        if success:
+            print(f"[ROS2 Bridge] Published return_to_queue for car {car_id}")
+        else:
+            print(f"[ROS2 Bridge] Failed to publish return_to_queue (see TaskPublisher logs)")
+    except Exception as e:
+        print(f"[ROS2 Bridge] Return-to-queue publish failed: {e}")
+
+
 def check_ros2_status() -> Dict[str, Any]:
     """检查ROS2状态"""
     if not NEW_MODULES_AVAILABLE:

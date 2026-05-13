@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ROS2 仿真状态监控 - 智能药品管理系统</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        .ros-connected { color: #22c55e; }
+        .ros-disconnected { color: #ef4444; }
+        .layout-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+        .layout-3col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+        @media (max-width: 768px) { .layout-2col, .layout-3col { grid-template-columns: 1fr; } }
+        .mini-map { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 16px; font-family: monospace; line-height: 1.8; }
+        .mini-map .shelf { display: inline-block; width: 48px; height: 48px; line-height: 48px; text-align: center; margin: 2px; background: #dcfce7; border-radius: 4px; font-size: 12px; }
+        .mini-map .shelf.has-car { background: #60a5fa; color: #fff; font-weight: bold; }
+        .badge-state-0 { background: #e2e8f0; color: #475569; }
+        .badge-state-1 { background: #fef3c7; color: #92400e; }
+        .badge-state-2 { background: #dcfce7; color: #166534; }
+        .badge-state-3 { background: #fee2e2; color: #991b1b; }
+    </style>
+</head>
+<body>
+<div class="app-layout">
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-brand"><i class="bi bi-capsule"></i><h2>智能药品管理</h2></div>
+        <nav class="sidebar-nav" id="sidebarNav"></nav>
+        <div class="sidebar-footer" id="sidebarFooter"></div>
+    </aside>
+
+    <div class="main-content">
+        <div class="top-bar">
+            <button class="btn btn-outline btn-sm menu-toggle" onclick="document.getElementById('sidebar').classList.toggle('open')">
+                <i class="bi bi-list"></i>
+            </button>
+            <h3 id="pageTitle">ROS2 仿真状态监控</h3>
+            <div class="user-badge" id="topUserBadge"></div>
+        </div>
+
+        <div class="content-area">
+            <!-- Connection Status -->
+            <div class="card">
+                <div class="card-header"><i class="bi bi-wifi"></i> ROS2 连接状态</div>
+                <div class="card-body" id="connectionStatus">
+                    <div class="spinner"></div>
+                </div>
+            </div>
+
+            <!-- Car & Task Stats -->
+            <div class="layout-3col" style="margin-top:16px;">
+                <div class="card">
+                    <div class="card-header"><i class="bi bi-truck"></i> AGV 小车</div>
+                    <div class="card-body" id="carStatsCard">
+                        <div class="spinner"></div>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-header"><i class="bi bi-list-check"></i> 任务状态</div>
+                    <div class="card-body" id="taskStatsCard">
+                        <div class="spinner"></div>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-header"><i class="bi bi-cupboard"></i> 药柜状态</div>
+                    <div class="card-body" id="cabinetStatsCard">
+                        <div class="spinner"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Task Detail Table -->
+            <div class="card" style="margin-top:16px;">
+                <div class="card-header">
+                    <span><i class="bi bi-list-task"></i> 任务执行详情</span>
+                    <button class="btn btn-outline btn-sm" onclick="refreshAll()">
+                        <i class="bi bi-arrow-clockwise"></i> 刷新
+                    </button>
+                </div>
+                <div class="card-body">
+                    <div class="table-container">
+                        <table>
+                            <thead><tr><th>任务ID</th><th>小车ID</th><th>状态</th><th>更新时间</th></tr></thead>
+                            <tbody id="taskTableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Car Position Mini-Map -->
+            <div class="card" style="margin-top:16px;">
+                <div class="card-header"><i class="bi bi-geo-alt"></i> 小车实时位置（俯视图）</div>
+                <div class="card-body" id="carMapContainer">
+                    <div class="mini-map" id="carMiniMap"></div>
+                    <p style="color:#64748b;font-size:13px;margin-top:8px;">🟢 货架格口 &nbsp; 🔵 AGV 小车（显示车号）</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="js/api.js"></script>
+<script src="js/utils.js"></script>
+<script>
+const user = requireAuth('admin');
+if (!user) throw new Error('Auth required');
+
+document.getElementById('sidebarNav').innerHTML = renderSidebar([
+    { label: '管理员功能', items: [
+        { label: '仪表盘', href: 'admin.html', icon: 'bi bi-speedometer2', page: 'dashboard' },
+        { label: '药品管理', href: 'admin_drugs.html', icon: 'bi bi-capsule', page: 'drugs' },
+        { label: '订单记录', href: 'admin_orders.html', icon: 'bi bi-list-ol', page: 'orders' },
+        { label: 'ROS2 监控', href: 'ros_monitor.html', icon: 'bi bi-robot', page: 'ros' },
+    ]},
+], 'ros');
+document.getElementById('sidebarFooter').innerHTML = `
+    <div class="user-avatar admin">${user.display_name?.[0] || 'A'}</div>
+    <div class="user-info"><div class="user-name">${user.display_name || user.username}</div><div class="user-role">管理员</div></div>
+    <button class="btn-logout" onclick="doLogout()" title="退出"><i class="bi bi-box-arrow-right"></i></button>
+`;
+document.getElementById('topUserBadge').innerHTML = `<i class="bi bi-person-circle"></i> ${getUserDisplay(user)}`;
+
+let refreshTimer = null;
+
+async function refreshAll() {
+    const rosRes = await ApiClient.getRosStatus();
+    const rosConnected = rosRes.success && rosRes.data?.connected;
+
+    // Connection status
+    document.getElementById('connectionStatus').innerHTML = rosConnected
+        ? `<div style="font-size:18px;"><span class="ros-connected"><i class="bi bi-check-circle-fill"></i> 已连接</span>
+           <span style="margin-left:16px;color:#64748b;font-size:14px;">小车: ${rosRes.data.car_count} | 执行中: ${rosRes.data.active_tasks}</span>
+           <span style="margin-left:16px;color:#64748b;font-size:14px;"><i class="bi bi-arrow-clockwise"></i> 每2s自动刷新</span></div>`
+        : `<div style="font-size:18px;"><span class="ros-disconnected"><i class="bi bi-x-circle-fill"></i> 未连接</span>
+           <span style="margin-left:16px;color:#64748b;font-size:14px;">仿真系统未运行或 ROS2 桥接未启动</span></div>`;
+
+    // Car stats
+    const cars = rosRes.success ? (rosRes.data.cars || []) : [];
+    const runningCars = cars.filter(c => c.isrunning === 1);
+    document.getElementById('carStatsCard').innerHTML = `
+        <div class="stat-value">${cars.length}</div>
+        <div class="stat-label">在线小车</div>
+        <div style="margin-top:8px;color:#64748b;font-size:13px;">运行中: ${runningCars.length}</div>
+        ${cars.length === 0 ? '<div style="color:#94a3b8;font-size:12px;margin-top:8px;">暂无小车数据</div>' : ''}
+        ${cars.map(c => `<div style="margin-top:4px;font-size:13px;">#${c.car_id}: (${c.x?.toFixed(1)}, ${c.y?.toFixed(1)}) ${c.isrunning ? '🟢运行中' : '⏸️停止'}</div>`).join('')}
+    `;
+
+    // Task stats
+    const tasks = rosRes.success ? (rosRes.data.tasks || []) : [];
+    const pendingTasks = tasks.filter(t => t.task_state === 0);
+    const activeTasks = tasks.filter(t => t.task_state === 1);
+    const completedTasks = tasks.filter(t => t.task_state >= 2);
+    document.getElementById('taskStatsCard').innerHTML = `
+        <div class="stat-value">${tasks.length}</div>
+        <div class="stat-label">总任务数</div>
+        <div style="margin-top:8px;color:#64748b;font-size:13px;">
+            ⏳ ${pendingTasks.length} 待执行 | 🔄 ${activeTasks.length} 执行中 | ✅ ${completedTasks.length} 已完成
+        </div>
+    `;
+
+    // Cabinet stats
+    const cabinets = rosRes.success ? (await ApiClient.getCabinetStates()).data || [] : [];
+    document.getElementById('cabinetStatsCard').innerHTML = `
+        <div class="stat-value">${cabinets.length}</div>
+        <div class="stat-label">药柜数量</div>
+        ${cabinets.length === 0 ? '<div style="color:#94a3b8;font-size:12px;margin-top:8px;">暂无药柜数据</div>' : ''}
+    `;
+
+    // Task table
+    const tbody = document.getElementById('taskTableBody');
+    if (tasks.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4"><div class="empty-state"><i class="bi bi-inbox"></i><p>暂无任务数据</p></div></td></tr>';
+    } else {
+        const stateMap = { 0: '待执行', 1: '执行中', 2: '已完成', 3: '失败' };
+        tbody.innerHTML = tasks.map(t => `
+            <tr>
+                <td><code>${t.task_id || '-'}</code></td>
+                <td>${t.car_id != null ? `#${t.car_id}` : '-'}</td>
+                <td><span class="badge badge-state-${t.task_state}">${stateMap[t.task_state] || '未知'}</span></td>
+                <td>${formatTime(t.updated_at)}</td>
+            </tr>
+        `).join('');
+    }
+
+    // Car mini-map
+    renderMiniMap(cars);
+}
+
+function renderMiniMap(cars) {
+    const container = document.getElementById('carMiniMap');
+    const cols = 5, rows = 5;
+    let html = '<div style="display:grid;grid-template-columns:repeat(' + cols + ',52px);gap:2px;">';
+    const carPositions = {};
+    cars.forEach(c => { carPositions[`${Math.round(c.x)},${Math.round(c.y)}`] = c.car_id; });
+    for (let r = 1; r <= rows; r++) {
+        for (let c = 1; c <= cols; c++) {
+            const key = `${c},${r}`;
+            const carId = carPositions[key];
+            const cls = carId != null ? 'shelf has-car' : 'shelf';
+            const label = carId != null ? `🚗${carId}` : `${c},${r}`;
+            html += `<div class="${cls}">${label}</div>`;
+        }
+    }
+    html += '</div>';
+    container.innerHTML = html;
+}
+
+// Auto-refresh every 2s
+refreshAll();
+refreshTimer = setInterval(refreshAll, 2000);
+</script>
+</body>
+</html>
