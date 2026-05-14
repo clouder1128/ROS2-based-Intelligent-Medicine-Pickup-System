@@ -13,10 +13,18 @@
       "Bash(git worktree *)",
       "Bash(venv/bin/python3 -m py_compile agent_with_backend/P1/cli/patient_cli.py)",
       "Bash(venv/bin/python -m py_compile agent_with_backend/P1/cli/patient_cli.py)",
-      "Bash(python3 -m py_compile agent_with_backend/P1/cli/patient_cli.py)"
+      "Bash(python3 -m py_compile agent_with_backend/P1/cli/patient_cli.py)",
+      "Bash(git -C /home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System ls-files --error-unmatch agent_with_backend/pharmacy.db)",
+      "Bash(sqlite3 /home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/agent_with_backend/pharmacy.db 'UPDATE inventory SET quantity = 134 WHERE drug_id = 1;')",
+      "Bash(sqlite3 /home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/agent_with_backend/pharmacy.db 'SELECT name, quantity FROM inventory WHERE drug_id = 1;')",
+      "Bash(sqlite3 /home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/agent_with_backend/pharmacy.db 'DELETE FROM order_log;')",
+      "Bash(sqlite3 /home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/agent_with_backend/pharmacy.db 'SELECT COUNT\\(*\\) FROM order_log;')",
+      "Bash(sqlite3 /home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/agent_with_backend/pharmacy.db 'DELETE FROM approvals;')",
+      "Bash(node -e ' *)"
     ],
     "additionalDirectories": [
-      "/home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/.worktrees/llm-thought-logging"
+      "/home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/.worktrees/llm-thought-logging",
+      "/home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/agent_with_backend/.session_states"
     ]
   }
 }
