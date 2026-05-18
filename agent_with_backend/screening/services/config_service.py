@@ -49,9 +49,28 @@ class ConfigService:
     
     def _load_configs(self):
         """从数据库加载配置"""
-        # TODO: 从数据库加载所有活跃配置
-        # 暂时使用默认配置
-        self._config_cache['default'] = self.DEFAULT_CONFIG.copy()
+        self._config_cache = {}
+        try:
+            from common.utils.database import get_db_connection
+            conn = get_db_connection()
+            try:
+                rows = conn.execute(
+                    "SELECT config_name, config_json FROM screening_config WHERE is_active = 1"
+                ).fetchall()
+                for row in rows:
+                    try:
+                        config = json.loads(row["config_json"])
+                        config["config_name"] = row["config_name"]
+                        self._config_cache[row["config_name"]] = config
+                    except json.JSONDecodeError:
+                        continue
+                if 'default' not in self._config_cache:
+                    self._config_cache['default'] = self.DEFAULT_CONFIG.copy()
+            finally:
+                conn.close()
+        except Exception as e:
+            logger.error(f"从数据库加载配置失败: {e}")
+            self._config_cache['default'] = self.DEFAULT_CONFIG.copy()
     
     def get_config(self, config_name: str = 'default') -> Optional[Dict]:
         """获取筛选配置
@@ -111,15 +130,29 @@ class ConfigService:
         new_config['version'] = 1
         new_config['created_at'] = datetime.utcnow().isoformat()
         
-        # 保存到缓存和数据库
+        # 保存到缓存
         self._config_cache[config_name] = new_config
-        
-        # TODO: 保存到数据库
-        # if self.db_session:
-        #     db_config = ScreeningConfig(**new_config)
-        #     self.db_session.add(db_config)
-        #     self.db_session.commit()
-        
+
+        # 保存到数据库
+        try:
+            from common.utils.database import get_db_connection
+            conn = get_db_connection()
+            try:
+                config_json = {k: v for k, v in new_config.items() if k != 'config_name'}
+                conn.execute(
+                    "INSERT INTO screening_config (config_name, config_json, is_active, version) VALUES (?, ?, ?, ?)",
+                    (config_name, json.dumps(config_json, ensure_ascii=False), new_config.get('is_active', 1), new_config['version'])
+                )
+                conn.commit()
+            except Exception as db_e:
+                logger.error(f"保存配置到数据库失败: {db_e}")
+                return {'success': False, 'error': f'保存配置到数据库失败: {str(db_e)}'}
+            finally:
+                conn.close()
+        except Exception as e:
+            logger.error(f"数据库连接失败: {e}")
+            return {'success': False, 'error': f'数据库连接失败: {str(e)}'}
+
         return {
             'success': True,
             'config': new_config,
@@ -157,9 +190,23 @@ class ConfigService:
         config['version'] = config.get('version', 1) + 1
         config['updated_at'] = datetime.utcnow().isoformat()
         config['updated_by'] = updated_by
-        
-        # TODO: 保存到数据库
-        
+
+        # 保存到数据库
+        try:
+            from common.utils.database import get_db_connection
+            conn = get_db_connection()
+            try:
+                config_json = {k: v for k, v in config.items() if k not in ('config_name',)}
+                conn.execute(
+                    "UPDATE screening_config SET config_json=?, version=?, updated_at=datetime('now') WHERE config_name=?",
+                    (json.dumps(config_json, ensure_ascii=False), config['version'], config_name)
+                )
+                conn.commit()
+            finally:
+                conn.close()
+        except Exception as e:
+            logger.error(f"更新数据库配置失败: {e}")
+
         return {
             'success': True,
             'config': config,
@@ -182,9 +229,20 @@ class ConfigService:
             return {'success': False, 'error': f'配置 {config_name} 不存在'}
         
         del self._config_cache[config_name]
-        
-        # TODO: 从数据库删除
-        
+
+        # 从数据库删除
+        try:
+            from common.utils.database import get_db_connection
+            conn = get_db_connection()
+            try:
+                conn.execute("DELETE FROM screening_config WHERE config_name=?", (config_name,))
+                conn.commit()
+            finally:
+                conn.close()
+        except Exception as e:
+            logger.error(f"从数据库删除配置失败: {e}")
+            return {'success': False, 'error': f'从数据库删除配置失败: {str(e)}'}
+
         return {
             'success': True,
             'message': f'配置 {config_name} 删除成功'
