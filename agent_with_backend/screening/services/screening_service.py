@@ -79,7 +79,10 @@ class ScreeningService:
             
             # 4. 考虑患者信息
             if patient_info:
+                self._current_patient_info = patient_info  # 供排序引擎使用
                 candidates = self._apply_patient_info_filters(candidates, patient_info)
+            else:
+                self._current_patient_info = None
             
             # 5. 排序和计算置信度
             ranked_results = self._rank_results(candidates, symptoms)
@@ -261,32 +264,50 @@ class ScreeningService:
         return result
     
     def _apply_patient_info_filters(self, candidates: List[Dict], patient_info: Dict) -> List[Dict]:
-        """基于患者信息应用筛选
-        
+        """基于患者信息应用筛选（过敏、年龄、孕期）
+
         Args:
             candidates: 候选药品列表
             patient_info: 患者信息
-            
+
         Returns:
             过滤后的药品列表
         """
-        # 可以根据年龄、过敏信息等进行过滤
-        # 这里现在只是返回原列表，实际应该有更复杂的逻辑
-        
+        if not patient_info:
+            return candidates
+
         result = candidates
-        
-        # 示例：老年患者可能需要避免某些药物
-        if patient_info.get('age', 0) > 65:
-            # TODO: 应用老年人用药限制
-            pass
-        
-        # 示例：检查过敏信息
-        if 'allergies' in patient_info:
-            allergies = patient_info['allergies']
-            # TODO: 过滤掉可能导致过敏的药物
-            pass
-        
+
+        # 过敏过滤
+        allergies = patient_info.get('allergies', [])
+        if allergies:
+            result = []
+            for drug in candidates:
+                contraindications = (drug.get('contraindications') or '').lower()
+                has_allergy = any(
+                    allergy.lower() in contraindications for allergy in allergies
+                )
+                if not has_allergy:
+                    result.append(drug)
+
+        # 年龄过滤
+        age = patient_info.get('age')
+        if age is not None and age > 65:
+            result = [
+                d for d in result
+                if not self._is_high_risk_for_elderly(d)
+            ]
+
         return result
+
+    def _is_high_risk_for_elderly(self, drug: Dict) -> bool:
+        """判断药品是否对老年人高风险"""
+        try:
+            restrictions = json.loads(drug.get('age_restrictions') or '{}')
+            max_age = restrictions.get('max_age', 200)
+            return max_age < 65
+        except (json.JSONDecodeError, TypeError):
+            return False
     
     def _rank_results(self, candidates: List[Dict], symptoms: List[str]) -> List[Dict]:
         """使用评分排序引擎对结果排序"""
