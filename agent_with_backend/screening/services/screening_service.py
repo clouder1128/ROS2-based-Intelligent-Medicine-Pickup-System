@@ -289,31 +289,20 @@ class ScreeningService:
         return result
     
     def _rank_results(self, candidates: List[Dict], symptoms: List[str]) -> List[Dict]:
-        """对结果进行排序和置信度计算
-        
-        Args:
-            candidates: 候选药品列表
-            symptoms: 症状列表
-            
-        Returns:
-            排序后的结果，包含置信度分数
-        """
-        for candidate in candidates:
-            # 综合计算置信度分数
-            # 因素：症状匹配度、药物效能、price等
-            confidence_score = (
-                candidate['match_ratio'] * 0.5 +  # 症状匹配度占50%
-                candidate['effectiveness'] * 0.3 +  # 效能占30%
-                (1 - candidate['price'] / 100) * 0.2  # 价格占20%（便宜的药更优先）
-            )
-            candidate['confidence_score'] = confidence_score
-        
-        # 按置信度降序排序
-        return sorted(
-            candidates,
-            key=lambda x: x['confidence_score'],
-            reverse=True
-        )
+        """使用评分排序引擎对结果排序"""
+        from screening.services.ranking_engine import rank_drugs
+
+        patient_info = getattr(self, '_current_patient_info', {})
+        ranked = rank_drugs(candidates, patient_info)
+
+        # 分离排除和有效药品
+        valid = [d for d in ranked if not d.get('excluded')]
+        excluded = [d for d in ranked if d.get('excluded')]
+
+        # 有效药品在前，排除药品在后并标注原因
+        for d in excluded:
+            d['confidence_score'] = 0
+        return valid + excluded
     
     def get_service_status(self) -> Dict:
         """获取筛选服务状态
