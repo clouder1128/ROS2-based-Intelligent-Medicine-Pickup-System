@@ -19,6 +19,9 @@ from .controllers.drug_controller import drug_bp
 from .controllers.order_controller import order_bp
 from .controllers.approval_controller import approval_bp
 
+# Screening blueprint (组件3)
+from screening.routes.screening_routes import create_screening_blueprint
+
 # Utility imports
 from .utils.ros2_bridge import init_ros2, publish_expiry_removal
 from .utils.logger import setup_logger
@@ -81,6 +84,21 @@ app.register_blueprint(health_bp)
 app.register_blueprint(drug_bp)
 app.register_blueprint(order_bp)
 app.register_blueprint(approval_bp)
+
+# Register screening blueprint (组件3)
+try:
+    screening_bp = create_screening_blueprint()
+    app.register_blueprint(screening_bp)
+    print("[Main] Screening blueprint registered")
+except Exception as e:
+    print(f"[Main] Failed to register screening blueprint: {e}")
+
+# Initialize screening database tables
+try:
+    from common.utils.database import init_database as init_screening_db
+    init_screening_db()
+except Exception as e:
+    print(f"[Main] Failed to init screening database: {e}")
 
 # Expiry sweep functionality
 _expiry_sweep_lock = threading.Lock()
