@@ -240,12 +240,17 @@ class MedicalAgent:
 
         # 1. 调用子代理提取症状
         structured_info = extract_symptoms(user_message, self.llm_client)
+        # 防御：P3回退占位符返回的是dict，统一转为对象
+        if isinstance(structured_info, dict):
+            from agent.subagents.models import StructuredSymptoms
+            structured_info = StructuredSymptoms.from_dict(structured_info)
 
         # 1.5 危险信号检测（在症状提取后、药品查询前）
         all_text = (user_message + " " + " ".join(structured_info.symptoms)).lower()
         detected_red_flags = [s for s in RED_FLAG_SYMPTOMS if s in all_text]
         if detected_red_flags:
             flag_text = "、".join(detected_red_flags)
+            logger.warning("Red flags detected: %s (user: %s)", detected_red_flags, user_message[:50])
             msg = (
                 f"⚠️ **紧急情况提示**\n\n"
                 f"您描述的症状中包含「{flag_text}」，这可能属于需要紧急医疗干预的情况。\n\n"
