@@ -271,7 +271,17 @@ def approve_approval(approval_id):
                                     f"订单创建成功，任务ID: {task_id}，数量: {quantity}"
                                 )
                             else:
-                                order_message = f"库存不足，需要{quantity}个，库存不足"
+                                # Query actual stock for better error reporting
+                                cur = conn.execute(
+                                    "SELECT quantity FROM inventory WHERE drug_id = ?",
+                                    (drug_id,),
+                                )
+                                row = cur.fetchone()
+                                current_stock = row["quantity"] if row else 0
+                                order_message = (
+                                    f"库存不足：需要 {quantity} 个，当前库存仅 {current_stock} 个。"
+                                    f"请减少数量或联系药房补货。"
+                                )
                         except Exception as db_error:
                             order_message = f"数据库错误: {str(db_error)}"
                             if conn:
