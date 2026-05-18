@@ -11,14 +11,14 @@ logger = logging.getLogger(__name__)
 
 
 class ScreeningService:
-    \"\"\"药品筛选服务
+    """药品筛选服务
     
     负责：
     - 基于症状的药品筛选
     - 多参数筛选
     - 批量筛选
     - 结果排序和聚合
-    \"\"\"
+    """
     
     # 示例药品数据库 - 实际应该从组件2的API获取
     SAMPLE_DRUGS = [
@@ -65,12 +65,12 @@ class ScreeningService:
     ]
     
     def __init__(self, symptom_service=None, db_session=None):
-        \"\"\"初始化筛选服务
+        """初始化筛选服务
         
         Args:
             symptom_service: 症状服务实例
             db_session: 数据库会话
-        \"\"\"
+        """
         self.symptom_service = symptom_service
         self.db_session = db_session
         self._cache = {}
@@ -83,7 +83,7 @@ class ScreeningService:
         user_id: Optional[int] = None,
         request_id: Optional[str] = None,
     ) -> Dict:
-        \"\"\"执行药品筛选查询
+        """执行药品筛选查询
         
         Args:
             symptoms: 标准化的症状列表
@@ -101,7 +101,7 @@ class ScreeningService:
                 'request_id': str,
                 'execution_time': float,
             }
-        \"\"\"
+        """
         start_time = time.time()
         request_id = request_id or str(uuid.uuid4())
         
@@ -148,7 +148,7 @@ class ScreeningService:
             }
             
         except Exception as e:
-            logger.error(f\"Screening query error: {str(e)}\")
+            logger.error(f"Screening query error: {str(e)}")
             execution_time = time.time() - start_time
             
             return {
@@ -164,7 +164,7 @@ class ScreeningService:
         queries: List[Dict],
         batch_id: Optional[str] = None,
     ) -> Dict:
-        \"\"\"执行批量筛选
+        """执行批量筛选
         
         Args:
             queries: 查询列表，每个查询包含症状、患者信息等
@@ -172,7 +172,7 @@ class ScreeningService:
             
         Returns:
             批处理结果
-        \"\"\"
+        """
         batch_id = batch_id or str(uuid.uuid4())
         results = []
         errors = []
@@ -184,7 +184,7 @@ class ScreeningService:
                     patient_info=query.get('patient_info'),
                     filters=query.get('filters'),
                     user_id=query.get('user_id'),
-                    request_id=f\"{batch_id}-{idx}\"
+                    request_id=f"{batch_id}-{idx}"
                 )
                 results.append(result)
             except Exception as e:
@@ -204,14 +204,14 @@ class ScreeningService:
         }
     
     def _match_drugs_by_symptoms(self, symptoms: List[str]) -> List[Dict]:
-        \"\"\"根据症状匹配药品
+        """根据症状匹配药品
         
         Args:
             symptoms: 症状列表
             
         Returns:
             候选药品列表
-        \"\"\"
+        """
         candidates = []
         
         for drug in self.SAMPLE_DRUGS:
@@ -236,7 +236,7 @@ class ScreeningService:
         return candidates
     
     def _apply_filters(self, candidates: List[Dict], filters: Dict) -> List[Dict]:
-        \"\"\"应用筛选条件
+        """应用筛选条件
         
         Args:
             candidates: 候选药品列表
@@ -244,7 +244,7 @@ class ScreeningService:
             
         Returns:
             过滤后的药品列表
-        \"\"\"
+        """
         result = candidates
         
         # 价格筛选
@@ -274,7 +274,7 @@ class ScreeningService:
         return result
     
     def _apply_patient_info_filters(self, candidates: List[Dict], patient_info: Dict) -> List[Dict]:
-        \"\"\"基于患者信息应用筛选
+        """基于患者信息应用筛选
         
         Args:
             candidates: 候选药品列表
@@ -282,7 +282,7 @@ class ScreeningService:
             
         Returns:
             过滤后的药品列表
-        \"\"\"
+        """
         # 可以根据年龄、过敏信息等进行过滤
         # 这里现在只是返回原列表，实际应该有更复杂的逻辑
         
@@ -302,7 +302,7 @@ class ScreeningService:
         return result
     
     def _rank_results(self, candidates: List[Dict], symptoms: List[str]) -> List[Dict]:
-        \"\"\"对结果进行排序和置信度计算
+        """对结果进行排序和置信度计算
         
         Args:
             candidates: 候选药品列表
@@ -310,7 +310,7 @@ class ScreeningService:
             
         Returns:
             排序后的结果，包含置信度分数
-        \"\"\"
+        """
         for candidate in candidates:
             # 综合计算置信度分数
             # 因素：症状匹配度、药物效能、price等
@@ -329,11 +329,11 @@ class ScreeningService:
         )
     
     def get_service_status(self) -> Dict:
-        \"\"\"获取筛选服务状态
+        """获取筛选服务状态
         
         Returns:
             服务状态信息
-        \"\"\"
+        """
         return {
             'status': 'healthy',
             'service_name': 'ScreeningService',

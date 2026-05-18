@@ -201,22 +201,28 @@ def generate_advice(drug_name: str, dosage: str, duration: str = None, notes: st
 
 
 def submit_approval(patient_name: str, advice: str, patient_age: int = None, patient_weight: float = None, symptoms: str = None, drug_name: str = None, drug_type: str = None, quantity: int = 1, **kwargs) -> str:
-    """提交用药建议给医生审批"""
+    """提交用药建议给医生审批（直接写入数据库，不走 HTTP）"""
     logger.info(f"提交审批: patient={patient_name}, drug={drug_name}, quantity={quantity}")
     try:
-        from common.utils.http_client import PharmacyHTTPClient
+        from database.approval_manager import get_approval_manager
 
-        client = PharmacyHTTPClient()
-        approval_id = client.create_approval(
-            patient_name=patient_name, advice=advice,
-            patient_age=patient_age, patient_weight=patient_weight,
-            symptoms=symptoms, drug_name=drug_name, drug_type=drug_type, quantity=quantity,
+        manager = get_approval_manager()
+        approval_id = manager.create(
+            patient_name=patient_name,
+            advice=advice,
+            patient_age=patient_age,
+            patient_weight=patient_weight,
+            symptoms=symptoms,
+            drug_name=drug_name,
+            drug_type=drug_type,
+            quantity=quantity,
         )
         if approval_id:
             logger.info(f"审批提交成功: {approval_id}")
             return json.dumps({
                 "status": "submitted",
                 "approval_id": approval_id,
+                "drug_name": drug_name,
                 "message": f"用药建议已提交审批，审批ID: {approval_id}",
                 "instructions": "请等待医生审批。批准后，系统将自动配药。",
                 "timestamp": datetime.now().isoformat(),
@@ -224,23 +230,21 @@ def submit_approval(patient_name: str, advice: str, patient_age: int = None, pat
             }, ensure_ascii=False)
         else:
             logger.error("审批提交失败: 未返回审批ID")
-            mock_id = f"AP-{datetime.now().strftime('%Y%m%d')}-MOCK{random.randint(1000, 9999)}"
             return json.dumps({
-                "status": "mock",
-                "approval_id": mock_id,
-                "message": f"审批提交失败，使用模拟审批ID: {mock_id}",
-                "instructions": "此为模拟审批，用于测试。",
+                "status": "error",
+                "approval_id": None,
+                "message": "审批提交失败，未返回审批ID",
+                "instructions": "请稍后重试或联系管理员。",
                 "timestamp": datetime.now().isoformat(),
                 "quantity": quantity,
             }, ensure_ascii=False)
     except Exception as e:
         logger.error(f"审批提交失败: {str(e)}")
-        mock_id = f"AP-{datetime.now().strftime('%Y%m%d')}-MOCK{random.randint(1000, 9999)}"
         return json.dumps({
             "status": "error",
-            "approval_id": mock_id,
+            "approval_id": None,
             "message": f"审批提交过程中出错: {str(e)}",
-            "instructions": "使用模拟审批ID继续测试。",
+            "instructions": "请稍后重试或联系管理员。",
             "timestamp": datetime.now().isoformat(),
             "quantity": quantity,
         }, ensure_ascii=False)

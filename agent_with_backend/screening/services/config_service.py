@@ -9,13 +9,13 @@ logger = logging.getLogger(__name__)
 
 
 class ConfigService:
-    \"\"\"筛选系统配置服务
+    """筛选系统配置服务
     
     负责：
     - 读取和更新筛选配置
     - 配置版本管理
     - 配置验证
-    \"\"\"
+    """
     
     # 默认配置模板
     DEFAULT_CONFIG = {
@@ -38,30 +38,30 @@ class ConfigService:
     }
     
     def __init__(self, db_session=None):
-        \"\"\"初始化配置服务
+        """初始化配置服务
         
         Args:
             db_session: 数据库会话
-        \"\"\"
+        """
         self.db_session = db_session
         self._config_cache = {}
         self._load_configs()
     
     def _load_configs(self):
-        \"\"\"从数据库加载配置\"\"\"
+        """从数据库加载配置"""
         # TODO: 从数据库加载所有活跃配置
         # 暂时使用默认配置
         self._config_cache['default'] = self.DEFAULT_CONFIG.copy()
     
     def get_config(self, config_name: str = 'default') -> Optional[Dict]:
-        \"\"\"获取筛选配置
+        """获取筛选配置
         
         Args:
             config_name: 配置名称，默认为'default'
             
         Returns:
             配置字典，如果不存在返回None
-        \"\"\"
+        """
         if config_name in self._config_cache:
             return self._config_cache[config_name].copy()
         
@@ -69,24 +69,24 @@ class ConfigService:
         return None
     
     def get_active_config(self) -> Dict:
-        \"\"\"获取当前活跃配置
+        """获取当前活跃配置
         
         Returns:
             活跃的筛选配置
-        \"\"\"
+        """
         # TODO: 从数据库查询is_active=True的配置
         return self.get_config('default') or self.DEFAULT_CONFIG
     
     def list_configs(self) -> list:
-        \"\"\"获取所有配置列表
+        """获取所有配置列表
         
         Returns:
             配置列表
-        \"\"\"
+        """
         return list(self._config_cache.values())
     
     def create_config(self, config_data: Dict, created_by: str = 'system') -> Dict:
-        \"\"\"创建新配置
+        """创建新配置
         
         Args:
             config_data: 配置数据
@@ -94,7 +94,7 @@ class ConfigService:
             
         Returns:
             创建的配置或错误信息
-        \"\"\"
+        """
         # 验证必填字段
         if 'config_name' not in config_data:
             return {'success': False, 'error': '配置名称不能为空'}
@@ -132,7 +132,7 @@ class ConfigService:
         updates: Dict,
         updated_by: str = 'system'
     ) -> Dict:
-        \"\"\"更新配置
+        """更新配置
         
         Args:
             config_name: 配置名称
@@ -141,7 +141,7 @@ class ConfigService:
             
         Returns:
             更新结果
-        \"\"\"
+        """
         if config_name not in self._config_cache:
             return {'success': False, 'error': f'配置 {config_name} 不存在'}
         
@@ -167,14 +167,14 @@ class ConfigService:
         }
     
     def delete_config(self, config_name: str) -> Dict:
-        \"\"\"删除配置
+        """删除配置
         
         Args:
             config_name: 配置名称
             
         Returns:
             删除结果
-        \"\"\"
+        """
         if config_name == 'default':
             return {'success': False, 'error': '默认配置不能删除'}
         
@@ -191,14 +191,14 @@ class ConfigService:
         }
     
     def _validate_config_fields(self, config_data: Dict) -> Dict:
-        \"\"\"验证配置字段
+        """验证配置字段
         
         Args:
             config_data: 配置数据
             
         Returns:
             验证结果
-        \"\"\"
+        """
         errors = []
         
         # 验证数值范围

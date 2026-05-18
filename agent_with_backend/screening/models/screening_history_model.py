@@ -46,10 +46,10 @@ class ScreeningHistory(db_base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, comment="更新时间")
     
     def __repr__(self):
-        return f\"<ScreeningHistory(id={self.id}, user_id={self.user_id}, result_count={self.result_count})>\"
+        return f"<ScreeningHistory(id={self.id}, user_id={self.user_id}, result_count={self.result_count})>"
     
     def to_dict(self):
-        \"\"\"转换为字典格式\"\"\"
+        """转换为字典格式"""
         return {
             'id': self.id,
             'user_id': self.user_id,

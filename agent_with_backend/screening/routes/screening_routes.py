@@ -1,7 +1,7 @@
-\"\"\"筛选系统API路由
+"""筛选系统API路由
 
 定义所有智能筛选的REST API端点
-\"\"\"
+"""
 
 from flask import Blueprint, request, jsonify, make_response
 import logging
@@ -19,14 +19,14 @@ logger = logging.getLogger(__name__)
 
 
 def create_screening_blueprint(db_session=None) -> Blueprint:
-    \"\"\"创建筛选系统蓝图
+    """创建筛选系统蓝图
     
     Args:
         db_session: 数据库会话
         
     Returns:
         Flask蓝图
-    \"\"\"
+    """
     bp = Blueprint('screening', __name__, url_prefix='/api/screening')
     
     # 初始化服务
@@ -39,24 +39,24 @@ def create_screening_blueprint(db_session=None) -> Blueprint:
     
     @bp.route('/symptoms/standardize', methods=['POST'])
     def standardize_symptoms():
-        \"\"\"POST /api/screening/symptoms/standardize
+        """POST /api/screening/symptoms/standardize
         
         症状文本标准化处理
         
         请求体:
         {
-            \"symptoms\": [\"头疼\", \"发烧\"],  // 症状文本列表
-            \"language\": \"zh\"  // 语言（可选）
+            "symptoms": ["头疼", "发烧"],  // 症状文本列表
+            "language": "zh"  // 语言（可选）
         }
         
         响应:
         {
-            \"success\": true,
-            \"standardized_symptoms\": [\"头痛\", \"发热\"],
-            \"unmatched\": [],
-            \"confidence\": 1.0
+            "success": true,
+            "standardized_symptoms": ["头痛", "发热"],
+            "unmatched": [],
+            "confidence": 1.0
         }
-        \"\"\"
+        """
         try:
             data = request.get_json()
             symptoms = data.get('symptoms', [])
@@ -75,7 +75,7 @@ def create_screening_blueprint(db_session=None) -> Blueprint:
             }), 200
             
         except Exception as e:
-            logger.error(f\"Error in standardize_symptoms: {str(e)}\")
+            logger.error(f"Error in standardize_symptoms: {str(e)}")
             return jsonify({
                 'success': False,
                 'error': str(e)
@@ -83,7 +83,7 @@ def create_screening_blueprint(db_session=None) -> Blueprint:
     
     @bp.route('/symptoms/synonyms', methods=['GET'])
     def get_symptom_synonyms():
-        \"\"\"GET /api/screening/symptoms/synonyms
+        """GET /api/screening/symptoms/synonyms
         
         获取症状同义词
         
@@ -92,11 +92,11 @@ def create_screening_blueprint(db_session=None) -> Blueprint:
             
         响应:
         {
-            \"success\": true,
-            \"symptom_name\": \"头痛\",
-            \"synonyms\": [\"头疼\", \"头痛\"]
+            "success": true,
+            "symptom_name": "头痛",
+            "synonyms": ["头疼", "头痛"]
         }
-        \"\"\"
+        """
         try:
             symptom_name = request.args.get('symptom_name')
             
@@ -117,7 +117,7 @@ def create_screening_blueprint(db_session=None) -> Blueprint:
             }), 200
             
         except Exception as e:
-            logger.error(f\"Error in get_symptom_synonyms: {str(e)}\")
+            logger.error(f"Error in get_symptom_synonyms: {str(e)}")
             return jsonify({
                 'success': False,
                 'error': str(e)
@@ -127,33 +127,33 @@ def create_screening_blueprint(db_session=None) -> Blueprint:
     
     @bp.route('/query', methods=['POST'])
     def screening_query():
-        \"\"\"POST /api/screening/query
+        """POST /api/screening/query
         
         根据症状筛选药品
         
         请求体:
         {
-            \"symptoms\": [\"头痛\", \"发热\"],  // 标准化的症状列表
-            \"patient_info\": {
-                \"age\": 35,
-                \"gender\": \"M\",
-                \"allergies\": []
+            "symptoms": ["头痛", "发热"],  // 标准化的症状列表
+            "patient_info": {
+                "age": 35,
+                "gender": "M",
+                "allergies": []
             },
-            \"filters\": {
-                \"max_results\": 20,
-                \"price_range\": [0, 50]
+            "filters": {
+                "max_results": 20,
+                "price_range": [0, 50]
             }
         }
         
         响应:
         {
-            \"success\": true,
-            \"results\": [...],
-            \"confidence_scores\": {...},
-            \"total_count\": 5,
-            \"execution_time\": 0.123
+            "success": true,
+            "results": [...],
+            "confidence_scores": {...},
+            "total_count": 5,
+            "execution_time": 0.123
         }
-        \"\"\"
+        """
         try:
             data = request.get_json()
             
@@ -192,7 +192,7 @@ def create_screening_blueprint(db_session=None) -> Blueprint:
             return jsonify(result), status_code
             
         except Exception as e:
-            logger.error(f\"Error in screening_query: {str(e)}\")
+            logger.error(f"Error in screening_query: {str(e)}")
             return jsonify({
                 'success': False,
                 'error': str(e)
@@ -200,28 +200,28 @@ def create_screening_blueprint(db_session=None) -> Blueprint:
     
     @bp.route('/batch', methods=['POST'])
     def batch_screening():
-        \"\"\"POST /api/screening/batch
+        """POST /api/screening/batch
         
         批量症状筛选
         
         请求体:
         {
-            \"queries\": [
-                {\"symptoms\": [...], \"patient_info\": {...}},
+            "queries": [
+                {"symptoms": [...], "patient_info": {...}},
                 ...
             ],
-            \"batch_id\": \"batch123\"  // 可选
+            "batch_id": "batch123"  // 可选
         }
         
         响应:
         {
-            \"batch_id\": \"batch123\",
-            \"total_queries\": 2,
-            \"successful_queries\": 2,
-            \"failed_queries\": 0,
-            \"results\": [...]
+            "batch_id": "batch123",
+            "total_queries": 2,
+            "successful_queries": 2,
+            "failed_queries": 0,
+            "results": [...]
         }
-        \"\"\"
+        """
         try:
             data = request.get_json()
             queries = data.get('queries', [])
@@ -241,7 +241,7 @@ def create_screening_blueprint(db_session=None) -> Blueprint:
             }), 200
             
         except Exception as e:
-            logger.error(f\"Error in batch_screening: {str(e)}\")
+            logger.error(f"Error in batch_screening: {str(e)}")
             return jsonify({
                 'success': False,
                 'error': str(e)
@@ -251,7 +251,7 @@ def create_screening_blueprint(db_session=None) -> Blueprint:
     
     @bp.route('/config', methods=['GET'])
     def get_config():
-        \"\"\"GET /api/screening/config
+        """GET /api/screening/config
         
         获取筛选配置
         
@@ -260,10 +260,10 @@ def create_screening_blueprint(db_session=None) -> Blueprint:
             
         响应:
         {
-            \"success\": true,
-            \"config\": {...}
+            "success": true,
+            "config": {...}
         }
-        \"\"\"
+        """
         try:
             config_name = request.args.get('config_name', 'default')
             config = config_service.get_config(config_name)
@@ -280,7 +280,7 @@ def create_screening_blueprint(db_session=None) -> Blueprint:
             }), 200
             
         except Exception as e:
-            logger.error(f\"Error in get_config: {str(e)}\")
+            logger.error(f"Error in get_config: {str(e)}")
             return jsonify({
                 'success': False,
                 'error': str(e)
@@ -288,24 +288,24 @@ def create_screening_blueprint(db_session=None) -> Blueprint:
     
     @bp.route('/config', methods=['PUT'])
     def update_config():
-        \"\"\"PUT /api/screening/config
+        """PUT /api/screening/config
         
         更新筛选配置
         
         请求体:
         {
-            \"config_name\": \"default\",
-            \"confidence_threshold\": 0.6,
-            \"max_results\": 25
+            "config_name": "default",
+            "confidence_threshold": 0.6,
+            "max_results": 25
         }
         
         响应:
         {
-            \"success\": true,
-            \"config\": {...},
-            \"message\": \"配置更新成功\"
+            "success": true,
+            "config": {...},
+            "message": "配置更新成功"
         }
-        \"\"\"
+        """
         try:
             data = request.get_json()
             config_name = data.get('config_name', 'default')
@@ -319,7 +319,7 @@ def create_screening_blueprint(db_session=None) -> Blueprint:
             return jsonify(result), status_code
             
         except Exception as e:
-            logger.error(f\"Error in update_config: {str(e)}\")
+            logger.error(f"Error in update_config: {str(e)}")
             return jsonify({
                 'success': False,
                 'error': str(e)
@@ -329,7 +329,7 @@ def create_screening_blueprint(db_session=None) -> Blueprint:
     
     @bp.route('/history', methods=['GET'])
     def get_history():
-        \"\"\"GET /api/screening/history
+        """GET /api/screening/history
         
         获取筛选历史
         
@@ -342,12 +342,12 @@ def create_screening_blueprint(db_session=None) -> Blueprint:
             
         响应:
         {
-            \"success\": true,
-            \"total\": 100,
-            \"count\": 20,
-            \"history\": [...]
+            "success": true,
+            "total": 100,
+            "count": 20,
+            "history": [...]
         }
-        \"\"\"
+        """
         try:
             user_id = request.args.get('user_id', type=int)
             
@@ -386,7 +386,7 @@ def create_screening_blueprint(db_session=None) -> Blueprint:
             return jsonify(result), 200
             
         except Exception as e:
-            logger.error(f\"Error in get_history: {str(e)}\")
+            logger.error(f"Error in get_history: {str(e)}")
             return jsonify({
                 'success': False,
                 'error': str(e)
@@ -394,7 +394,7 @@ def create_screening_blueprint(db_session=None) -> Blueprint:
     
     @bp.route('/history/<int:history_id>', methods=['GET'])
     def get_history_detail(history_id: int):
-        \"\"\"GET /api/screening/history/{id}
+        """GET /api/screening/history/{id}
         
         获取历史详情
         
@@ -403,17 +403,17 @@ def create_screening_blueprint(db_session=None) -> Blueprint:
             
         响应:
         {
-            \"success\": true,
-            \"detail\": {...}
+            "success": true,
+            "detail": {...}
         }
-        \"\"\"
+        """
         try:
             result = history_service.get_history_detail(history_id)
             status_code = 200 if result['success'] else 404
             return jsonify(result), status_code
             
         except Exception as e:
-            logger.error(f\"Error in get_history_detail: {str(e)}\")
+            logger.error(f"Error in get_history_detail: {str(e)}")
             return jsonify({
                 'success': False,
                 'error': str(e)
@@ -423,19 +423,19 @@ def create_screening_blueprint(db_session=None) -> Blueprint:
     
     @bp.route('/status', methods=['GET'])
     def get_status():
-        \"\"\"GET /api/screening/status
+        """GET /api/screening/status
         
         获取筛选服务状态
         
         响应:
         {
-            \"success\": true,
-            \"status\": \"healthy\",
-            \"service_name\": \"ScreeningService\",
-            \"version\": \"1.0.0\",
-            \"metrics\": {...}
+            "success": true,
+            "status": "healthy",
+            "service_name": "ScreeningService",
+            "version": "1.0.0",
+            "metrics": {...}
         }
-        \"\"\"
+        """
         try:
             status = screening_service.get_service_status()
             
@@ -445,7 +445,7 @@ def create_screening_blueprint(db_session=None) -> Blueprint:
             }), 200
             
         except Exception as e:
-            logger.error(f\"Error in get_status: {str(e)}\")
+            logger.error(f"Error in get_status: {str(e)}")
             return jsonify({
                 'success': False,
                 'error': str(e)
@@ -471,7 +471,7 @@ def create_screening_blueprint(db_session=None) -> Blueprint:
     
     @bp.errorhandler(500)
     def internal_error(e):
-        logger.error(f\"Internal server error: {str(e)}\")
+        logger.error(f"Internal server error: {str(e)}")
         return jsonify({
             'success': False,
             'error': '服务器内部错误',

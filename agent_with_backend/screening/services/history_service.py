@@ -9,32 +9,32 @@ logger = logging.getLogger(__name__)
 
 
 class HistoryService:
-    \"\"\"筛选历史服务
+    """筛选历史服务
     
     负责：
     - 保存筛选历史
     - 查询历史记录
     - 历史数据分析
-    \"\"\"
+    """
     
     def __init__(self, db_session=None):
-        \"\"\"初始化历史服务
+        """初始化历史服务
         
         Args:
             db_session: 数据库会话
-        \"\"\"
+        """
         self.db_session = db_session
         self._memory_storage = []  # 内存存储，用于开发测试
     
     def save_history(self, history_data: Dict) -> Dict:
-        \"\"\"保存筛选历史记录
+        """保存筛选历史记录
         
         Args:
             history_data: 历史数据
             
         Returns:
             保存结果
-        \"\"\"
+        """
         try:
             # 准备历史记录
             record = {
@@ -71,7 +71,7 @@ class HistoryService:
             }
             
         except Exception as e:
-            logger.error(f\"Error saving history: {str(e)}\")
+            logger.error(f"Error saving history: {str(e)}")
             return {
                 'success': False,
                 'error': str(e),
@@ -84,7 +84,7 @@ class HistoryService:
         offset: int = 0,
         date_range: Optional[tuple] = None,
     ) -> Dict:
-        \"\"\"获取用户的筛选历史
+        """获取用户的筛选历史
         
         Args:
             user_id: 用户ID
@@ -94,7 +94,7 @@ class HistoryService:
             
         Returns:
             历史记录列表
-        \"\"\"
+        """
         # 过滤用户记录
         user_records = [
             r for r in self._memory_storage
@@ -131,14 +131,14 @@ class HistoryService:
         }
     
     def get_history_detail(self, history_id: int) -> Dict:
-        \"\"\"获取单条历史记录详情
+        """获取单条历史记录详情
         
         Args:
             history_id: 历史记录ID
             
         Returns:
             历史记录详情
-        \"\"\"
+        """
         for record in self._memory_storage:
             if record['id'] == history_id:
                 return {
@@ -153,14 +153,14 @@ class HistoryService:
         }
     
     def get_history_by_request_id(self, request_id: str) -> Dict:
-        \"\"\"根据请求ID获取历史记录
+        """根据请求ID获取历史记录
         
         Args:
             request_id: 请求ID
             
         Returns:
             历史记录
-        \"\"\"
+        """
         for record in self._memory_storage:
             if record['request_id'] == request_id:
                 return {
@@ -175,14 +175,14 @@ class HistoryService:
         }
     
     def delete_history(self, history_id: int) -> Dict:
-        \"\"\"删除历史记录
+        """删除历史记录
         
         Args:
             history_id: 历史记录ID
             
         Returns:
             删除结果
-        \"\"\"
+        """
         for idx, record in enumerate(self._memory_storage):
             if record['id'] == history_id:
                 del self._memory_storage[idx]
@@ -197,14 +197,14 @@ class HistoryService:
         }
     
     def clear_old_history(self, days: int = 30) -> Dict:
-        \"\"\"清理旧的历史记录
+        """清理旧的历史记录
         
         Args:
             days: 保留天数，超过此时间的记录将被删除
             
         Returns:
             清理结果
-        \"\"\"
+        """
         cutoff_date = datetime.utcnow() - timedelta(days=days)
         original_count = len(self._memory_storage)
         
@@ -225,14 +225,14 @@ class HistoryService:
         }
     
     def get_user_statistics(self, user_id: int) -> Dict:
-        \"\"\"获取用户的筛选统计信息
+        """获取用户的筛选统计信息
         
         Args:
             user_id: 用户ID
             
         Returns:
             统计信息
-        \"\"\"
+        """
         user_records = [
             r for r in self._memory_storage
             if r['user_id'] == user_id

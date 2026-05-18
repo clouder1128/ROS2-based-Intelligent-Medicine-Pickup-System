@@ -10,6 +10,7 @@ from typing import List, Dict, Any, Optional
 from datetime import datetime
 
 from common.config import Config
+from common.utils.drug_service import query_drugs as service_query_drugs
 from common.utils.http_client import PharmacyHTTPClient
 
 logger = logging.getLogger(__name__)
@@ -25,11 +26,10 @@ def _get_client() -> PharmacyHTTPClient:
 
 
 def query_drugs_by_symptom(symptom: str) -> List[Dict[str, Any]]:
-    """根据症状从后端API查询相关药品（含同义词扩展）"""
+    """根据症状查询相关药品（直接数据库查询，绕过 HTTP 回环）"""
     logger.info(f"Querying drugs by symptom: {symptom}")
     try:
-        client = _get_client()
-        drugs = client.get_drugs(symptom_filter=symptom)
+        drugs = service_query_drugs(symptom=symptom)
         if not drugs:
             logger.info(f"No drugs found for symptom '{symptom}'")
             return []
@@ -45,7 +45,6 @@ def get_drugs_by_symptom_or_name(query: str) -> List[Dict[str, Any]]:
     drugs = query_drugs_by_symptom(query)
     if drugs:
         return drugs
-    # 症状查询无结果，尝试按药品名称查询
     drug = query_drug_by_name(query)
     return [drug] if drug else []
 
@@ -53,8 +52,7 @@ def get_drugs_by_symptom_or_name(query: str) -> List[Dict[str, Any]]:
 def query_drug_by_name(name: str) -> Optional[Dict[str, Any]]:
     logger.info(f"Querying drug by name: {name}")
     try:
-        client = _get_client()
-        drugs = client.get_drugs(name_filter=name)
+        drugs = service_query_drugs(name=name)
         if not drugs:
             logger.warning(f"Drug not found: {name}")
             return None

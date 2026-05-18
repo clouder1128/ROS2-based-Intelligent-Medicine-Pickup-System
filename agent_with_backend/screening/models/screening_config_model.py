@@ -60,10 +60,10 @@ class ScreeningConfig(db_base):
     updated_by = Column(String(100), comment="最后更新人")
     
     def __repr__(self):
-        return f\"<ScreeningConfig(id={self.id}, name={self.config_name}, active={self.is_active})>\"
+        return f"<ScreeningConfig(id={self.id}, name={self.config_name}, active={self.is_active})>"
     
     def to_dict(self):
-        \"\"\"转换为字典格式\"\"\"
+        """转换为字典格式"""
         return {
             'id': self.id,
             'config_name': self.config_name,
