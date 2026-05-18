@@ -11,7 +11,7 @@ from common.config import Config
 
 def get_db_connection() -> sqlite3.Connection:
     """获取数据库连接"""
-    conn = sqlite3.connect(Config.DATABASE_PATH, check_same_thread=False)
+    conn = sqlite3.connect(Config.DATABASE_PATH)
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -198,17 +198,17 @@ def init_database() -> None:
         CREATE TABLE IF NOT EXISTS screening_history (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id INTEGER NOT NULL,
-            input_symptoms TEXT DEFAULT '[]',
+            input_symptoms TEXT NOT NULL,
             patient_info TEXT DEFAULT '{}',
             filters TEXT DEFAULT '{}',
             result_drugs TEXT DEFAULT '[]',
             result_count INTEGER DEFAULT 0,
             confidence_scores TEXT DEFAULT '{}',
-            execution_time REAL,
+            execution_time REAL DEFAULT 0.0,
             status TEXT DEFAULT 'success',
-            error_message TEXT DEFAULT '',
-            request_id TEXT DEFAULT '',
-            created_at TEXT DEFAULT (datetime('now'))
+            request_id TEXT,
+            error_message TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
     _add_index_if_not_exists(conn, "idx_sh_user_id",
@@ -219,12 +219,12 @@ def init_database() -> None:
     # --- screening_config（智能筛选配置） ---
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS screening_config (
-            config_name TEXT PRIMARY KEY,
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            config_name TEXT NOT NULL UNIQUE,
             config_json TEXT NOT NULL DEFAULT '{}',
             is_active INTEGER DEFAULT 1,
-            version INTEGER DEFAULT 1,
-            created_at TEXT DEFAULT (datetime('now')),
-            updated_at TEXT DEFAULT (datetime('now'))
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
 

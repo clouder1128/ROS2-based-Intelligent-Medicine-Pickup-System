@@ -16,7 +16,7 @@ help:
 
 test:
 	@echo "Running unit tests..."
-	@cd P1 && pytest tests/ -v --tb=short
+	@pytest tests/ -v --tb=short
 
 patient:
 	@echo "Starting patient cli..."
@@ -28,12 +28,12 @@ doctor:
 
 backend-start:
 	@echo "Starting backend server..."
-	@cd backend && ../venv/bin/python app.py &
+	@venv/bin/python main.py &
 
 backend-stop:
 	@echo "Stopping backend server..."
-	@if pgrep -f "python3.*app\.py" > /dev/null; then \
-		pkill -f "python3.*app\.py"; \
+	@if pgrep -f "python3.*main\.py" > /dev/null; then \
+		pkill -f "python3.*main\.py"; \
 		echo "Backend stopped"; \
 	else \
 		echo "Backend not running"; \

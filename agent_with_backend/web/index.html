@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>智能药品管理系统 - 登录</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="login-container">
+    <div class="login-card">
+        <div class="login-header">
+            <div class="login-icon"><i class="bi bi-capsule"></i></div>
+            <h2>智能药品管理系统</h2>
+            <p>ROS2-based Intelligent Medicine Pickup System</p>
+        </div>
+        <div class="login-body">
+            <div class="role-tabs" id="roleTabs">
+                <button class="role-tab active" data-role="patient" onclick="selectRole('patient', this)">
+                    <i class="bi bi-person"></i> 患者
+                </button>
+                <button class="role-tab" data-role="doctor" onclick="selectRole('doctor', this)">
+                    <i class="bi bi-heart-pulse"></i> 医生
+                </button>
+                <button class="role-tab" data-role="admin" onclick="selectRole('admin', this)">
+                    <i class="bi bi-shield-lock"></i> 管理员
+                </button>
+            </div>
+
+            <div class="form-group">
+                <label>用户名</label>
+                <select class="form-control" id="username" onchange="onUserChange()">
+                    <option value="">-- 选择账号 --</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>密码</label>
+                <input type="password" class="form-control" id="password" placeholder="输入密码（默认: 123456）" value="123456">
+            </div>
+            <div id="loginHint" class="alert alert-info" style="display:none;"></div>
+            <button class="btn btn-primary btn-lg" style="width:100%;" onclick="handleLogin()">
+                <i class="bi bi-box-arrow-in-right"></i> 登 录
+            </button>
+        </div>
+        <div class="login-footer">
+            演示账号 | 患者: patient1 / 医生: doctor1 / 管理员: admin1 | 密码: 123456
+        </div>
+    </div>
+</div>
+
+<script src="js/api.js"></script>
+<script>
+let selectedRole = 'patient';
+
+const accountsByRole = {
+    patient: ['patient1', 'patient2'],
+    doctor: ['doctor1', 'doctor2'],
+    admin: ['admin1'],
+};
+
+const displayNames = {
+    patient1: '张患者', patient2: '李患者',
+    doctor1: '王医生', doctor2: '赵医生',
+    admin1: '陈管理员',
+};
+
+function selectRole(role, btn) {
+    selectedRole = role;
+    document.querySelectorAll('.role-tab').forEach(t => t.classList.remove('active'));
+    btn.classList.add('active');
+    populateUsers(role);
+    document.getElementById('password').value = '123456';
+    document.getElementById('loginHint').style.display = 'none';
+}
+
+function populateUsers(role) {
+    const select = document.getElementById('username');
+    select.innerHTML = '<option value="">-- 选择账号 --</option>';
+    for (const id of accountsByRole[role]) {
+        select.innerHTML += `<option value="${id}">${displayNames[id] || id} (${id})</option>`;
+    }
+    select.value = accountsByRole[role][0] || '';
+}
+
+function onUserChange() {
+    document.getElementById('loginHint').style.display = 'none';
+}
+
+async function handleLogin() {
+    const username = document.getElementById('username').value;
+    const password = document.getElementById('password').value;
+    if (!username) {
+        document.getElementById('loginHint').style.display = 'block';
+        document.getElementById('loginHint').textContent = '请选择账号';
+        return;
+    }
+    document.getElementById('loginHint').style.display = 'none';
+
+    const result = await ApiClient.login(username, password);
+    if (!result.success) {
+        document.getElementById('loginHint').style.display = 'block';
+        document.getElementById('loginHint').textContent = result.message || '登录失败，请检查用户名和密码';
+        return;
+    }
+    localStorage.setItem('auth_token', result.access_token);
+    localStorage.setItem('refresh_token', result.refresh_token);
+    localStorage.setItem('currentUser', JSON.stringify(result.user_info));
+
+    const pages = { patient: 'patient.html', doctor: 'doctor.html', admin: 'admin.html' };
+    window.location.href = pages[result.user_info.role] || 'index.html';
+}
+
+populateUsers('patient');
+</script>
+</body>
+</html>

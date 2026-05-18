@@ -1,0 +1,522 @@
+openapi: 3.0.0
+info:
+  title: 智能筛选系统 API
+  description: 智能药品管理系统 - 组件3 智能筛选系统的REST API
+  version: 1.0.0
+  contact:
+    name: 组件3开发团队
+    email: component3@pharmacy.local
+  license:
+    name: MIT
+
+servers:
+  - url: http://localhost:5000
+    description: 开发服务器
+  - url: http://api.pharmacy.local:8001
+    description: 生产服务器
+
+tags:
+  - name: 症状处理
+    description: 症状识别和标准化相关接口
+  - name: 筛选查询
+    description: 药品筛选和推荐相关接口
+  - name: 配置管理
+    description: 系统配置管理接口
+  - name: 历史管理
+    description: 查询历史记录管理接口
+  - name: 状态监控
+    description: 服务健康监控接口
+
+paths:
+  /api/screening/symptoms/standardize:
+    post:
+      tags:
+        - 症状处理
+      summary: 标准化症状文本
+      description: 将用户输入的症状文本转换为标准医学术语
+      operationId: standardizeSymptoms
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - symptoms
+              properties:
+                symptoms:
+                  type: array
+                  items:
+                    type: string
+                  minItems: 1
+                  example: ["头疼", "发烧"]
+                language:
+                  type: string
+                  default: "zh"
+                  enum: ["zh"]
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      standardized_symptoms:
+                        type: array
+                        items:
+                          type: string
+                      unmatched:
+                        type: array
+                        items:
+                          type: string
+                      confidence:
+                        type: number
+                        format: float
+                      matched_count:
+                        type: integer
+        '400':
+          description: 请求参数错误
+
+  /api/screening/symptoms/synonyms:
+    get:
+      tags:
+        - 症状处理
+      summary: 获取症状同义词
+      description: 获取指定症状的所有同义词表达
+      operationId: getSynonyms
+      parameters:
+        - name: symptom_name
+          in: query
+          required: true
+          schema:
+            type: string
+          example: "头痛"
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      symptom_name:
+                        type: string
+                      synonyms:
+                        type: array
+                        items:
+                          type: string
+        '400':
+          description: 缺少必填参数
+
+  /api/screening/query:
+    post:
+      tags:
+        - 筛选查询
+      summary: 执行药品筛选查询
+      description: 根据患者症状进行药品智能筛选
+      operationId: screeningQuery
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - symptoms
+              properties:
+                symptoms:
+                  type: array
+                  items:
+                    type: string
+                  minItems: 1
+                  example: ["头痛", "发热"]
+                patient_info:
+                  type: object
+                  properties:
+                    age:
+                      type: integer
+                    gender:
+                      type: string
+                      enum: ["M", "F", "Other"]
+                    allergies:
+                      type: array
+                      items:
+                        type: string
+                filters:
+                  type: object
+                  properties:
+                    max_results:
+                      type: integer
+                      default: 20
+                    price_range:
+                      type: array
+                      items:
+                        type: number
+                      minItems: 2
+                      maxItems: 2
+                user_id:
+                  type: integer
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  results:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/DrugResult'
+                  total_count:
+                    type: integer
+                  execution_time:
+                    type: number
+                    format: float
+        '400':
+          description: 请求参数错误
+        '401':
+          description: 未认证
+
+  /api/screening/batch:
+    post:
+      tags:
+        - 筛选查询
+      summary: 批量筛选查询
+      description: 一次性执行多个筛选查询
+      operationId: batchScreening
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - queries
+              properties:
+                queries:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                      - symptoms
+                    properties:
+                      symptoms:
+                        type: array
+                        items:
+                          type: string
+                      patient_info:
+                        type: object
+                batch_id:
+                  type: string
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      batch_id:
+                        type: string
+                      total_queries:
+                        type: integer
+                      successful_queries:
+                        type: integer
+                      failed_queries:
+                        type: integer
+                      results:
+                        type: array
+                        items:
+                          type: object
+
+  /api/screening/config:
+    get:
+      tags:
+        - 配置管理
+      summary: 获取配置
+      description: 获取筛选系统配置
+      operationId: getConfig
+      parameters:
+        - name: config_name
+          in: query
+          schema:
+            type: string
+            default: "default"
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: '#/components/schemas/ScreeningConfig'
+
+    put:
+      tags:
+        - 配置管理
+      summary: 更新配置
+      description: 更新筛选系统配置（需要管理员权限）
+      operationId: updateConfig
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ScreeningConfig'
+      responses:
+        '200':
+          description: 成功
+        '400':
+          description: 配置值错误
+        '403':
+          description: 无权限
+
+  /api/screening/history:
+    get:
+      tags:
+        - 历史管理
+      summary: 获取筛选历史
+      description: 获取用户的筛选查询历史记录
+      operationId: getHistory
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: user_id
+          in: query
+          required: true
+          schema:
+            type: integer
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: start_date
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: end_date
+          in: query
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  total:
+                    type: integer
+                  count:
+                    type: integer
+                  history:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/HistoryRecord'
+
+  /api/screening/history/{id}:
+    get:
+      tags:
+        - 历史管理
+      summary: 获取历史详情
+      description: 获取单条历史记录的详细信息
+      operationId: getHistoryDetail
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  detail:
+                    $ref: '#/components/schemas/HistoryRecord'
+        '404':
+          description: 历史记录不存在
+
+  /api/screening/status:
+    get:
+      tags:
+        - 状态监控
+      summary: 获取服务状态
+      description: 获取筛选服务的运行状态和性能指标
+      operationId: getStatus
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      status:
+                        type: string
+                        enum: ["healthy", "degraded", "unhealthy", "unavailable"]
+                      service_name:
+                        type: string
+                      version:
+                        type: string
+                      metrics:
+                        type: object
+                        properties:
+                          available_drugs:
+                            type: integer
+                          uptime_seconds:
+                            type: integer
+                          total_queries_today:
+                            type: integer
+                          average_response_time:
+                            type: number
+
+components:
+  schemas:
+    DrugResult:
+      type: object
+      properties:
+        drug_id:
+          type: integer
+        drug_name:
+          type: string
+        category:
+          type: string
+        matched_symptoms:
+          type: array
+          items:
+            type: string
+        match_ratio:
+          type: number
+          format: float
+        effectiveness:
+          type: number
+          format: float
+        price:
+          type: number
+          format: float
+        confidence_score:
+          type: number
+          format: float
+
+    ScreeningConfig:
+      type: object
+      properties:
+        config_name:
+          type: string
+        description:
+          type: string
+        algorithm_type:
+          type: string
+          enum: ["similarity", "ml", "hybrid"]
+        confidence_threshold:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+        max_results:
+          type: integer
+          minimum: 1
+          maximum: 1000
+        enable_synonym_expansion:
+          type: boolean
+        enable_llm_synonym:
+          type: boolean
+        cache_ttl:
+          type: integer
+        cache_strategy:
+          type: string
+          enum: ["lru", "lfu", "fifo"]
+        timeout_seconds:
+          type: number
+          format: float
+
+    HistoryRecord:
+      type: object
+      properties:
+        id:
+          type: integer
+        user_id:
+          type: integer
+        input_symptoms:
+          type: array
+          items:
+            type: string
+        result_count:
+          type: integer
+        result_drugs:
+          type: array
+          items:
+            $ref: '#/components/schemas/DrugResult'
+        confidence_scores:
+          type: object
+        execution_time:
+          type: number
+          format: float
+        status:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+security:
+  - BearerAuth: []

@@ -72,6 +72,9 @@ test/build/
 test/install/
 test/log/
 
+# 数据库文件
+pharmacy.db
+
 # 本地分析文档（不上传到github）
 backend-to-p1-integration-analysis.md
 docs/superpowers/

@@ -222,10 +222,6 @@ window.sendMessage = async function() {
         const cleanReply = result.reply.replace(/\*\*/g, '').replace(/```/g, '').replace(/`/g, '');
         addChatMessage('agent', cleanReply);
 
-        // 更新右侧"药品推荐"面板 — 显示完整推理内容
-        const resultPanel = document.getElementById('drugRecommendations');
-        resultPanel.innerHTML = `<div style="font-size:13px;line-height:1.7;white-space:pre-wrap;">${escapeHtml(cleanReply)}</div>`;
-
         // Extract structured info from LLM reply
         const drugName = result.drug_name || extractValue(result.reply, /推荐[了]?\s*[:：]?\s*([^\n，。,]+)/) || '未知';
         const dosage   = extractValue(result.reply, /剂量[了]?\s*[:：]?\s*([^\n]+)/) || '';
@@ -402,12 +398,6 @@ function startRosTaskPolling(approvalId, taskId, drugName) {
 }
 
 // ===== UI Updates =====
-function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-}
-
 function addChatMessage(type, text) {
     const container = document.getElementById('chatMessages');
     const div = document.createElement('div');

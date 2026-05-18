@@ -49,58 +49,10 @@ class SymptomService:
     
     def _load_symptoms(self):
         """从数据库加载症状定义"""
-        self.STANDARD_SYMPTOMS = {}
-        try:
-            if self.db_session:
-                cursor = self.db_session.execute(
-                    "SELECT standard_term, synonym FROM symptom_synonyms"
-                )
-                rows = cursor.fetchall()
-            else:
-                from common.utils.database import get_db_connection
-                conn = get_db_connection()
-                try:
-                    rows = conn.execute(
-                        "SELECT standard_term, synonym FROM symptom_synonyms"
-                    ).fetchall()
-                finally:
-                    conn.close()
-
-            for row in rows:
-                standard = row["standard_term"]
-                synonym = row["synonym"]
-                if standard not in self.STANDARD_SYMPTOMS:
-                    self.STANDARD_SYMPTOMS[standard] = []
-                self.STANDARD_SYMPTOMS[standard].append(synonym)
-                # 确保标准词本身也在列表中
-                if standard not in self.STANDARD_SYMPTOMS[standard]:
-                    self.STANDARD_SYMPTOMS[standard].append(standard)
-
-            if not self.STANDARD_SYMPTOMS:
-                self._use_fallback_symptoms()
-        except Exception as e:
-            logger.error(f"从数据库加载症状失败: {e}, 使用内置症状库")
-            self._use_fallback_symptoms()
-
-    def _use_fallback_symptoms(self):
-        """数据库加载失败时使用内置症状库"""
-        self.STANDARD_SYMPTOMS = {
-            '头痛': ['头疼', '头痛'],
-            '发热': ['发烧', '发热', '高热'],
-            '咳嗽': ['咳嗽'],
-            '喉咙疼痛': ['喉咙痛', '咽痛'],
-            '腹泻': ['腹泻', '拉肚子'],
-            '便秘': ['便秘', '排便困难'],
-            '恶心': ['恶心', '想吐'],
-            '呕吐': ['呕吐', '吐'],
-            '腹痛': ['腹痛', '肚子疼'],
-            '肌肉酸痛': ['肌肉酸痛', '肌肉疼'],
-            '失眠': ['失眠', '睡眠不好'],
-            '嗜睡': ['嗜睡', '总想睡'],
-            '手脚冰冷': ['手脚冷', '怕冷'],
-            '皮疹': ['皮疹', '长疹子'],
-            '瘙痒': ['瘙痒', '痒'],
-        }
+        # TODO: 从数据库加载症状
+        # 如果提供了db_session，从数据库加载
+        # 否则使用内置的示例症状库
+        pass
     
     def standardize_symptom(self, symptom_text: str) -> Optional[str]:
         """标准化单个症状

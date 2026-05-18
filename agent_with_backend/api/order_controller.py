@@ -1,0 +1,316 @@
+"""
+Order Controller
+Handles drug ordering, pickup, dispensing, and order history
+"""
+
+from flask import Blueprint, jsonify, request
+from common.utils.database import get_db_connection
+from ros_integration.bridge import publish_task
+from common.utils.drug_helpers import validate_and_get_drug, find_drug_id_by_name
+
+from auth.middleware import require_auth, require_permission
+from auth.constants import PERM_READ_ORDER
+
+order_bp = Blueprint("order", __name__, url_prefix="/api")
+
+
+def create_order_for_drug(
+    conn, drug_id: int, quantity: int, drug: dict, publish_now: bool = True
+) -> tuple[int | None, str]:
+    try:
+        cur = conn.execute(
+            "UPDATE inventory SET quantity = quantity - ? WHERE drug_id = ? AND quantity >= ?",
+            (quantity, drug_id, quantity),
+        )
+        if cur.rowcount == 0:
+            return None, f'库存不足: {drug["name"]}，请刷新后重试'
+
+        cur = conn.execute(
+            "INSERT INTO order_log (status, target_drug_id, quantity) VALUES (?, ?, ?)",
+            ("pending", drug_id, quantity),
+        )
+        task_id = cur.lastrowid
+
+        if publish_now:
+            publish_task(task_id, drug, quantity)
+
+        return task_id, ""
+    except Exception as e:
+        return None, f"创建订单失败: {str(e)}"
+
+
+@order_bp.route("/order", methods=["OPTIONS"])
+def order_options():
+    return "", 204
+
+
+@order_bp.route("/order", methods=["POST"])
+@require_auth
+def order():
+    data = request.get_json(silent=True)
+    if not data:
+        return (jsonify({"success": False, "ok": False, "error": "请求体必须为 JSON", "code": "INVALID_JSON"}), 400)
+
+    if not isinstance(data, list):
+        data = [data]
+
+    order_data = []
+    for item in data:
+        drug_id = item.get("id")
+        num = item.get("num")
+        if drug_id is None or num is None:
+            return (jsonify({"success": False, "ok": False, "error": "每项需包含 id 和 num", "code": "MISSING_FIELDS"}), 400)
+        try:
+            order_data.append((int(drug_id), int(num)))
+        except (TypeError, ValueError):
+            return (jsonify({"success": False, "ok": False, "error": "id 和 num 必须为整数", "code": "INVALID_TYPE"}), 400)
+
+    if not order_data:
+        return (jsonify({"success": False, "ok": False, "error": "药单为空", "code": "EMPTY_ORDER"}), 400)
+
+    tasks = []
+    for drug_id, num in order_data:
+        if num <= 0:
+            return (jsonify({"success": False, "ok": False, "error": f"药品 {drug_id} 数量必须大于 0", "code": "INVALID_QUANTITY"}), 400)
+        drug, err = validate_and_get_drug(drug_id, num)
+        if err:
+            return (jsonify({"success": False, "ok": False, "error": err, "code": "DRUG_VALIDATION_FAILED"}), 400)
+        tasks.append((drug_id, num, drug))
+
+    conn = None
+    try:
+        conn = get_db_connection()
+        task_ids = []
+        for drug_id, num, drug in tasks:
+            task_id, err = create_order_for_drug(conn, drug_id, num, drug, publish_now=False)
+            if task_id is None:
+                conn.rollback()
+                return (jsonify({"success": False, "ok": False, "error": err, "code": "INSUFFICIENT_INVENTORY"}), 400)
+            task_ids.append(task_id)
+        conn.commit()
+        for (drug_id, num, drug), task_id in zip(tasks, task_ids):
+            publish_task(task_id, drug, num)
+        return jsonify({"success": True, "ok": True, "task_ids": task_ids, "message": f"已下发 {len(task_ids)} 个取药任务，库存已扣减"})
+    except Exception as e:
+        print(f"Database error in order function: {e}")
+        if conn:
+            conn.rollback()
+        return (jsonify({"success": False, "ok": False, "error": "Database error while processing order", "code": "DB_ERROR"}), 500)
+    finally:
+        if conn:
+            conn.close()
+
+
+@order_bp.route("/pickup", methods=["POST"])
+@require_auth
+def pickup():
+    data = request.get_json(silent=True)
+    if not data:
+        return (jsonify({"success": False, "ok": False, "error": "请求体必须为 JSON", "code": "INVALID_JSON"}), 400)
+
+    drug_id = data.get("id")
+    num = data.get("num")
+    if drug_id is None or num is None:
+        return (jsonify({"success": False, "ok": False, "error": "缺少 id 或 num", "code": "MISSING_FIELDS"}), 400)
+    try:
+        drug_id, num = int(drug_id), int(num)
+    except (TypeError, ValueError):
+        return (jsonify({"success": False, "ok": False, "error": "id 和 num 必须为整数", "code": "INVALID_TYPE"}), 400)
+    if num <= 0:
+        return (jsonify({"success": False, "ok": False, "error": "num 必须大于 0", "code": "INVALID_QUANTITY"}), 400)
+
+    drug, err = validate_and_get_drug(drug_id, num)
+    if err:
+        return (jsonify({"success": False, "ok": False, "error": err, "code": "DRUG_VALIDATION_FAILED"}), 400)
+
+    conn = None
+    try:
+        conn = get_db_connection()
+        task_id, err = create_order_for_drug(conn, drug_id, num, drug, publish_now=True)
+        if task_id is None:
+            conn.rollback()
+            return (jsonify({"success": False, "ok": False, "error": err, "code": "INSUFFICIENT_INVENTORY"}), 400)
+        conn.commit()
+        return jsonify({"success": True, "ok": True, "task_id": task_id, "drug_id": drug_id, "name": drug["name"], "quantity": num, "shelve_id": drug["shelve_id"], "x": drug["shelf_x"], "y": drug["shelf_y"]})
+    except Exception as e:
+        print(f"Database error in pickup function: {e}")
+        if conn:
+            conn.rollback()
+        return (jsonify({"success": False, "ok": False, "error": "Database error while processing pickup", "code": "DB_ERROR"}), 500)
+    finally:
+        if conn:
+            conn.close()
+
+
+@order_bp.route("/dispense", methods=["POST"])
+@require_auth
+def dispense():
+    data = request.get_json(silent=True)
+    if not data:
+        return (jsonify({"success": False, "ok": False, "error": "请求体必须为 JSON", "code": "INVALID_JSON"}), 400)
+
+    prescription_id = data.get("prescription_id")
+    patient_name = data.get("patient_name")
+    drugs = data.get("drugs")
+
+    if not prescription_id or not patient_name or not drugs:
+        return (jsonify({"success": False, "ok": False, "error": "缺少必要参数: prescription_id, patient_name, drugs", "code": "MISSING_REQUIRED_FIELDS"}), 400)
+
+    if not isinstance(drugs, list):
+        return (jsonify({"success": False, "ok": False, "error": "drugs必须为数组", "code": "INVALID_TYPE"}), 400)
+
+    order_items = []
+    for drug_item in drugs:
+        drug_name = drug_item.get("name")
+        quantity = drug_item.get("quantity", 1)
+
+        if not drug_name:
+            return (jsonify({"success": False, "ok": False, "error": "药品缺少name字段", "code": "MISSING_FIELD"}), 400)
+
+        try:
+            quantity = int(quantity)
+            if quantity <= 0:
+                return (jsonify({"success": False, "ok": False, "error": f"药品数量必须大于0: {drug_name}", "code": "INVALID_QUANTITY"}), 400)
+        except (TypeError, ValueError):
+            return (jsonify({"success": False, "ok": False, "error": f"药品数量必须为整数: {drug_name}", "code": "INVALID_TYPE"}), 400)
+
+        drug_id = find_drug_id_by_name(drug_name)
+        if not drug_id:
+            return (jsonify({"success": False, "ok": False, "error": f"未找到药品: {drug_name}", "code": "DRUG_NOT_FOUND"}), 400)
+
+        order_items.append((drug_id, quantity, drug_name))
+
+    conn = None
+    try:
+        conn = get_db_connection()
+        task_ids = []
+        for drug_id, quantity, drug_name in order_items:
+            drug, err = validate_and_get_drug(drug_id, quantity)
+            if err:
+                conn.rollback()
+                return (jsonify({"success": False, "ok": False, "error": err, "code": "DRUG_VALIDATION_FAILED"}), 400)
+
+            task_id, err = create_order_for_drug(conn, drug_id, quantity, drug, publish_now=False)
+            if task_id is None:
+                conn.rollback()
+                return (jsonify({"success": False, "ok": False, "error": f"库存不足: {drug_name}", "code": "INSUFFICIENT_INVENTORY"}), 400)
+            task_ids.append(task_id)
+
+        conn.commit()
+
+        for (drug_id, quantity, drug_name), task_id in zip(order_items, task_ids):
+            drug, _ = validate_and_get_drug(drug_id, quantity)
+            if drug:
+                publish_task(task_id, drug, quantity)
+
+        return jsonify({"success": True, "ok": True, "prescription_id": prescription_id, "patient_name": patient_name, "task_ids": task_ids, "message": f"处方配药成功，创建了{len(task_ids)}个取药任务", "mode": "real_api"})
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        return jsonify({"success": False, "ok": False, "error": f"配药失败: {str(e)}", "code": "DISPENSE_ERROR", "mode": "error"})
+    finally:
+        if conn:
+            conn.close()
+
+
+@order_bp.route("/orders", methods=["GET"])
+@require_permission(PERM_READ_ORDER)
+def list_orders():
+    """
+    GET /api/orders
+    支持分页：?page=1&limit=20
+    不传 page/limit 时向后兼容旧行为（返回最近 50 条）
+    """
+    use_pagination = (
+        request.args.get("page") is not None or request.args.get("limit") is not None
+    )
+
+    if use_pagination:
+        try:
+            page  = max(1, int(request.args.get("page", 1)))
+        except (TypeError, ValueError):
+            page = 1
+        try:
+            limit = min(100, max(1, int(request.args.get("limit", 20))))
+        except (TypeError, ValueError):
+            limit = 20
+        offset = (page - 1) * limit
+    else:
+        page, limit, offset = 1, 50, 0   # 旧行为：最近 50 条
+
+    conn = None
+    try:
+        conn = get_db_connection()
+
+        total = conn.execute("SELECT COUNT(*) FROM order_log").fetchone()[0]
+
+        cur = conn.execute(
+            """
+            SELECT o.task_id, o.status, o.target_drug_id, o.quantity, o.created_at, i.name
+            FROM order_log o
+            LEFT JOIN inventory i ON o.target_drug_id = i.drug_id
+            ORDER BY o.task_id DESC
+            LIMIT ? OFFSET ?
+            """,
+            (limit, offset),
+        )
+        orders = [
+            {
+                "task_id":       r[0],
+                "status":        r[1],
+                "target_drug_id": r[2],
+                "quantity":      r[3],
+                "created_at":    r[4],
+                "drug_name":     r[5],
+            }
+            for r in cur.fetchall()
+        ]
+
+        resp = {"success": True, "ok": True, "data": orders}
+        if use_pagination:
+            pages = (total + limit - 1) // limit if limit else 0
+            resp["pagination"] = {
+                "page":     page,
+                "limit":    limit,
+                "total":    total,
+                "pages":    pages,
+                "has_next": page < pages,
+                "has_prev": page > 1,
+            }
+        return jsonify(resp)
+
+    except Exception as e:
+        print(f"Database error in list_orders: {e}")
+        return (
+            jsonify({"success": False, "ok": False,
+                     "error": "Database error while fetching orders", "code": "DB_ERROR"}),
+            500,
+        )
+    finally:
+        if conn:
+            conn.close()
+
+
+@order_bp.route("/orders/<int:task_id>/complete", methods=["POST"])
+@require_auth
+def complete_order(task_id):
+    """
+    POST /api/orders/<task_id>/complete
+    患者确认取药后，标记订单为已完成
+    """
+    conn = None
+    try:
+        conn = get_db_connection()
+        cur = conn.execute(
+            "UPDATE order_log SET status = ? WHERE task_id = ?",
+            ("completed", task_id),
+        )
+        conn.commit()
+        if cur.rowcount == 0:
+            return jsonify({"success": False, "error": "订单不存在", "code": "NOT_FOUND"}), 404
+        return jsonify({"success": True, "message": "订单已标记为已完成", "task_id": task_id})
+    except Exception as e:
+        return jsonify({"success": False, "error": f"更新订单失败: {str(e)}", "code": "DB_ERROR"}), 500
+    finally:
+        if conn:
+            conn.close()

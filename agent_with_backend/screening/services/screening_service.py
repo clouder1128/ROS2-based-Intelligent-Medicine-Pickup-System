@@ -19,7 +19,51 @@ class ScreeningService:
     - 批量筛选
     - 结果排序和聚合
     """
-
+    
+    # 示例药品数据库 - 实际应该从组件2的API获取
+    SAMPLE_DRUGS = [
+        {
+            'id': 1, 'name': '感冒灵', 'category': '感冒用药',
+            'suitable_symptoms': ['头痛', '发热', '咳嗽'],
+            'effectiveness': 0.85, 'price': 12.5
+        },
+        {
+            'id': 2, 'name': '止咳糖浆', 'category': '咳嗽用药',
+            'suitable_symptoms': ['咳嗽', '喉咙疼痛'],
+            'effectiveness': 0.80, 'price': 8.0
+        },
+        {
+            'id': 3, 'name': '止泻药', 'category': '肠胃用药',
+            'suitable_symptoms': ['腹泻', '腹痛'],
+            'effectiveness': 0.90, 'price': 6.0
+        },
+        {
+            'id': 4, 'name': '退烧药', 'category': '退烧用药',
+            'suitable_symptoms': ['发热', '头痛'],
+            'effectiveness': 0.95, 'price': 3.5
+        },
+        {
+            'id': 5, 'name': '消炎药', 'category': '消炎用药',
+            'suitable_symptoms': ['喉咙疼痛', '皮疹'],
+            'effectiveness': 0.88, 'price': 10.0
+        },
+        {
+            'id': 6, 'name': '助眠药', 'category': '睡眠用药',
+            'suitable_symptoms': ['失眠', '嗜睡'],
+            'effectiveness': 0.82, 'price': 15.0
+        },
+        {
+            'id': 7, 'name': '止痛药', 'category': '止痛用药',
+            'suitable_symptoms': ['头痛', '肌肉酸痛', '腹痛'],
+            'effectiveness': 0.87, 'price': 5.0
+        },
+        {
+            'id': 8, 'name': '抗过敏药', 'category': '过敏用药',
+            'suitable_symptoms': ['皮疹', '瘙痒'],
+            'effectiveness': 0.84, 'price': 9.0
+        },
+    ]
+    
     def __init__(self, symptom_service=None, db_session=None):
         """初始化筛选服务
         
@@ -79,10 +123,7 @@ class ScreeningService:
             
             # 4. 考虑患者信息
             if patient_info:
-                self._current_patient_info = patient_info  # 供排序引擎使用
                 candidates = self._apply_patient_info_filters(candidates, patient_info)
-            else:
-                self._current_patient_info = None
             
             # 5. 排序和计算置信度
             ranked_results = self._rank_results(candidates, symptoms)
@@ -162,67 +203,36 @@ class ScreeningService:
             'timestamp': datetime.utcnow().isoformat(),
         }
     
-    def _load_drugs_from_db(self) -> List[Dict]:
-        """从数据库加载所有可用药品（含适应症）"""
-        try:
-            from common.utils.database import get_db_connection
-            conn = get_db_connection()
-            try:
-                cursor = conn.execute(
-                    "SELECT * FROM inventory WHERE is_deleted = 0 AND quantity > 0"
-                )
-                drugs = [dict(row) for row in cursor.fetchall()]
-
-                drug_ids = [d["drug_id"] for d in drugs]
-                if drug_ids:
-                    placeholders = ",".join("?" for _ in drug_ids)
-                    cursor = conn.execute(
-                        f"SELECT drug_id, indication FROM drug_indications WHERE drug_id IN ({placeholders})",
-                        drug_ids,
-                    )
-                    imap = {}
-                    for row in cursor.fetchall():
-                        imap.setdefault(row["drug_id"], []).append(row["indication"])
-                    for d in drugs:
-                        d["suitable_symptoms"] = imap.get(d["drug_id"], [])
-                else:
-                    for d in drugs:
-                        d["suitable_symptoms"] = []
-
-                return drugs
-            finally:
-                conn.close()
-        except Exception as e:
-            logger.error(f"从数据库加载药品失败: {e}")
-            return []
-
     def _match_drugs_by_symptoms(self, symptoms: List[str]) -> List[Dict]:
-        """根据症状从数据库匹配药品"""
-        all_drugs = self._load_drugs_from_db()
-        if not all_drugs:
-            return []
-
+        """根据症状匹配药品
+        
+        Args:
+            symptoms: 症状列表
+            
+        Returns:
+            候选药品列表
+        """
         candidates = []
-        for drug in all_drugs:
-            suitable = drug.get("suitable_symptoms", [])
-            matched_symptoms = [s for s in symptoms if s in suitable]
-
+        
+        for drug in self.SAMPLE_DRUGS:
+            # 计算症状匹配度
+            matched_symptoms = [
+                s for s in symptoms
+                if s in drug['suitable_symptoms']
+            ]
+            
             if matched_symptoms:
-                match_ratio = len(matched_symptoms) / len(symptoms) if symptoms else 0
+                match_ratio = len(matched_symptoms) / len(symptoms)
                 candidates.append({
-                    'drug_id': drug['drug_id'],
+                    'drug_id': drug['id'],
                     'drug_name': drug['name'],
-                    'category': drug.get('category', ''),
+                    'category': drug['category'],
                     'matched_symptoms': matched_symptoms,
                     'match_ratio': match_ratio,
-                    'effectiveness': 0.8,  # 基线值，后续可由排序引擎调整
-                    'price': drug.get('retail_price', 0),
-                    'quantity': drug.get('quantity', 0),
-                    'contraindications': drug.get('contraindications', ''),
-                    'pregnancy_category': drug.get('pregnancy_category', ''),
-                    'age_restrictions': drug.get('age_restrictions', '{}'),
+                    'effectiveness': drug['effectiveness'],
+                    'price': drug['price'],
                 })
-
+        
         return candidates
     
     def _apply_filters(self, candidates: List[Dict], filters: Dict) -> List[Dict]:
@@ -264,66 +274,59 @@ class ScreeningService:
         return result
     
     def _apply_patient_info_filters(self, candidates: List[Dict], patient_info: Dict) -> List[Dict]:
-        """基于患者信息应用筛选（过敏、年龄、孕期）
-
+        """基于患者信息应用筛选
+        
         Args:
             candidates: 候选药品列表
             patient_info: 患者信息
-
+            
         Returns:
             过滤后的药品列表
         """
-        if not patient_info:
-            return candidates
-
+        # 可以根据年龄、过敏信息等进行过滤
+        # 这里现在只是返回原列表，实际应该有更复杂的逻辑
+        
         result = candidates
-
-        # 过敏过滤
-        allergies = patient_info.get('allergies', [])
-        if allergies:
-            result = []
-            for drug in candidates:
-                contraindications = (drug.get('contraindications') or '').lower()
-                has_allergy = any(
-                    allergy.lower() in contraindications for allergy in allergies
-                )
-                if not has_allergy:
-                    result.append(drug)
-
-        # 年龄过滤
-        age = patient_info.get('age')
-        if age is not None and age > 65:
-            result = [
-                d for d in result
-                if not self._is_high_risk_for_elderly(d)
-            ]
-
+        
+        # 示例：老年患者可能需要避免某些药物
+        if patient_info.get('age', 0) > 65:
+            # TODO: 应用老年人用药限制
+            pass
+        
+        # 示例：检查过敏信息
+        if 'allergies' in patient_info:
+            allergies = patient_info['allergies']
+            # TODO: 过滤掉可能导致过敏的药物
+            pass
+        
         return result
-
-    def _is_high_risk_for_elderly(self, drug: Dict) -> bool:
-        """判断药品是否对老年人高风险"""
-        try:
-            restrictions = json.loads(drug.get('age_restrictions') or '{}')
-            max_age = restrictions.get('max_age', 200)
-            return max_age < 65
-        except (json.JSONDecodeError, TypeError):
-            return False
     
     def _rank_results(self, candidates: List[Dict], symptoms: List[str]) -> List[Dict]:
-        """使用评分排序引擎对结果排序"""
-        from screening.services.ranking_engine import rank_drugs
-
-        patient_info = getattr(self, '_current_patient_info', {})
-        ranked = rank_drugs(candidates, patient_info)
-
-        # 分离排除和有效药品
-        valid = [d for d in ranked if not d.get('excluded')]
-        excluded = [d for d in ranked if d.get('excluded')]
-
-        # 有效药品在前，排除药品在后并标注原因
-        for d in excluded:
-            d['confidence_score'] = 0
-        return valid + excluded
+        """对结果进行排序和置信度计算
+        
+        Args:
+            candidates: 候选药品列表
+            symptoms: 症状列表
+            
+        Returns:
+            排序后的结果，包含置信度分数
+        """
+        for candidate in candidates:
+            # 综合计算置信度分数
+            # 因素：症状匹配度、药物效能、price等
+            confidence_score = (
+                candidate['match_ratio'] * 0.5 +  # 症状匹配度占50%
+                candidate['effectiveness'] * 0.3 +  # 效能占30%
+                (1 - candidate['price'] / 100) * 0.2  # 价格占20%（便宜的药更优先）
+            )
+            candidate['confidence_score'] = confidence_score
+        
+        # 按置信度降序排序
+        return sorted(
+            candidates,
+            key=lambda x: x['confidence_score'],
+            reverse=True
+        )
     
     def get_service_status(self) -> Dict:
         """获取筛选服务状态
@@ -337,7 +340,7 @@ class ScreeningService:
             'version': '1.0.0',
             'timestamp': datetime.utcnow().isoformat(),
             'metrics': {
-                'available_drugs': len(self._load_drugs_from_db()),
+                'available_drugs': len(self.SAMPLE_DRUGS),
                 'cache_size': len(self._cache),
             }
         }
