@@ -52,8 +52,32 @@ except ImportError as e:
     extract_symptoms = _placeholder_extract_symptoms
 
 
+# 危险信号（red flag）—— 出现任一症状立即建议就医，不执行药品推荐流程
+RED_FLAG_SYMPTOMS = [
+    "呼吸困难", "呼吸急促", "喘不上气",
+    "高热不退", "高烧不退", "体温超过39",
+    "胸痛", "胸闷",
+    "意识模糊", "昏迷", "晕厥",
+    "大出血", "吐血", "便血",
+    "剧烈头痛", "抽搐",
+    "过敏反应", "过敏性休克",
+]
+
+
 # ==================== 系统提示词 ====================
 SYSTEM_PROMPT = """你是一个医疗用药助手。请按以下流程工作：
+
+[危险信号检查]
+- 如果患者的症状包含呼吸困难、高热（≥39°C）、胸痛、意识模糊、大出血等急重症表现，请立即建议就医并终止流程
+- 不要对急重症患者推荐任何药品
+
+[信息收集——必填项]
+在进入药品推荐之前，必须先收集以下信息。如果信息不全，向患者追问：
+- age（年龄）— 必填，影响剂量计算和药品选择
+- allergies（过敏史）— 必填，影响药品安全
+- 症状持续时间 — 影响病情判断
+追问时一次只问 1-2 个问题，避免让患者一次性提供大量信息。
+
 
 [药品查询]
 - 注意：如果系统消息中已经提供了匹配的药品列表，则跳过 query_drug 直接进入筛选步骤
@@ -67,18 +91,47 @@ SYSTEM_PROMPT = """你是一个医疗用药助手。请按以下流程工作：
 - 对每种候选药品调用 check_allergy 检查过敏风险
 - 对通过过敏检查的药品调用 calc_dosage 计算剂量
 - 可根据需要选择多种药品联用（重复过敏检查和剂量计算）
+- 输出推荐方案时，附上简要的推理依据：为什么选这些药、排除了哪些药
 
 [提交审批]
 - 调用 generate_advice 生成用药建议
 - 调用 submit_approval 将建议提交给医生审批
 
 重要规则：
+- 每次只调用一个工具，等待结果后再继续
 - 如果系统中已经提供了药品列表，不要重复调用 query_drug
 - 如果药品列表为空，不要重复调用 query_drug 超过 3 次
 - 3 次失败后直接建议就医并结束
-- 回复保持简洁，不要多余的叙述，不要输出思考过程
+- 回复保持简洁，不要多余的叙述
 - 已提供的患者信息不要重复询问
-- 每次只调用一个工具，等待结果后再继续
+- 未收集到必填信息时，追问，不推荐药品
+- 每次推荐药品时，必须附带免责声明：「本推荐由 AI 生成，仅供参考，请以医生诊断为准。」
+
+在给出最终推荐方案时，请包含以下格式的结构化分析报告：
+
+━━━━━━━━━━━━━━━━━━━━━━
+📋 分析报告
+
+1️⃣ 症状分析
+   · 患者信息：[年龄/过敏史/性别]
+   · 主诉：[简要总结患者主诉]
+   · 初步判断：[可能的疾病方向]
+
+2️⃣ 药品匹配逻辑
+   · [药品名称]：[选用理由，如对症、药效温和]
+   · [排除的药品]：[排除原因，如无需抗生素]
+
+3️⃣ 安全审查
+   · 过敏史检查：[结果]
+   · 禁忌症检查：[结果]
+   · 剂量建议：[药品] [用法用量]
+
+4️⃣ 最终推荐方案
+   → [药品名称] [用法用量]
+   → [辅助建议]
+
+⚠️ 本推荐由 AI 生成，仅供参考，请以医生诊断为准。
+━━━━━━━━━━━━━━━━━━━━━━
 """
 
 
@@ -228,6 +281,29 @@ class MedicalAgent:
 
         # 1. 调用子代理提取症状
         structured_info = extract_symptoms(user_message, self.llm_client)
+        # 防御：P3回退占位符返回的是dict，统一转为对象
+        if isinstance(structured_info, dict):
+            from agent.subagents.models import StructuredSymptoms
+            structured_info = StructuredSymptoms.from_dict(structured_info)
+
+        # 1.5 危险信号检测（在症状提取后、药品查询前）
+        all_text = (user_message + " " + " ".join(structured_info.symptoms)).lower()
+        detected_red_flags = [s for s in RED_FLAG_SYMPTOMS if s in all_text]
+        if detected_red_flags:
+            flag_text = "、".join(detected_red_flags)
+            logger.warning("Red flags detected: %s (user: %s)", detected_red_flags, user_message[:50])
+            msg = (
+                f"⚠️ **紧急情况提示**\n\n"
+                f"您描述的症状中包含「{flag_text}」，这可能属于需要紧急医疗干预的情况。\n\n"
+                f"**建议您立即就医，由医生进行专业诊断和治疗。**\n\n"
+                f"请勿自行用药，以免延误病情。"
+            )
+            self.message_manager.add_message("assistant", msg)
+            self.workflow_completed = True
+            steps.append({"step": 0, "type": "assistant", "content": msg, "duration_ms": 0})
+            self.last_steps = steps
+            workflow.mark_step_completed(WorkflowStep.DRUG_QUERY_FAILED, {"reason": "red_flag_detected", "flags": detected_red_flags})
+            return msg, steps
 
         # 2. 后端批量查询药品（带重试）
         symptoms = structured_info.symptoms or [user_message]

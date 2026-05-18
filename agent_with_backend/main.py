@@ -34,6 +34,12 @@ from api.category_controller import category_bp
 from screening.routes import create_screening_blueprint
 from api.ros_state_controller import ros_state_bp
 
+# Auth blueprint (组件4)
+from auth.blueprint import auth_bp
+
+# Screening blueprint (组件3)
+from screening.routes.screening_routes import create_screening_blueprint
+
 # Utility imports
 from ros_integration.bridge import init_ros2, publish_expiry_removal
 from common.utils.logger import setup_logger
@@ -104,6 +110,13 @@ try:
     ensure_auth_schema()
 except Exception as e:
     print(f"[Main] Auth schema initialization warning: {e}")
+
+# Initialize screening database tables
+try:
+    from common.utils.database import init_database as init_screening_db
+    init_screening_db()
+except Exception as e:
+    print(f"[Main] Failed to init screening database: {e}")
 
 # Expiry sweep functionality
 _expiry_sweep_lock = threading.Lock()

@@ -8,6 +8,7 @@ import logging
 from typing import Tuple
 from datetime import datetime
 
+from auth.middleware import require_auth
 from screening.services import (
     SymptomService,
     ScreeningService,
@@ -38,6 +39,7 @@ def create_screening_blueprint(db_session=None) -> Blueprint:
     # ==================== 症状处理接口 ====================
     
     @bp.route('/symptoms/standardize', methods=['POST'])
+    @require_auth
     def standardize_symptoms():
         """POST /api/screening/symptoms/standardize
         
@@ -126,6 +128,7 @@ def create_screening_blueprint(db_session=None) -> Blueprint:
     # ==================== 筛选查询接口 ====================
     
     @bp.route('/query', methods=['POST'])
+    @require_auth
     def screening_query():
         """POST /api/screening/query
         
@@ -199,6 +202,7 @@ def create_screening_blueprint(db_session=None) -> Blueprint:
             }), 500
     
     @bp.route('/batch', methods=['POST'])
+    @require_auth
     def batch_screening():
         """POST /api/screening/batch
         
@@ -287,6 +291,7 @@ def create_screening_blueprint(db_session=None) -> Blueprint:
             }), 500
     
     @bp.route('/config', methods=['PUT'])
+    @require_auth
     def update_config():
         """PUT /api/screening/config
         
@@ -328,6 +333,7 @@ def create_screening_blueprint(db_session=None) -> Blueprint:
     # ==================== 历史管理接口 ====================
     
     @bp.route('/history', methods=['GET'])
+    @require_auth
     def get_history():
         """GET /api/screening/history
         
@@ -393,6 +399,7 @@ def create_screening_blueprint(db_session=None) -> Blueprint:
             }), 500
     
     @bp.route('/history/<int:history_id>', methods=['GET'])
+    @require_auth
     def get_history_detail(history_id: int):
         """GET /api/screening/history/{id}
         
