@@ -5,6 +5,7 @@
 
 import os
 import sqlite3
+import sys
 from datetime import date
 from config.settings import Config
 
@@ -90,6 +91,15 @@ def init_db():
         init_screening_db()
     except Exception as e:
         print(f"筛选系统表初始化略过: {e}")
+
+    # 写入筛选演示种子数据
+    try:
+        _seed_script = os.path.join(_project_root, "scripts", "seed_screening_data.py")
+        if os.path.exists(_seed_script):
+            import subprocess
+            subprocess.run([sys.executable, _seed_script], cwd=_project_root, check=True)
+    except Exception as e:
+        print(f"种子数据写入略过: {e}")
 
 
 if __name__ == "__main__":
