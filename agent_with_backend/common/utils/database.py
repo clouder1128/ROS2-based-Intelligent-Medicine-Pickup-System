@@ -11,7 +11,7 @@ from common.config import Config
 
 def get_db_connection() -> sqlite3.Connection:
     """获取数据库连接"""
-    conn = sqlite3.connect(Config.DATABASE_PATH)
+    conn = sqlite3.connect(Config.DATABASE_PATH, check_same_thread=False)
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -215,6 +215,18 @@ def init_database() -> None:
         "CREATE INDEX idx_sh_user_id ON screening_history(user_id)")
     _add_index_if_not_exists(conn, "idx_sh_created_at",
         "CREATE INDEX idx_sh_created_at ON screening_history(created_at)")
+
+    # --- screening_config（智能筛选配置） ---
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS screening_config (
+            config_name TEXT PRIMARY KEY,
+            config_json TEXT NOT NULL DEFAULT '{}',
+            is_active INTEGER DEFAULT 1,
+            version INTEGER DEFAULT 1,
+            created_at TEXT DEFAULT (datetime('now')),
+            updated_at TEXT DEFAULT (datetime('now'))
+        )
+    """)
 
     conn.commit()
     conn.close()
