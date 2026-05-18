@@ -19,6 +19,9 @@ from .controllers.drug_controller import drug_bp
 from .controllers.order_controller import order_bp
 from .controllers.approval_controller import approval_bp
 
+# Auth blueprint (组件4)
+from auth.blueprint import auth_bp
+
 # Screening blueprint (组件3)
 from screening.routes.screening_routes import create_screening_blueprint
 
@@ -84,6 +87,7 @@ app.register_blueprint(health_bp)
 app.register_blueprint(drug_bp)
 app.register_blueprint(order_bp)
 app.register_blueprint(approval_bp)
+app.register_blueprint(auth_bp)
 
 # Register screening blueprint (组件3)
 try:

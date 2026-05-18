@@ -79,6 +79,18 @@ def init_db():
     print("数据库初始化成功")
     print(f"过期清扫基准日（从 init_db 起算）: {sweep_anchor}")
 
+    # 初始化筛选系统表（组件3）
+    try:
+        # 将 project root 加入 sys.path 以导入 common 模块
+        _script_dir = os.path.dirname(os.path.abspath(__file__))
+        _project_root = os.path.abspath(os.path.join(_script_dir, ".."))
+        if _project_root not in os.sys.path:
+            os.sys.path.insert(0, _project_root)
+        from common.utils.database import init_database as init_screening_db
+        init_screening_db()
+    except Exception as e:
+        print(f"筛选系统表初始化略过: {e}")
+
 
 if __name__ == "__main__":
     init_db()
