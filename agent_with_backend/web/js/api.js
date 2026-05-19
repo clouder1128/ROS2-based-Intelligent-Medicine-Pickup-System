@@ -42,6 +42,63 @@ const ApiClient = {
     put(path, body) { return this.request('PUT', path, body); },
     delete(path) { return this.request('DELETE', path); },
 
+    /**
+     * 构建 query string（忽略 null/undefined/空字符串）
+     */
+    _buildQuery(params) {
+        const sp = new URLSearchParams();
+        Object.entries(params || {}).forEach(([key, val]) => {
+            if (val !== null && val !== undefined && val !== '') {
+                sp.set(key, String(val));
+            }
+        });
+        const qs = sp.toString();
+        return qs ? `?${qs}` : '';
+    },
+
+    /**
+     * 非 JSON 响应（如 CSV 导出）
+     */
+    async requestRaw(method, path, { accept, body } = {}) {
+        const headers = {};
+        const token = localStorage.getItem('auth_token');
+        if (token) {
+            headers['Authorization'] = `Bearer ${token}`;
+        }
+        if (accept) {
+            headers['Accept'] = accept;
+        }
+        if (body !== undefined && body !== null) {
+            headers['Content-Type'] = 'application/json';
+        }
+        try {
+            const options = { method, headers };
+            if (body !== undefined && body !== null && method !== 'GET') {
+                options.body = JSON.stringify(body);
+            }
+            const response = await fetch(`${API_BASE}${path}`, options);
+            const contentType = response.headers.get('content-type') || '';
+            if (!response.ok) {
+                let errMsg = `HTTP ${response.status}`;
+                try {
+                    if (contentType.includes('application/json')) {
+                        const errData = await response.json();
+                        errMsg = errData.error?.message || errData.message || errMsg;
+                    }
+                } catch (_) { /* ignore */ }
+                return { success: false, error: errMsg, code: 'HTTP_ERROR' };
+            }
+            if (contentType.includes('application/json')) {
+                return await response.json();
+            }
+            const text = await response.text();
+            return { success: true, data: text, contentType };
+        } catch (err) {
+            console.error(`API raw ${method} ${path} error:`, err);
+            return { success: false, error: `网络错误: ${err.message}`, code: 'NETWORK_ERROR' };
+        }
+    },
+
     /* ===== 认证 ===== */
     login(username, password) { return this.post('/auth/login', { username, password }); },
     logout(token) { return this.post('/auth/logout', { refresh_token: token }); },
@@ -53,22 +110,152 @@ const ApiClient = {
     health() { return this.get('/health'); },
 
     /* ===== 药品管理 ===== */
-    getDrugs(nameFilter, categoryFilter, indicationFilter) {
-        const params = [];
-        if (nameFilter) params.push(`name=${encodeURIComponent(nameFilter)}`);
-        if (categoryFilter) params.push(`category=${encodeURIComponent(categoryFilter)}`);
-        if (indicationFilter) params.push(`indication=${encodeURIComponent(indicationFilter)}`);
-        const query = params.length ? `?${params.join('&')}` : '';
+    /**
+     * 药品列表 GET /api/drugs
+     * @param {string} [nameFilter] - name 模糊筛选
+     * @param {string} [categoryFilter] - category 精确筛选
+     * @param {string} [symptomFilter] - symptom 适应症筛选（第三参兼容旧名 indicationFilter）
+     * @param {object} [extra] - page, limit, sort_by, order
+     */
+    getDrugs(nameFilter, categoryFilter, symptomFilter, extra = {}) {
+        if (typeof nameFilter === 'object' && nameFilter !== null) {
+            extra = nameFilter;
+            nameFilter = extra.name || extra.nameFilter;
+            categoryFilter = extra.category || extra.categoryFilter;
+            symptomFilter = extra.symptom || extra.symptomFilter || extra.indicationFilter;
+        }
+        const query = this._buildQuery({
+            name: nameFilter,
+            category: categoryFilter,
+            symptom: symptomFilter,
+            page: extra.page,
+            limit: extra.limit,
+            sort_by: extra.sort_by,
+            order: extra.order,
+        });
         return this.get(`/drugs${query}`);
     },
+
     getDrug(id) { return this.get(`/drugs/${id}`); },
     createDrug(drug) { return this.post('/drugs', drug); },
     updateDrug(id, data) { return this.put(`/drugs/${id}`, data); },
     deleteDrug(id) { return this.delete(`/drugs/${id}`); },
+
+    /**
+     * 综合搜索 GET /api/drugs/search
+     * @param {string} keyword - keyword 或 q
+     * @param {object} [extra] - category, page, limit, sort_by, order
+     */
+    searchDrugs(keyword, extra = {}) {
+        const query = this._buildQuery({
+            keyword: keyword || extra.keyword || extra.q,
+            q: keyword || extra.q || extra.keyword,
+            category: extra.category,
+            page: extra.page,
+            limit: extra.limit,
+            sort_by: extra.sort_by,
+            order: extra.order,
+        });
+        return this.get(`/drugs/search${query}`);
+    },
+
+    /**
+     * 拣货/库区视图 GET /api/inventory
+     */
+    getInventory(extra = {}) {
+        const query = this._buildQuery({
+            name: extra.name || extra.nameFilter,
+            category: extra.category || extra.categoryFilter,
+            symptom: extra.symptom || extra.symptomFilter,
+            threshold: extra.threshold,
+            expiring_window: extra.expiring_window,
+            page: extra.page,
+            limit: extra.limit,
+            sort_by: extra.sort_by,
+            order: extra.order,
+        });
+        return this.get(`/inventory${query}`);
+    },
+
     adjustInventory(id, data) { return this.post(`/drugs/${id}/adjust`, data); },
     batchImport(drugs) { return this.post('/drugs/batch-import', drugs); },
+
     drugStats() { return this.get('/drugs/stats'); },
-    drugCategories() { return this.get('/drugs/stats'); },
+
+    getLowStockDrugs(threshold, extra = {}) {
+        const query = this._buildQuery({
+            threshold: threshold ?? extra.threshold,
+            page: extra.page,
+            limit: extra.limit,
+        });
+        return this.get(`/drugs/low-stock${query}`);
+    },
+
+    getExpiringSoonDrugs(days, extra = {}) {
+        const query = this._buildQuery({
+            days: days ?? extra.days,
+            page: extra.page,
+            limit: extra.limit,
+        });
+        return this.get(`/drugs/expiring-soon${query}`);
+    },
+
+    /** GET /api/categories */
+    getCategories(tree = false, extra = {}) {
+        if (typeof tree === 'object' && tree !== null) {
+            extra = tree;
+            tree = !!extra.tree;
+        }
+        const query = this._buildQuery({
+            tree: tree ? 1 : null,
+            page: extra.page,
+            limit: extra.limit,
+        });
+        return this.get(`/categories${query}`);
+    },
+
+    createCategory(data) { return this.post('/categories', data); },
+
+    /** @deprecated 请用 getCategories() */
+    drugCategories() { return this.getCategories(); },
+
+    /**
+     * 导出药品 GET /api/drugs/export
+     * @param {'json'|'csv'} format
+     */
+    exportDrugs(format = 'json') {
+        if (format === 'csv') {
+            return this.requestRaw('GET', '/drugs/export?format=csv', { accept: 'text/csv' });
+        }
+        return this.get('/drugs/export?format=json');
+    },
+
+    /**
+     * 触发浏览器下载导出文件
+     */
+    async downloadDrugExport(format = 'csv') {
+        const result = await this.exportDrugs(format);
+        if (!result.success) {
+            return result;
+        }
+        let blob;
+        let filename;
+        if (format === 'csv') {
+            blob = new Blob(['\ufeff' + (result.data || '')], { type: 'text/csv;charset=utf-8' });
+            filename = 'drugs_export.csv';
+        } else {
+            const json = JSON.stringify(result.data ?? result, null, 2);
+            blob = new Blob([json], { type: 'application/json;charset=utf-8' });
+            filename = 'drugs_export.json';
+        }
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        a.click();
+        URL.revokeObjectURL(url);
+        return { success: true, filename };
+    },
 
     /* ===== 订单管理 ===== */
     getOrders() { return this.get('/orders'); },
