@@ -22,7 +22,12 @@ from auth.constants import (
 )
 from auth.middleware import require_permission
 from common.utils.database import get_db_connection
-from common.utils.drug_service import query_drugs, get_drug as load_drug_detail
+from common.utils.drug_service import (
+    query_drugs,
+    get_drug as load_drug_detail,
+    _deduplicate as _deduplicate_drugs,
+    _fetch_with_indications as _fetch_drugs_with_indications,
+)
 from common.utils.validation import (
     TRANSACTION_TYPE_CHOICES,
     validate_drug,

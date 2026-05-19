@@ -87,41 +87,46 @@
 
 根据框架定义和当前代码库，以下为需要负责的**已有文件**与**需新建文件**（仓库中路径以 `agent_with_backend/` 为前缀）。
 
-### 已有文件（需要扩展/完善）
+### 已有文件（扩展/完善 — 当前状态）
 
 
-| 文件路径                             | 当前状态                                          | 需要做                                         |
-| -------------------------------- | --------------------------------------------- | ------------------------------------------- |
-| `api/drug_controller.py`         | 仅实现了 `GET /api/drugs` 和 `GET /api/drugs/{id}` | 补充 POST/PUT/DELETE、分页、排序、筛选；搜索与批量可落在本文件或子模块 |
-| `api/order_controller.py`        | 已有基础订单/取药/配药功能                                | 完善库存管理相关能力（低库存预警、效期提醒等）                     |
-| `database/models/drug.py`        | Drug dataclass，字段较少                           | 扩展到 30+ 字段的完整药品模型                           |
-| `database/pharmacy_client.py`    | HTTP 客户端封装                                    | 补充新 API 的客户端方法                              |
-| `database/scripts/seed_drugs.py` | 100+ 种种子药品数据                                  | 随字段扩展更新种子数据                                 |
-| `common/utils/drug_helpers.py`   | 药品验证辅助工具                                      | 扩展验证逻辑以支持更多字段                               |
+| 文件路径 | 当前状态 |
+| -------------------------------- | --------------------------------------------- |
+| `api/drug_controller.py` | ✅ 药品 CRUD、搜索、批量导入/导出、库存视图、adjust、low-stock、expiring-soon、stats（统一在 `drug_bp`） |
+| `api/category_controller.py` | ✅ `GET/POST /api/categories`（树形、分页、`drug_count`） |
+| `api/order_controller.py` | ✅ 订单/取药/配药；出库时同步写 `inventory_transactions` |
+| `database/models/drug.py` | ✅ 35 字段 Drug dataclass |
+| `database/models/category.py` | ✅ Category dataclass |
+| `database/pharmacy_client.py` | ✅ 封装 search/categories/adjust/batch/export/inventory/low-stock/expiring-soon 等 |
+| `common/utils/http_client.py` | ✅ 与 pharmacy_client 对齐的 HTTP 方法 |
+| `common/utils/validation.py` | ✅ `validate_drug`、`validate_inventory_transaction`、`validate_category` |
+| `common/utils/drug_service.py` | ✅ 共享查询层（列表/详情/indications） |
+| `web/js/api.js` | ✅ 前端 API 封装（含 search/export/inventory 等） |
+| `web/admin_drugs.html` | ✅ 管理端：搜索、分类筛选、批量导入、导出、库存调整 |
+| `database/scripts/seed_drugs.py` | ✅ 100+ 种子药品 |
+| `tests/test_drug_api.py` | ✅ 13 个用例（CRUD、搜索、批量、导出、分类） |
+| `tests/test_inventory_api.py` | ✅ 8 个用例（库区视图、adjust+流水、预警、统计） |
+| `docs/组件2-药品API接口手册.md` | ✅ Markdown 接口手册（供组件3 测试 / 组件5 联调） |
 
 
-### 需要新建的文件
+### 原计划新建、实际合并或未单独建文件的项
 
 
-| 文件路径                           | 功能          | 对应接口                                                   |
-| ------------------------------ | ----------- | ------------------------------------------------------ |
-| `api/inventory_controller.py`  | 库存管理 API    | `GET /api/inventory`，`POST /api/drugs/{id}/adjust`     |
-| `api/category_controller.py`   | 分类管理 API    | `GET /api/categories`，`POST /api/categories`           |
-| `api/batch_controller.py`      | 批量操作 API    | `POST /api/drugs/batch-import`，`GET /api/drugs/export` |
-| `database/models/category.py`  | 药品分类模型      | 分类树形结构                                                 |
-| `database/models/inventory.py` | 库存变化记录模型    | 库存事务记录                                                 |
-| `tests/test_drug_api.py`       | 药品 API 测试套件 | CRUD + 搜索测试（**接口文档由组件2提供，测试由组件3实施**）                   |
-| `tests/test_inventory_api.py`  | 库存 API 测试套件 | 库存调整、低库存预警测试                                           |
+| 原计划路径 | 实际做法 |
+| ------------------------------ | ----------- |
+| `api/inventory_controller.py` | 库存相关路由合并在 `api/drug_controller.py`（`drug_bp`） |
+| `api/batch_controller.py` | batch-import / export 合并在 `api/drug_controller.py` |
+| `database/models/inventory.py` | 流水直接写 `inventory_transactions` 表，未单独 dataclass |
 
 
-### 需要修改的共享文件（需协调其他角色）
+### 需要修改的共享文件（协调情况）
 
 
-| 文件路径                          | 修改内容                                                       | 负责角色 |
+| 文件路径 | 修改内容 | 状态 |
 | ----------------------------- | ---------------------------------------------------------- | ---- |
-| `main.py`                     | 注册新 Blueprint（`inventory_bp`, `category_bp`, `batch_bp` 等） | 组件2  |
-| `common/utils/database.py`    | 添加新表结构（`categories` 表、`inventory_transactions` 表）          | 组件1  |
-| `database/scripts/init_db.py` | 添加新表的初始化 SQL                                               | 组件1  |
+| `main.py` | 注册 `category_bp` 等 Blueprint | ✅ 已完成 |
+| `common/utils/database.py` | `categories`、`inventory_transactions` 等表 | ✅ 组件1/组件2 已对齐 |
+| `database/scripts/init_db.py` | 新表初始化 SQL | ✅ 已完成 |
 
 
 ## 四、组件2需要调用的外部 API
@@ -134,10 +139,10 @@
 | `get_db_connection()`      | 获取 SQLite 数据库连接                          | ✅ 已实现          |
 | `init_database()`          | 数据库初始化                                   | ✅ 已实现          |
 | 数据库 Schema（`inventory` 表等） | 所有查询的基础                                  | ✅ 已实现，字段已扩展    |
-| 缓存层接口                      | 热门药品查询缓存                                 | 🔴 未实现，需组件1 提供 |
-| 文件上传存储接口                   | 药品图片上传管理                                 | 🔴 未实现         |
-| 统一响应格式模板                   | `{ success, data, message, pagination }` | ⚠ 部分实现         |
-| 统一错误处理格式                   | `{ success, error_code, message }`       | ⚠ 部分实现         |
+| 缓存层接口                      | 热门药品查询缓存                                 | ⏭ **组件1 未提供，已跳过**（第四～五周不阻塞交付） |
+| 文件上传存储接口                   | 药品图片上传 / CSV 文件上传                         | ⏭ **组件1 未提供，已跳过**（当前 batch-import 为 JSON 体；`image_url` 仍为字符串字段） |
+| 统一响应格式模板                   | `{ success, data, pagination, error }` | ✅ 已实现（`common/utils/response.py`） |
+| 统一错误处理格式                   | 业务路由 `{ error: { code, message } }`；鉴权路由 `{ error_code, message }` | ✅ 已实现 |
 
 
 ### 来自组件4（权限认证系统）
@@ -161,6 +166,9 @@
 | `GET /api/drugs`        | 获取药品列表（含筛选）               | ✅ 已实现，支持 name/symptom/category 筛选 + 分页排序 |
 | `GET /api/drugs/{id}`   | 获取单个药品详情                  | ✅ 已实现                                    |
 | `GET /api/drugs/search` | 综合搜索（keyword/q + filters） | ✅ 已实现 |
+| `GET /api/drugs/low-stock` | 低库存列表 | ✅ 已实现 |
+| `GET /api/drugs/expiring-soon` | 临期列表 | ✅ 已实现 |
+| `GET /api/drugs/stats` | 库存统计 | ✅ 已实现 |
 
 
 ### 提供给组件5（前端界面）
@@ -188,11 +196,11 @@
 | 资源                             | 操作权限码              | 角色要求   |
 | ------------------------------ | ------------------ | ------ |
 | `GET /api/drugs`               | `read:drug`        | 所有角色   |
-| `POST /api/drugs`              | `create:drug`      | 管理员、医生 |
-| `PUT /api/drugs/{id}`          | `update:drug`      | 管理员、医生 |
+| `POST /api/drugs`              | `create:drug`      | 管理员、药剂师 |
+| `PUT /api/drugs/{id}`          | `update:drug`      | 管理员、药剂师 |
 | `DELETE /api/drugs/{id}`       | `delete:drug`      | 管理员    |
-| `GET /api/inventory`           | `read:inventory`   | 管理员、医生 |
-| `POST /api/drugs/{id}/adjust`  | `update:inventory` | 管理员、医生 |
+| `GET /api/inventory`           | `read:inventory`   | 管理员、药剂师、医生 |
+| `POST /api/drugs/{id}/adjust`  | `update:inventory` | 管理员、药剂师 |
 | `POST /api/drugs/batch-import` | `batch:drug`       | 管理员    |
 
 
@@ -211,6 +219,12 @@
 | `GET /api/drugs/search` | 关键词综合搜索 | ✅ 已实现 | 中 |
 | `POST /api/drugs/batch-import` / `GET /api/drugs/export` | JSON 批量导入 / 导出 | ✅ 已实现 | 中 |
 | JWT + `require_permission` | API 权限 | ✅（见 `auth`） | 高 |
+| `GET /api/drugs/low-stock` / `expiring-soon` | 预警列表 | ✅ 已实现 | 中 |
+| 订单出库写 `inventory_transactions` | 审计链完整 | ✅ 已实现（`order_controller`） | 高 |
+| API 接口文档（Markdown） | 供组件3 / 组件5 | ✅ `docs/组件2-药品API接口手册.md` | 高 |
+| pytest 药品/库存套件 | 组件2 自测 | ✅ `tests/test_drug_api.py` + `test_inventory_api.py`（21 用例） | 中 |
+| 缓存层集成 | 依赖组件1 | ⏭ 已跳过 | 低 |
+| 文件上传集成 | 依赖组件1 | ⏭ 已跳过 | 低 |
 
 
 ## 七、开发计划
@@ -224,37 +238,34 @@
 - 更新 `seed_drugs.py` 匹配新字段
 - `main.py` 无需改（CRUD 全在已有 `drug_bp` 里）
 
-**第 2 周：批量操作 + 分类管理**
+**第 2 周：批量操作 + 分类管理** ✅ 已完成（详见 B 部分第二周进展）
 
-- 实现 `POST /api/drugs/batch-import`（CSV/JSON 批量导入）
-- 实现 `GET /api/drugs/export`（导出全部药品为 JSON 等）
-- 新建 `api/category_controller.py`、`database/models/category.py`
-- 实现 `GET /api/categories`、`POST /api/categories`
+**第 3 周：库存管理 API** ✅ 已完成
 
-**第 3 周：库存管理 API**
+- `GET /api/inventory`、`POST /api/drugs/{id}/adjust`、`GET /api/drugs/low-stock`、`GET /api/drugs/expiring-soon`（均在 `drug_controller.py`）
+- `inventory_transactions` 表由组件1 DDL 提供；手动 adjust 与 **订单出库/发药/取药**（`order_controller`）均写入流水
+- 未单独新建 `inventory_controller.py`（路由合并入 `drug_bp`）
 
-- 新建 `api/inventory_controller.py`
-- 实现 `GET /api/inventory`、`POST /api/drugs/{id}/adjust`
-- 新建 `database/models/inventory.py`，添加 `inventory_transactions` 表（与组件1 协调落库）
-- 实现 `GET /api/drugs/low-stock`（低库存预警）、`GET /api/drugs/expiring-soon`（过期预警）
+**第 4–5 周：搜索增强 + 集成联调** ✅ 已完成（缓存/文件上传见下方跳过项）
 
-  | 优先级 | 需要配合的组                         | 尚未就绪 / 待约定内容                                         | 影响                                             |
-  | --- | ------------------------------ | ---------------------------------------------------- | ---------------------------------------------- |
-  | 高   | **组件1**                        | **缓存层**（热点键、失效策略、是否包装 `get_db_connection` 查询）        | 列表压测前难以承诺延迟；第四～五周「缓存集成」仍 blocked               |
-  | 高   | **组件1**                        | **文件上传 / 对象存储**（若产品要求「导入＝上传 CSV 文件」而非 JSON 体）        | 当前仅 JSON 导入；要接 multipart/对象存储需组件1 接口与鉴权        |
-  | 高 | **组件3 / 5 / 产品** | 若条目需并入 **工单/灯号等业务字段**，或条目内嵌 **流水摘要**：需再行约定扩展字段（当前已提供库区白名单视图 + 补货 / 临期布尔标记） | 增强而非阻塞 |
-  | 高   | **订单 / 取药责任方**（若属组件1 或独立「订单组」） | **出库/发药是否统一写 `inventory_transactions`**、幂等与回滚        | 若仅 `adjust` 记流水、订单扣库不写表，则审计链断裂                 |
-  | 中   | **全员**                         | **统一错误码与响应 envelope**                                | `low-stock` / `expiring-soon` 等新端点若解析不一致，联调成本高 |
-  | 中   | **组件5**                        | 预警 UI 是否与 `threshold`/`days` 暴露一致、是否要配置中心收口          | ✅ 后端已支持查询参数默认与 `/drugs/stats` 对齐；按需再上会         |
+- `GET /api/drugs/search` ✅
+- JWT + `require_permission` 全路由对齐 ✅
+- Markdown 接口手册 ✅（`agent_with_backend/docs/组件2-药品API接口手册.md`）
+- `pharmacy_client` / `http_client` / `web/js/api.js` / `admin_drugs.html` 联调 ✅
+- pytest 套件 ✅（21 用例全部通过）
+- ⏭ 缓存层集成 — **组件1 未提供，已跳过**
+- ⏭ 文件上传（CSV multipart / 图片对象存储）— **组件1 未提供，已跳过**
+
+### 第三周起跨组依赖（归档）
 
 
-**第 4–5 周：搜索增强 + 集成联调**
-
-- 实现 `GET /api/drugs/search`（多条件组合搜索）
-- 缓存层集成（依赖组件1 缓存接口）
-- JWT 认证集成交接（配合组件4）
-- 编写 API 接口文档，提供给组件3 写测试
-- 与组件5 前端联调，修复接口不匹配问题
+| 优先级 | 需要配合的组 | 状态 / 结论 |
+| --- | --- | --- |
+| 高 | **组件1** 缓存层 | ⏭ 未提供 → **已跳过**，不影响当前交付 |
+| 高 | **组件1** 文件上传 | ⏭ 未提供 → **已跳过**；batch-import 维持 JSON 数组 |
+| 高 | **订单 / 取药** | ✅ `order_controller` 扣库同时写 `inventory_transactions`（`type=out`） |
+| 中 | **组件5** 预警 UI | ✅ `admin_drugs.html` 已接 stats / low-stock 类数据；`threshold`/`days` 与 stats 默认对齐 |
+| 中 | **组件3** | ✅ 接口手册 + 组件2 自测用例可供参考；组件3 可在此基础上扩展集成测试 |
 
 ## 八、关键交付物
 
@@ -264,8 +275,9 @@
 4. 库存管理 API（查询、调整、低库存预警、过期预警）
 5. 综合搜索 API（`GET /api/drugs/search`）
 6. Drug / Category / Inventory 数据模型
-7. API 接口文档（供测试与前端联调）
-8. 各 API 端点的权限矩阵配置（与组件4 对齐实现方式）
+7. API 接口文档（供测试与前端联调）→ `docs/组件2-药品API接口手册.md`
+8. 各 API 端点的权限矩阵配置（与组件4 对齐实现方式）→ `auth/constants.py` `ROLE_PERMISSION_MAP`
+9. pytest 自测套件 → `tests/test_drug_api.py`、`tests/test_inventory_api.py`
 
 ---
 
@@ -394,6 +406,55 @@
 - **`GET /api/inventory`**：拣货 / 库区视图，过滤、排序、`page/limit`、`name`、`category`、`symptom` 与 `GET /api/drugs` 对齐；每条为**库区与白名单字段**（位点、条码、单位、剂型、警戒线等），不含全文说明书类长字段；并附带 `location_label`、`needs_restock`（阈值 `threshold`，默认与 `/drugs/stats`）、`expiring_soon`（窗口 `expiring_window`，默认 30 天）、`is_expired_stock`；仍返回 `indications`；需 `read:inventory`。
 - **`GET /api/drugs/low-stock`**：配置了 `min_stock_alert` 的药品判为 `quantity <= min_stock_alert`；未配置的药品与 `/drugs/stats` 的低库存计数一致地使用 `quantity < threshold`（默认 `threshold=10`）；可选分页；需 `read:inventory`。
 - **`GET /api/drugs/expiring-soon`**：筛选 `0 < expiry_date <= days`（默认 `days=30`），与同口径统计对齐；过期（`expiry_date <= 0`）不在本列表内；可选分页；需 `read:inventory`。
+
+## 第三周进展（2026-05-20）
+
+### 完成状态
+
+
+| 序号 | 任务 | 涉及文件 | 状态 |
+| --- | --- | --- | --- |
+| 1 | 订单/取药/配药扣库时写入 `inventory_transactions`（`transaction_type=out`，负 `quantity_change`） | `api/order_controller.py` | ✅ 完成 |
+| 2 | `operator` 取自 `request.auth_user.username`；`source` 区分 order / pickup / dispense | `api/order_controller.py` | ✅ 完成 |
+| 3 | 确认 `GET /api/inventory` 拣货视图与 adjust / 预警端点行为与接口清单一致 | `api/drug_controller.py` | ✅ 完成（第二周已实现，本周联调验收） |
+| 4 | `database/models/category.py` 落地并在分类 API 中使用 | `database/models/category.py`、`api/category_controller.py` | ✅ 完成 |
+
+
+### 行为说明（摘）
+
+- **订单出库流水**：`create_order_for_drug()` 在 UPDATE `inventory.quantity` 前读取 `before_quantity`，扣库后 INSERT `order_log` 与 `inventory_transactions`，保证与 `POST /api/drugs/{id}/adjust` 同一审计表。
+- **低库存判定**：配置了 `min_stock_alert` 的药品用 `quantity <= min_stock_alert`；未配置时 fallback 为 `quantity < threshold`（默认 10）。注意新建药品若未传 `min_stock_alert` 则默认写入 `0`，此时仅 `quantity <= 0` 会命中 per-drug 规则，联调时宜显式设置预警值。
+
+## 第四～五周进展（2026-05-20）
+
+### 完成状态
+
+
+| 序号 | 任务 | 涉及文件 | 状态 |
+| --- | --- | --- | --- |
+| 1 | 扩展 `pharmacy_client.py`：search / categories / adjust / batch / export / inventory / low-stock / expiring-soon | `database/pharmacy_client.py` | ✅ 完成 |
+| 2 | 扩展 `http_client.py` 与上一致；修正 `get_drug_by_id` 解析 `data` 字段 | `common/utils/http_client.py` | ✅ 完成 |
+| 3 | 修复 `api.js`：`drugCategories` → `GET /categories`；补齐 search/export/inventory 等 | `web/js/api.js` | ✅ 完成 |
+| 4 | 管理端接入综合搜索、分类筛选、批量导入、导出 CSV/JSON、库存调整 | `web/admin_drugs.html` | ✅ 完成 |
+| 5 | 编写 Markdown API 接口手册（无 OpenAPI/Swagger） | `docs/组件2-药品API接口手册.md` | ✅ 完成 |
+| 6 | pytest：`test_drug_api.py`（13）+ `test_inventory_api.py`（8），共 21 用例 | `tests/` | ✅ 完成 |
+| 7 | 修复 `GET /api/drugs/export` 缺失 `_fetch_drugs_with_indications` 导致 500 | `api/drug_controller.py` | ✅ 完成 |
+| 8 | 缓存层集成 | — | ⏭ **组件1 未提供，已跳过** |
+| 9 | 文件上传（CSV 文件 / 图片对象存储） | — | ⏭ **组件1 未提供，已跳过** |
+
+
+### 测试与文档
+
+- **运行自测**：在 `agent_with_backend` 目录执行  
+  `python3 -m pytest tests/test_drug_api.py tests/test_inventory_api.py -v`
+- **接口手册**：[`agent_with_backend/docs/组件2-药品API接口手册.md`](agent_with_backend/docs/组件2-药品API接口手册.md) — 含 Base URL、JWT、15 个端点、curl 示例、组件3 用例矩阵。
+- **手测脚本**：`scripts/smoke_drug_api.sh`（需自行加 Bearer Token，见手册 §2）。
+
+### 其他组件需注意
+
+- **组件3**：可直接依据接口手册与组件2 pytest 用例编写集成测试；搜索/列表不传 `page`/`limit` 仍为全量返回。
+- **组件5**：`admin_drugs.html` 已对接后端新接口；导出支持 `format=csv|json`。
+- **组件1**：若后续提供缓存或文件存储 API，组件2 可在 `drug_controller` / 前端上传处增量接入，当前不阻塞验收。
 
 ---
 
