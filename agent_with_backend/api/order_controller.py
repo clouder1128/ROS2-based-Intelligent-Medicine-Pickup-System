@@ -3,6 +3,8 @@ Order Controller
 Handles drug ordering, pickup, dispensing, and order history
 """
 
+from datetime import datetime, timezone
+
 from flask import Blueprint, jsonify, request
 from common.utils.database import get_db_connection
 from ros_integration.bridge import publish_task
@@ -14,13 +16,87 @@ from auth.constants import PERM_READ_ORDER
 order_bp = Blueprint("order", __name__, url_prefix="/api")
 
 
+def _utc_now_iso() -> str:
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _auth_operator() -> str:
+    """从 JWT 装饰器写入的 request.auth_user 取操作者（无则空串）。"""
+    user = getattr(request, "auth_user", None)
+    if user and user.get("username"):
+        return str(user["username"])[:100]
+    return ""
+
+
+def _insert_inventory_out_transaction(
+    conn,
+    *,
+    drug_id: int,
+    quantity: int,
+    before_quantity: int,
+    reason: str,
+    operator: str,
+    created_at: str,
+) -> int:
+    """出库流水：quantity_change 为负，transaction_type=out（与 adjust 口径一致）。"""
+    after_quantity = before_quantity - quantity
+    cur = conn.execute(
+        """
+        INSERT INTO inventory_transactions (
+            drug_id, quantity_change, transaction_type,
+            before_quantity, after_quantity, reason, operator, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            drug_id,
+            -quantity,
+            "out",
+            before_quantity,
+            after_quantity,
+            reason[:500],
+            operator[:100],
+            created_at,
+        ),
+    )
+    return int(cur.lastrowid)
+
+
 def create_order_for_drug(
-    conn, drug_id: int, quantity: int, drug: dict, publish_now: bool = True
+    conn,
+    drug_id: int,
+    quantity: int,
+    drug: dict,
+    publish_now: bool = True,
+    *,
+    source: str = "order",
 ) -> tuple[int | None, str]:
+    """
+    扣减库存、写 order_log，并同步写 inventory_transactions（type=out）。
+    三步在同一 conn 事务内；调用方负责 commit/rollback。
+    """
     try:
+        now = _utc_now_iso()
+        row = conn.execute(
+            """
+            SELECT quantity FROM inventory
+            WHERE drug_id = ? AND COALESCE(is_deleted, 0) = 0
+            """,
+            (drug_id,),
+        ).fetchone()
+        if row is None:
+            return None, f'药品不存在: {drug["name"]}'
+
+        before_quantity = int(row["quantity"])
+        if before_quantity < quantity:
+            return None, f'库存不足: {drug["name"]}，请刷新后重试'
+
         cur = conn.execute(
-            "UPDATE inventory SET quantity = quantity - ? WHERE drug_id = ? AND quantity >= ?",
-            (quantity, drug_id, quantity),
+            """
+            UPDATE inventory
+            SET quantity = quantity - ?, updated_at = ?
+            WHERE drug_id = ? AND quantity >= ?
+            """,
+            (quantity, now, drug_id, quantity),
         )
         if cur.rowcount == 0:
             return None, f'库存不足: {drug["name"]}，请刷新后重试'
@@ -30,6 +106,18 @@ def create_order_for_drug(
             ("pending", drug_id, quantity),
         )
         task_id = cur.lastrowid
+
+        drug_name = drug.get("name") or str(drug_id)
+        reason = f"{source}: order_log task_id={task_id}, drug={drug_name}, qty={quantity}"
+        _insert_inventory_out_transaction(
+            conn,
+            drug_id=drug_id,
+            quantity=quantity,
+            before_quantity=before_quantity,
+            reason=reason,
+            operator=_auth_operator(),
+            created_at=now,
+        )
 
         if publish_now:
             publish_task(task_id, drug, quantity)
@@ -82,7 +170,9 @@ def order():
         conn = get_db_connection()
         task_ids = []
         for drug_id, num, drug in tasks:
-            task_id, err = create_order_for_drug(conn, drug_id, num, drug, publish_now=False)
+            task_id, err = create_order_for_drug(
+                conn, drug_id, num, drug, publish_now=False, source="order"
+            )
             if task_id is None:
                 conn.rollback()
                 return (jsonify({"success": False, "ok": False, "error": err, "code": "INSUFFICIENT_INVENTORY"}), 400)
@@ -126,7 +216,9 @@ def pickup():
     conn = None
     try:
         conn = get_db_connection()
-        task_id, err = create_order_for_drug(conn, drug_id, num, drug, publish_now=True)
+        task_id, err = create_order_for_drug(
+            conn, drug_id, num, drug, publish_now=True, source="pickup"
+        )
         if task_id is None:
             conn.rollback()
             return (jsonify({"success": False, "ok": False, "error": err, "code": "INSUFFICIENT_INVENTORY"}), 400)
@@ -190,7 +282,9 @@ def dispense():
                 conn.rollback()
                 return (jsonify({"success": False, "ok": False, "error": err, "code": "DRUG_VALIDATION_FAILED"}), 400)
 
-            task_id, err = create_order_for_drug(conn, drug_id, quantity, drug, publish_now=False)
+            task_id, err = create_order_for_drug(
+                conn, drug_id, quantity, drug, publish_now=False, source="dispense"
+            )
             if task_id is None:
                 conn.rollback()
                 return (jsonify({"success": False, "ok": False, "error": f"库存不足: {drug_name}", "code": "INSUFFICIENT_INVENTORY"}), 400)
