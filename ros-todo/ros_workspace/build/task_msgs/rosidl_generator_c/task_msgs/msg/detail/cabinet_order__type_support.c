@@ -5,8 +5,8 @@
 #include <string.h>
 
 #include "rosidl_typesupport_interface/macros.h"
-#include "task_msgs/msg/detail/cabinet_order__struct.h"
 #include "task_msgs/msg/detail/cabinet_order__functions.h"
+#include "task_msgs/msg/detail/cabinet_order__struct.h"
 #include "task_msgs/msg/detail/cabinet_order__type_support.h"
 
 #ifdef __cplusplus

@@ -29,9 +29,13 @@ def _add_index_if_not_exists(conn, index_name, sql):
 
 def init_db():
     conn = sqlite3.connect(DB_PATH)
+    conn.execute("PRAGMA foreign_keys = ON")   # 启用外键约束（SQLite 默认关闭）
     c = conn.cursor()
 
     # ========== 建表 ==========
+    # 注：认证相关表（auth_users / auth_roles / auth_permissions 等）
+    # 由 auth.schema.ensure_auth_schema() 负责建立，main.py 启动时自动调用，
+    # 无需在本脚本中重复。users 视图亦在 ensure_auth_schema() 中创建。
 
     c.execute("""
         CREATE TABLE IF NOT EXISTS inventory (

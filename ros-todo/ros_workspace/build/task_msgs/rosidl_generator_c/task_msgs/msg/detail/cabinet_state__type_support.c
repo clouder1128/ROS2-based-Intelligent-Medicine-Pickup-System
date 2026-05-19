@@ -5,9 +5,9 @@
 #include <string.h>
 
 #include "rosidl_typesupport_interface/macros.h"
-#include "task_msgs/msg/detail/cabinet_state__struct.h"
-#include "task_msgs/msg/detail/cabinet_state__functions.h"
 #include "task_msgs/msg/detail/cabinet_state__type_support.h"
+#include "task_msgs/msg/detail/cabinet_state__functions.h"
+#include "task_msgs/msg/detail/cabinet_state__struct.h"
 
 #ifdef __cplusplus
 extern "C"

@@ -1,8 +1,8 @@
-# Install script for directory: /home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/ros-todo/ros_workspace/build/task_msgs/task_msgs__py
+# Install script for directory: /home/wyt/exp/ROS2-based-Intelligent-Medicine-Pickup-System/ros-todo/ros_workspace/build/task_msgs/task_msgs__py
 
 # Set the install prefix
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)
-  set(CMAKE_INSTALL_PREFIX "/home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/ros-todo/ros_workspace/install/task_msgs")
+  set(CMAKE_INSTALL_PREFIX "/home/wyt/exp/ROS2-based-Intelligent-Medicine-Pickup-System/ros-todo/ros_workspace/install/task_msgs")
 endif()
 string(REGEX REPLACE "/$" "" CMAKE_INSTALL_PREFIX "${CMAKE_INSTALL_PREFIX}")
 

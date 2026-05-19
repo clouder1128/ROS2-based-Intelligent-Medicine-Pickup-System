@@ -4,9 +4,9 @@
 
 #include <string.h>
 
-#include "task_msgs/msg/detail/medicine_data__struct.h"
 #include "rosidl_typesupport_interface/macros.h"
 #include "task_msgs/msg/detail/medicine_data__functions.h"
+#include "task_msgs/msg/detail/medicine_data__struct.h"
 #include "task_msgs/msg/detail/medicine_data__type_support.h"
 
 #ifdef __cplusplus

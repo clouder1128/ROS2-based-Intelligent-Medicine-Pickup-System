@@ -4,10 +4,10 @@
 
 #include <string.h>
 
-#include "task_msgs/msg/detail/cabinet_running__struct.h"
-#include "task_msgs/msg/detail/cabinet_running__functions.h"
 #include "rosidl_typesupport_interface/macros.h"
+#include "task_msgs/msg/detail/cabinet_running__functions.h"
 #include "task_msgs/msg/detail/cabinet_running__type_support.h"
+#include "task_msgs/msg/detail/cabinet_running__struct.h"
 
 #ifdef __cplusplus
 extern "C"

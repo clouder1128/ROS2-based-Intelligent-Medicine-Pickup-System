@@ -4,7 +4,7 @@
 # compile C with /usr/bin/cc
 C_DEFINES = -DROS_PACKAGE_NAME=\"task_msgs\" -Dtask_msgs_s__rosidl_typesupport_introspection_c_EXPORTS
 
-C_INCLUDES = -I/home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/ros-todo/ros_workspace/build/task_msgs/rosidl_generator_c -I/home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/ros-todo/ros_workspace/build/task_msgs/rosidl_generator_py -I/opt/ros/jazzy/include/rmw -I/home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/ros-todo/ros_workspace/build/task_msgs/rosidl_typesupport_introspection_c -isystem /usr/include/python3.12 -isystem /opt/ros/jazzy/include/rosidl_runtime_c -isystem /opt/ros/jazzy/include/rcutils -isystem /opt/ros/jazzy/include/rosidl_typesupport_interface -isystem /opt/ros/jazzy/include/rosidl_typesupport_introspection_c -isystem /opt/ros/jazzy/include/rosidl_typesupport_c -isystem /opt/ros/jazzy/include/rosidl_dynamic_typesupport
+C_INCLUDES = -I/home/wyt/exp/ROS2-based-Intelligent-Medicine-Pickup-System/ros-todo/ros_workspace/build/task_msgs/rosidl_generator_c -I/home/wyt/exp/ROS2-based-Intelligent-Medicine-Pickup-System/ros-todo/ros_workspace/build/task_msgs/rosidl_generator_py -I/opt/ros/jazzy/include/rmw -I/home/wyt/exp/ROS2-based-Intelligent-Medicine-Pickup-System/ros-todo/ros_workspace/build/task_msgs/rosidl_typesupport_introspection_c -isystem /usr/include/python3.12 -isystem /opt/ros/jazzy/include/rosidl_runtime_c -isystem /opt/ros/jazzy/include/rcutils -isystem /opt/ros/jazzy/include/rosidl_typesupport_interface -isystem /opt/ros/jazzy/include/rosidl_typesupport_introspection_c -isystem /opt/ros/jazzy/include/rosidl_typesupport_c -isystem /opt/ros/jazzy/include/rosidl_dynamic_typesupport
 
 C_FLAGS = -fPIC -Wall -Wextra
 

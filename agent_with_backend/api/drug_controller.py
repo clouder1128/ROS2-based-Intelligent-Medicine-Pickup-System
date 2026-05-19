@@ -28,6 +28,7 @@ from common.utils.drug_service import (
     _deduplicate as _deduplicate_drugs,
     _fetch_with_indications as _fetch_drugs_with_indications,
 )
+from common.utils.cache import get_drug_cache
 from common.utils.validation import (
     TRANSACTION_TYPE_CHOICES,
     validate_drug,
@@ -251,13 +252,21 @@ def list_drugs():
             return bad_request_response("Invalid characters in filter")
 
     try:
-        drugs = query_drugs(
-            symptom=symptom_filter,
-            name=name_filter,
-            category=category_filter,
-            sort_by=sort_by,
-            sort_order=sort_order,
+        _cache = get_drug_cache()
+        drugs = _cache.get_drug_list(
+            symptom_filter, name_filter, category_filter, sort_by, sort_order
         )
+        if drugs is None:
+            drugs = query_drugs(
+                symptom=symptom_filter,
+                name=name_filter,
+                category=category_filter,
+                sort_by=sort_by,
+                sort_order=sort_order,
+            )
+            _cache.set_drug_list(
+                symptom_filter, name_filter, category_filter, sort_by, sort_order, drugs
+            )
 
         total = len(drugs)
         if use_pagination:
@@ -346,7 +355,7 @@ def list_inventory():
         if symptom_filter is not None:
             base_where = (
                 "WHERE drug_id IN (SELECT DISTINCT drug_id FROM drug_indications WHERE indication LIKE ?) "
-                "AND quantity > 0 AND is_deleted = 0"
+                "AND quantity > 0 AND COALESCE(is_deleted, 0) = 0"
             )
             drugs = _fetch_drugs_with_indications(conn, base_where, (f"%{symptom_filter}%",))
 
@@ -415,7 +424,7 @@ def list_inventory():
             }
             return jsonify(out)
 
-        where_parts = ["is_deleted = 0"]
+        where_parts = ["COALESCE(is_deleted, 0) = 0"]
         params: list = []
 
         if category_filter:
@@ -737,9 +746,13 @@ def list_expiring_soon_drugs():
 @require_permission(PERM_READ_DRUG)
 def get_drug(drug_id):
     try:
-        drug = load_drug_detail(drug_id)
+        _cache = get_drug_cache()
+        drug = _cache.get_drug(drug_id)
         if drug is None:
-            return not_found_response(f"Drug not found: id={drug_id}")
+            drug = load_drug_detail(drug_id)
+            if drug is None:
+                return not_found_response(f"Drug not found: id={drug_id}")
+            _cache.set_drug(drug_id, drug)
         return success_response(drug)
     except Exception as e:
         print(f"Database error in get_drug: {e}")
@@ -924,6 +937,7 @@ def create_drug():
         conn = get_db_connection()
         drug_id = _insert_drug_row(conn, data)
         conn.commit()
+        get_drug_cache().invalidate_drug_writes()
         return created_response({"drug_id": drug_id}, "Drug created")
     except Exception as e:
         print(f"Database error in create_drug: {e}")
@@ -1031,6 +1045,7 @@ def update_drug(drug_id):
             _replace_indications(conn, drug_id, data["indications"] or [])
 
         conn.commit()
+        get_drug_cache().invalidate_drug_writes(drug_id=drug_id)
         return success_response(None, "Drug updated")
     except Exception as e:
         print(f"Database error in update_drug: {e}")
@@ -1063,6 +1078,7 @@ def delete_drug(drug_id):
             (now, drug_id),
         )
         conn.commit()
+        get_drug_cache().invalidate_drug_writes(drug_id=drug_id)
         return success_response(None, "Drug soft-deleted")
     except Exception as e:
         print(f"Database error in delete_drug: {e}")
@@ -1203,6 +1219,9 @@ def adjust_drug_inventory(drug_id):
             transaction_id = tx_cur.lastrowid
 
         conn.commit()
+        # 仅在库存实际变化时失效缓存；qc==0 无写操作，无需失效
+        if qc != 0:
+            get_drug_cache().invalidate_drug_writes(drug_id=drug_id)
         final_row = conn.execute(
             "SELECT quantity FROM inventory WHERE drug_id = ?", (drug_id,)
         ).fetchone()
@@ -1262,6 +1281,7 @@ def batch_import_drugs():
             created_ids.append(drug_id)
 
         conn.commit()
+        get_drug_cache().invalidate_drug_writes()
         return created_response(
             {"drug_ids": created_ids, "count": len(created_ids)},
             "Batch import completed",
@@ -1349,6 +1369,11 @@ def export_drugs():
 @require_permission(PERM_READ_INVENTORY)
 def drug_stats():
     """Get drug inventory statistics"""
+    _cache = get_drug_cache()
+    cached_stats = _cache.get_stats()
+    if cached_stats is not None:
+        return success_response(cached_stats)
+
     conn = None
     try:
         conn = get_db_connection()
@@ -1375,13 +1400,15 @@ def drug_stats():
         )
         expiring_soon = cur.fetchone()[0]
 
-        return success_response({
+        stats_data = {
             "total_drugs": total,
             "total_quantity": total_quantity,
             "expired_count": expired,
             "low_stock_count": low_stock,
             "expiring_soon_count": expiring_soon,
-        })
+        }
+        _cache.set_stats(stats_data)
+        return success_response(stats_data)
     except Exception as e:
         print(f"Database error in drug_stats: {e}")
         return internal_error_response("数据库错误")

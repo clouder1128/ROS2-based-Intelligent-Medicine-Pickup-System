@@ -276,6 +276,9 @@ def dispense():
     try:
         conn = get_db_connection()
         task_ids = []
+        # 保存 commit 前的 drug 对象（含位置信息），供 commit 后通知 ROS 使用；
+        # commit 后库存已扣减，再次调 validate_and_get_drug 可能因库存不足而返回 None。
+        dispatched: list[tuple[int, int, dict]] = []
         for drug_id, quantity, drug_name in order_items:
             drug, err = validate_and_get_drug(drug_id, quantity)
             if err:
@@ -289,13 +292,12 @@ def dispense():
                 conn.rollback()
                 return (jsonify({"success": False, "ok": False, "error": f"库存不足: {drug_name}", "code": "INSUFFICIENT_INVENTORY"}), 400)
             task_ids.append(task_id)
+            dispatched.append((task_id, quantity, drug))
 
         conn.commit()
 
-        for (drug_id, quantity, drug_name), task_id in zip(order_items, task_ids):
-            drug, _ = validate_and_get_drug(drug_id, quantity)
-            if drug:
-                publish_task(task_id, drug, quantity)
+        for task_id, quantity, drug in dispatched:
+            publish_task(task_id, drug, quantity)
 
         return jsonify({"success": True, "ok": True, "prescription_id": prescription_id, "patient_name": patient_name, "task_ids": task_ids, "message": f"处方配药成功，创建了{len(task_ids)}个取药任务", "mode": "real_api"})
     except Exception as e:

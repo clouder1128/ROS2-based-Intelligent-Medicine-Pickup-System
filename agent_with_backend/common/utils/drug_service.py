@@ -76,7 +76,7 @@ def query_drugs(
         if symptom is not None:
             base_where = (
                 "WHERE drug_id IN (SELECT DISTINCT drug_id FROM drug_indications "
-                "WHERE indication LIKE ?) AND quantity > 0 AND is_deleted = 0"
+                "WHERE indication LIKE ?) AND quantity > 0 AND COALESCE(is_deleted, 0) = 0"
             )
             drugs = _fetch_with_indications(conn, base_where, (f"%{symptom}%",))
 
@@ -108,7 +108,7 @@ def query_drugs(
             return drugs
 
         # ---- 名称 / 分类查询路径 ----
-        where_parts = ["is_deleted = 0"]
+        where_parts = ["COALESCE(is_deleted, 0) = 0"]
         params: list = []
 
         if category:

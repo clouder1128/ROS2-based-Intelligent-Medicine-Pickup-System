@@ -12,6 +12,7 @@ from auth.constants import PERM_CREATE_DRUG, PERM_READ_DRUG
 from auth.middleware import require_permission
 from common.utils.database import get_db_connection
 from common.utils.validation import validate_category
+from common.utils.cache import get_drug_cache
 from database.models.category import Category
 from common.utils import (
     success_response,
@@ -88,6 +89,11 @@ def list_categories():
             return paginated_response(categories, page, limit, total)
 
         else:
+            _cache = get_drug_cache()
+            cached = _cache.get_categories(want_tree)
+            if cached is not None:
+                return success_response(cached)
+
             rows = conn.execute(
                 "SELECT * FROM categories ORDER BY sort_order, id"
             ).fetchall()
@@ -102,6 +108,7 @@ def list_categories():
             if want_tree:
                 categories = _build_tree(categories)
 
+            _cache.set_categories(want_tree, categories)
             return success_response(categories)
 
     except Exception as e:
@@ -170,6 +177,7 @@ def create_category():
         conn.commit()
 
         new_id = cur.lastrowid
+        get_drug_cache().invalidate_categories()
         return created_response(
             {
                 "id": new_id,

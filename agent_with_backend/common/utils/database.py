@@ -10,9 +10,10 @@ from common.config import Config
 
 
 def get_db_connection() -> sqlite3.Connection:
-    """获取数据库连接"""
+    """获取数据库连接（已启用外键约束）"""
     conn = sqlite3.connect(Config.DATABASE_PATH)
     conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA foreign_keys = ON")
     return conn
 
 
