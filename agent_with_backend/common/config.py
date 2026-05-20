@@ -71,6 +71,9 @@ class Config:
     ENABLE_LLM_SYMPTOM_EXTRACTION = os.getenv(
         "ENABLE_LLM_SYMPTOM_EXTRACTION", "true"
     ).lower() == "true"
+    ENABLE_FORM_COLLECTION: bool = os.getenv(
+        "ENABLE_FORM_COLLECTION", "true"
+    ).lower() in ["true", "1"]
     NEGATION_WORDS = ["无", "没有", "不", "否", "非", "未"]
 
     # === 日志配置 ===

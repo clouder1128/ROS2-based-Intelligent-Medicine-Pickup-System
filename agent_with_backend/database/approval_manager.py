@@ -67,11 +67,23 @@ class ApprovalManager:
             conn.execute("ALTER TABLE approvals ADD COLUMN task_id TEXT")
         except sqlite3.OperationalError:
             pass
+        for col, dtype in [
+            ("gender", "TEXT"),
+            ("pregnant", "TEXT"),
+            ("drug_allergies", "TEXT"),
+            ("food_allergies", "TEXT"),
+            ("medical_history", "TEXT"),
+            ("vital_signs", "TEXT"),
+        ]:
+            try:
+                conn.execute(f"ALTER TABLE approvals ADD COLUMN {col} {dtype}")
+            except sqlite3.OperationalError:
+                pass
         conn.execute("CREATE INDEX IF NOT EXISTS idx_approvals_status ON approvals(status)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_approvals_created ON approvals(created_at DESC)")
 
     def _connect(self) -> sqlite3.Connection:
-        conn = sqlite3.connect(self.db_path)
+        conn = sqlite3.connect(self.db_path, check_same_thread=False)
         conn.row_factory = sqlite3.Row
         if not self._table_ready:
             self.ensure_table(conn)
@@ -90,6 +102,12 @@ class ApprovalManager:
         drug_name: str | None = None,
         drug_type: str | None = None,
         quantity: int = 1,
+        gender: str | None = None,
+        pregnant: str | None = None,
+        drug_allergies: str | None = None,
+        food_allergies: str | None = None,
+        medical_history: str | None = None,
+        vital_signs: str | None = None,
     ) -> str:
         aid = _new_approval_id()
         with _lock:
@@ -98,10 +116,14 @@ class ApprovalManager:
                 conn.execute(
                     """INSERT INTO approvals (
                         id, patient_name, patient_age, patient_weight, symptoms,
-                        advice, drug_name, drug_type, quantity, status
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                        advice, drug_name, drug_type, quantity, status,
+                        gender, pregnant, drug_allergies, food_allergies,
+                        medical_history, vital_signs
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                     (aid, patient_name, patient_age, patient_weight, symptoms,
-                     advice, drug_name, drug_type, quantity, self.STATUS_PENDING),
+                     advice, drug_name, drug_type, quantity, self.STATUS_PENDING,
+                     gender, pregnant, drug_allergies, food_allergies,
+                     medical_history, vital_signs),
                 )
                 conn.commit()
                 return aid

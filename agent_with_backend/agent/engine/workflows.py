@@ -10,6 +10,8 @@ from datetime import datetime
 
 class WorkflowStep(Enum):
     """工作流步骤枚举"""
+    FORM_COLLECTION = "form_collection"
+    FORM_CONFIRMATION = "form_confirmation"
     COLLECT_INFO = "collect_info"
     QUERY_DRUG = "query_drug"
     CHECK_ALLERGY = "check_allergy"

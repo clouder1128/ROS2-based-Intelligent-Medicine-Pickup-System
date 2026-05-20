@@ -4,6 +4,8 @@ import logging
 from typing import Dict, Optional
 from agent.engine import MedicalAgent
 from common.config import Config
+from thought_logging import with_thought_logging
+from thought_logging.config import ThoughtLoggingConfig
 
 logger = logging.getLogger(__name__)
 
@@ -15,6 +17,17 @@ class SessionManager:
         self.state_dir = state_dir or Config.SESSION_STATE_DIR
         os.makedirs(self.state_dir, exist_ok=True)
         self._sessions: Dict[str, MedicalAgent] = {}
+        self._thought_config = ThoughtLoggingConfig() if Config.ENABLE_THOUGHT_LOGGING else None
+
+    def _wrap_agent(self, agent: MedicalAgent) -> MedicalAgent:
+        """如果启用了 thought_logging，包装 agent 实例"""
+        if self._thought_config and self._thought_config.enabled:
+            agent = with_thought_logging(agent, self._thought_config)
+            logger.info(
+                "Thought logging enabled for agent, session_id: %s",
+                agent._recorder.session_id,
+            )
+        return agent
 
     def get_agent(self, patient_id: str, create_new: bool = True) -> MedicalAgent:
         """获取或创建患者的Agent实例"""
@@ -30,14 +43,16 @@ class SessionManager:
         if os.path.exists(state_file):
             if agent.load_state(state_file):
                 logger.info(f"Loaded session for {patient_id}")
+                agent._load_form_from_session()
             else:
                 logger.warning(f"Failed to load session for {patient_id}, creating new")
+        agent = self._wrap_agent(agent)
         self._sessions[patient_id] = agent
         return agent
 
     def create_agent(self, patient_id: str) -> MedicalAgent:
         """创建新的Agent实例（不尝试加载）"""
-        agent = MedicalAgent()
+        agent = self._wrap_agent(MedicalAgent())
         self._sessions[patient_id] = agent
         logger.info(f"Created new session for {patient_id}")
         return agent

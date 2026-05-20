@@ -15,7 +15,7 @@ def get_database_path() -> str:
 def get_db_connection() -> sqlite3.Connection:
     path = Path(get_database_path())
     path.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(str(path))
+    conn = sqlite3.connect(str(path), check_same_thread=False)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
     return conn

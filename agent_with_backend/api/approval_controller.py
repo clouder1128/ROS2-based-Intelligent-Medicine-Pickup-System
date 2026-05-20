@@ -291,9 +291,42 @@ def consultation():
         reply, steps = agent.run(message, patient_id)
         approval_id = agent.get_approval_id()
 
+        # 构建表单状态信息
+        form_status = None
+        phase = "drug_matching"
+        if (
+            hasattr(agent, "consultation_form")
+            and agent.consultation_form is not None
+        ):
+            cf = agent.consultation_form
+            phase = cf.phase
+            try:
+                from agent.subagents.form import check_form_completeness
+                completeness = check_form_completeness(cf)
+                form_status = {
+                    "phase": cf.phase,
+                    "confirmed": cf.confirmed,
+                    "filled_fields": list(cf.filled_fields),
+                    "missing_fields_global": completeness.get("missing_global", []),
+                    "missing_fields_conditional": completeness.get("missing_conditional", []),
+                    "total_global_required": 7,  # GLOBAL_REQUIRED_FIELDS 数量
+                }
+            except Exception:
+                form_status = {
+                    "phase": cf.phase,
+                    "confirmed": cf.confirmed,
+                    "filled_fields": list(cf.filled_fields),
+                }
+
         return jsonify({
             "success": True,
             "reply": reply,
+            "phase": phase,
+            "questions": [
+                q.to_dict() if hasattr(q, "to_dict") else q
+                for q in (getattr(agent, "_pending_questions", []) or [])
+            ],
+            "form_status": form_status,
             "approval_id": approval_id,
             "drug_name": getattr(agent, "drug_name", None),
             "quantity": getattr(agent, "quantity", None),
@@ -305,6 +338,53 @@ def consultation():
             "success": False,
             "error": f"咨询处理异常: {str(e)}",
             "code": "CONSULTATION_ERROR",
+        }), 500
+
+
+@approval_bp.route("/form/submit_basics", methods=["POST"])
+@require_auth
+def submit_basics():
+    """
+    POST /api/form/submit_basics
+    Round 1 固定表单提交：直接填充基础信息，不经过 LLM 提取。
+
+    Request: {
+        "gender": "男",
+        "age": 20,
+        "age_unit": "岁",
+        "weight": 70,
+        "weight_unit": "kg",   # 或 "斤"
+        "drug_allergies": ["布洛芬"],
+        "current_medications": ["药名"],
+        "chronic_diseases": ["高血压"],
+        "patient_id": "optional"
+    }
+    """
+    ready, err = _check_llm_ready()
+    if not ready:
+        return jsonify({"success": False, "error": err, "code": "LLM_NOT_CONFIGURED"}), 400
+
+    data = request.get_json(silent=True)
+    if not data:
+        return jsonify({"success": False, "error": "Invalid JSON", "code": "INVALID_JSON"}), 400
+
+    user = request.auth_user
+    patient_id = data.get("patient_id") or user.get("username") or str(user.get("id"))
+
+    try:
+        agent = _session_manager.get_agent(patient_id)
+        agent.submit_basics(data)
+
+        return jsonify({
+            "success": True,
+            "phase": "basics_collection",
+            "message": "基础信息已提交。请描述您的症状。",
+        })
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": f"提交失败: {str(e)}",
+            "code": "BASICS_SUBMIT_ERROR",
         }), 500
 
 

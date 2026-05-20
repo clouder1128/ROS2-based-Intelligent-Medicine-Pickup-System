@@ -1701,3 +1701,108 @@ hr {
 @media (min-width: 769px) {
     .menu-toggle { display: none !important; }
 }
+
+.text-danger {
+    color: var(--danger-color);
+}
+
+.me-2 {
+    margin-right: 8px;
+}
+
+/* ===== Question Options ===== */
+.question-options {
+    margin-top: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.question-group + .question-group {
+    margin-top: 4px;
+    padding-top: 8px;
+    border-top: 1px solid var(--border);
+}
+
+.question-label {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-bottom: 4px;
+}
+
+.question-btn-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.question-btn {
+    padding: 6px 14px;
+    border: 1.5px solid var(--primary-color);
+    border-radius: 18px;
+    background: #fff;
+    color: var(--primary-color);
+    font-size: 13px;
+    cursor: pointer;
+    transition: var(--transition);
+    white-space: nowrap;
+    font-family: inherit;
+}
+
+.question-btn:hover {
+    background: var(--primary-color);
+    color: #fff;
+    box-shadow: 0 2px 8px rgba(52,152,219,0.3);
+}
+
+.question-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    background: var(--bg-light);
+    color: var(--text-muted);
+    border-color: var(--border);
+    box-shadow: none;
+}
+
+.question-custom {
+    display: flex;
+    gap: 4px;
+    margin-top: 4px;
+    width: 100%;
+}
+
+.question-custom-input {
+    flex: 1;
+    padding: 6px 10px;
+    border: 1.5px solid var(--border);
+    border-radius: var(--border-radius-sm);
+    font-size: 13px;
+    outline: none;
+    min-width: 0;
+    font-family: inherit;
+}
+
+.question-custom-input:focus {
+    border-color: var(--primary-color);
+}
+
+.question-custom-btn {
+    padding: 6px 12px;
+    border: none;
+    border-radius: var(--border-radius-sm);
+    background: var(--primary-color);
+    color: #fff;
+    font-size: 12px;
+    cursor: pointer;
+    white-space: nowrap;
+    font-family: inherit;
+}
+
+.question-custom-btn:hover {
+    background: var(--primary-dark);
+}
+
+.question-custom-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}

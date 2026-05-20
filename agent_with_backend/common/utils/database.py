@@ -227,8 +227,6 @@ def init_database() -> None:
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
-        )
-    """)
 
     conn.commit()
     conn.close()

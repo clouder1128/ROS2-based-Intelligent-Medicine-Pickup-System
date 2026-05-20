@@ -30,10 +30,33 @@ def query_drug(query: str) -> str:
     logger.info(f"查询药物: {query}")
 
     try:
-        from database.pharmacy_client import get_drugs_by_symptom_or_name
+        from database.pharmacy_client import (
+            get_drugs_by_symptom_or_name,
+            query_drugs_by_symptom,
+        )
 
-        # 优先按症状查询，再按名称查询
-        drugs = get_drugs_by_symptom_or_name(query)
+        # 拆分多关键词查询（LLM 可能传入"头痛 发热"或"头痛、发热"）
+        terms = [t.strip() for t in query.replace("　", " ").split() if t.strip()]
+        if len(terms) <= 1:
+            for sep in ["、", "，", ","]:
+                if sep in query:
+                    terms = [t.strip() for t in query.split(sep) if t.strip()]
+                    break
+
+        if len(terms) > 1:
+            # 多关键词：分别查询后合并去重
+            all_drugs = []
+            seen_ids = set()
+            for term in terms:
+                drugs = query_drugs_by_symptom(term)
+                for d in drugs:
+                    did = d.get("drug_id")
+                    if did not in seen_ids:
+                        seen_ids.add(did)
+                        all_drugs.append(d)
+            drugs = all_drugs
+        else:
+            drugs = get_drugs_by_symptom_or_name(query)
     except Exception as e:
         logger.error(f"查询药物失败: {str(e)}")
         return json.dumps({
@@ -200,7 +223,16 @@ def generate_advice(drug_name: str, dosage: str, duration: str = None, notes: st
     return json.dumps(response, ensure_ascii=False, indent=2)
 
 
-def submit_approval(patient_name: str, advice: str, patient_age: int = None, patient_weight: float = None, symptoms: str = None, drug_name: str = None, drug_type: str = None, quantity: int = 1, **kwargs) -> str:
+def submit_approval(
+    patient_name: str, advice: str,
+    patient_age: int = None, patient_weight: float = None,
+    symptoms: str = None, drug_name: str = None, drug_type: str = None,
+    quantity: int = 1,
+    gender: str = None, pregnant: str = None,
+    drug_allergies: str = None, food_allergies: str = None,
+    medical_history: str = None, vital_signs: str = None,
+    **kwargs,
+) -> str:
     """提交用药建议给医生审批（直接写入数据库，不走 HTTP）"""
     logger.info(f"提交审批: patient={patient_name}, drug={drug_name}, quantity={quantity}")
     try:
@@ -216,6 +248,12 @@ def submit_approval(patient_name: str, advice: str, patient_age: int = None, pat
             drug_name=drug_name,
             drug_type=drug_type,
             quantity=quantity,
+            gender=gender,
+            pregnant=pregnant,
+            drug_allergies=drug_allergies,
+            food_allergies=food_allergies,
+            medical_history=medical_history,
+            vital_signs=vital_signs,
         )
         if approval_id:
             logger.info(f"审批提交成功: {approval_id}")

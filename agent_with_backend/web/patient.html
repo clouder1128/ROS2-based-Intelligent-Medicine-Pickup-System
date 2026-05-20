@@ -40,20 +40,19 @@
             <!-- Tab: Consultation -->
             <div id="tab-consult">
                 <div class="consult-layout">
-                    <!-- Left: Chat -->
                     <div class="chat-container">
                         <div class="chat-messages" id="chatMessages">
                             <div class="chat-msg agent">
                                 <div class="msg-avatar"><i class="bi bi-robot"></i></div>
                                 <div class="msg-bubble">
                                     您好！我是AI医疗助手。<br><br>
-                                    请告诉我您的症状，我会为您推荐合适的药品。<br>
-                                    例如：「头痛、发热，30岁，60kg，无过敏史」
+                                    让我为您收集一些基本信息，请根据提示回答问题。<br><br>
+                                    <b>温馨提示：</b>用药建议仅供参考，最终请遵医嘱。
                                 </div>
                             </div>
                         </div>
                         <div class="chat-input-area">
-                            <input type="text" id="chatInput" placeholder="描述您的症状..."
+                            <input type="text" id="chatInput" placeholder="请输入您的回复..."
                                    onkeydown="if(event.key==='Enter')sendMessage()" autocomplete="off">
                             <button onclick="sendMessage()" id="sendBtn" title="发送">
                                 <i class="bi bi-send"></i>
@@ -140,6 +139,7 @@ ApiClient.getProfile().then(r => { if (!r.success) { localStorage.clear(); windo
 let consultHistory = JSON.parse(localStorage.getItem(`consultHistory_${user.id}`) || '[]');
 let pickupHistory = JSON.parse(localStorage.getItem(`pickupHistory_${user.id}`) || '[]');
 let activeApprovals = JSON.parse(localStorage.getItem(`activeApprovals_${user.id}`) || '[]');
+let _lastFormSymptoms = '';  // 跟踪表单收集阶段累积的症状描述
 
 function saveState() {
     localStorage.setItem(`consultHistory_${user.id}`, JSON.stringify(consultHistory));
@@ -182,29 +182,12 @@ window.sendMessage = async function() {
 
     addChatMessage('user', text);
 
-    // Loading message with dynamically updated progress text
+    // Loading message
     const progressId = 'progress-' + Date.now();
-    addChatMessage('system', `<div id="${progressId}">⏳ <span id="progress-text">正在准备...</span></div>`);
-
-    // Simulated progress steps（purely frontend timing）
-    const steps = [
-        { time: 2000,  text: '正在分析您的症状描述...' },
-        { time: 5000,  text: '正在查询匹配药品...' },
-        { time: 8000,  text: '正在检查过敏史和禁忌症...' },
-        { time: 11000, text: '正在计算用药剂量...' },
-        { time: 15000, text: '正在生成用药建议...' },
-        { time: 19000, text: '正在提交医生审批...' },
-    ];
-    const progressTimers = steps.map(s => setTimeout(() => {
-        const el = document.getElementById('progress-text');
-        if (el) el.textContent = s.text;
-    }, s.time));
+    addChatMessage('system', `<div id="${progressId}">⏳ 正在处理...</div>`);
 
     try {
         const result = await ApiClient.sendConsultation(text, user.id);
-
-        // Clear progress timers once response arrives
-        progressTimers.forEach(t => clearTimeout(t));
 
         // Remove loading message
         const loadingEl = document.getElementById(progressId);
@@ -218,7 +201,80 @@ window.sendMessage = async function() {
             return;
         }
 
-        // Show LLM narrative reply (strip markdown formatting)
+        const phase = result.phase || 'drug_matching';
+
+        if (phase === 'basics_collection') {
+            const cleanReply = result.reply.replace(/\*\*/g, '').replace(/```/g, '').replace(/`/g, '');
+            addChatMessage('agent', cleanReply);
+
+            // 渲染可点击问题按钮
+            if (result.questions && result.questions.length > 0) {
+                const lastMsg = document.querySelector('#chatMessages .chat-msg:last-child');
+                if (lastMsg) {
+                    renderQuestions(lastMsg.querySelector('.msg-bubble'), result.questions);
+                }
+            }
+
+            input.disabled = false;
+            document.getElementById('sendBtn').disabled = false;
+            input.focus();
+            return;
+        }
+
+        if (phase === 'form_collection') {
+            // Phase A: 表单收集 — 显示 agent 追问，保持对话继续
+            const cleanReply = result.reply.replace(/\*\*/g, '').replace(/```/g, '').replace(/`/g, '');
+            addChatMessage('agent', cleanReply);
+
+            // 累积表单收集阶段的症状描述
+            _lastFormSymptoms = _lastFormSymptoms
+                ? _lastFormSymptoms + '；' + text
+                : text;
+
+            // 更新表单进度状态
+            if (result.form_status) {
+                updateFormProgress(result.form_status);
+            }
+
+            // 渲染可点击问题按钮
+            if (result.questions && result.questions.length > 0) {
+                const lastMsg = document.querySelector('#chatMessages .chat-msg:last-child');
+                if (lastMsg) {
+                    renderQuestions(lastMsg.querySelector('.msg-bubble'), result.questions);
+                }
+            }
+
+            input.disabled = false;
+            document.getElementById('sendBtn').disabled = false;
+            input.focus();
+            return;
+        }
+
+        if (phase === 'form_confirmation') {
+            // Phase B: 表单确认 — 显示总结报告 + 确认按钮
+            const cleanReply = result.reply.replace(/\*\*/g, '').replace(/```/g, '').replace(/`/g, '');
+            addChatMessage('agent', cleanReply);
+
+            // 添加确认按钮
+            const confirmId = 'confirm-' + Date.now();
+            addChatMessage('system',
+                `<div id="${confirmId}">
+                    <p>请确认以上信息是否准确？</p>
+                    <button class="btn btn-success btn-sm me-2" onclick="confirmForm()">✅ 确认无误</button>
+                    <button class="btn btn-outline-secondary btn-sm" onclick="editForm()">✏️ 需要修改</button>
+                </div>`
+            );
+
+            // 保存当前对话上下文，确认按钮会复用
+            window._pendingConfirm = true;
+
+            input.disabled = false;
+            document.getElementById('sendBtn').disabled = false;
+            input.focus();
+            return;
+        }
+
+        // Phase C (drug_matching): 现有逻辑
         const cleanReply = result.reply.replace(/\*\*/g, '').replace(/```/g, '').replace(/`/g, '');
         addChatMessage('agent', cleanReply);
 
@@ -250,18 +306,19 @@ window.sendMessage = async function() {
                 approval_id: result.approval_id,
                 drug_name: drugName,
                 quantity: result.quantity || 1,
-                symptoms: text,
+                symptoms: _lastFormSymptoms || text,
                 created_at: new Date().toISOString(),
                 status: 'pending',
             });
 
             consultHistory.unshift({
                 date: new Date().toISOString(),
-                symptoms: text,
+                symptoms: _lastFormSymptoms || text,
                 drug: drugName,
                 approval_id: result.approval_id,
             });
             saveState();
+            _lastFormSymptoms = '';
             updateApprovalPanel({ approval_id: result.approval_id, status: 'pending', drug_name: drugName, quantity: result.quantity || 1 });
             startApprovalPolling(result.approval_id);
         }
@@ -282,6 +339,326 @@ function extractValue(text, regex) {
     const m = text.match(regex);
     return m ? m[1].trim() : null;
 }
+
+/** 更新表单收集进度显示 */
+function updateFormProgress(formStatus) {
+    const panel = document.getElementById('symptomInfo');
+    if (!panel) return;
+    const total = formStatus.total_global_required || 7;
+    const filled = (formStatus.filled_fields || []).length;
+    const missing = formStatus.missing_fields_global || [];
+    let html = `<small class="text-muted">表单进度: ${filled}/${total}</small><div class="progress mt-1" style="height:4px">`;
+    const pct = Math.min(100, Math.round(filled / total * 100));
+    html += `<div class="progress-bar" style="width:${pct}%;background:#0d6efd"></div></div>`;
+    if (missing.length > 0) {
+        html += `<small class="text-muted">待收集: ${missing.join(', ')}</small>`;
+    }
+    panel.innerHTML = html;
+}
+
+/** Phase B: 用户点击确认 — 发送"确认"给后端，推进到 Phase C */
+window.confirmForm = async function() {
+    const user = getCurrentUser();
+    if (!user) return;
+    // 隐藏确认按钮
+    const btns = document.querySelectorAll('[id^="confirm-"]');
+    btns.forEach(el => {
+        const container = el.closest('.chat-msg');
+        if (container) container.remove();
+    });
+
+    // 显示用户确认消息
+    addChatMessage('user', '确认');
+
+    // 显示加载
+    const progressId = 'progress-' + Date.now();
+    addChatMessage('system', `<div id="${progressId}">⏳ 正在提交确认，进入药品匹配...</div>`);
+
+    try {
+        const result = await ApiClient.sendConsultation('确认', user.id);
+        const loadingEl = document.getElementById(progressId);
+        if (loadingEl) loadingEl.closest('.chat-msg')?.remove();
+
+        if (!result.success) {
+            addChatMessage('system', `⚠ 提交失败: ${result.error}`);
+            return;
+        }
+
+        // Phase C 结果正常展示
+        const cleanReply = result.reply.replace(/\*\*/g, '').replace(/```/g, '').replace(/`/g, '');
+        addChatMessage('agent', cleanReply);
+
+        const drugName = result.drug_name || '未知';
+        updateSymptomInfoPanel({ symptoms: '' });
+        if (drugName !== '未知') {
+            updateDrugPanel([{ name: drugName }]);
+        }
+
+        if (result.approval_id) {
+            let summary = `审批单已自动提交\n\n`;
+            summary += `审批编号：${result.approval_id}\n`;
+            summary += `推荐药品：${drugName} x${result.quantity || 1}\n`;
+            summary += `\n当前结果由 AI 生成，仅供参考，正在等待真人医生审批，请勿自行用药。`;
+            addChatMessage('system', summary);
+
+            activeApprovals.push({
+                approval_id: result.approval_id,
+                drug_name: drugName,
+                quantity: result.quantity || 1,
+                symptoms: _lastFormSymptoms,
+                created_at: new Date().toISOString(),
+                status: 'pending',
+            });
+            saveState();
+            _lastFormSymptoms = '';
+            updateApprovalPanel({ approval_id: result.approval_id, status: 'pending', drug_name: drugName, quantity: result.quantity || 1 });
+            startApprovalPolling(result.approval_id);
+        }
+    } catch (err) {
+        const loadingEl = document.getElementById(progressId);
+        if (loadingEl) loadingEl.closest('.chat-msg')?.remove();
+        addChatMessage('system', `⚠ 网络错误: ${err.message}`);
+    }
+};
+
+/** Phase B: 用户点击修改 — 清除确认按钮，让用户继续输入 */
+window.editForm = function() {
+    const btns = document.querySelectorAll('[id^="confirm-"]');
+    btns.forEach(el => {
+        const container = el.closest('.chat-msg');
+        if (container) container.remove();
+    });
+    addChatMessage('system', '请指出需要修改的项目，或补充缺少的信息。');
+    document.getElementById('chatInput')?.focus();
+};
+
+// ===== 可点击问题按钮 =====
+
+/** 渲染可点击问题按钮 */
+function renderQuestions(container, questions) {
+    if (!questions || !Array.isArray(questions) || questions.length === 0) return;
+
+    // 移除已有的问题按钮
+    var existing = container.querySelector('.question-options');
+    if (existing) existing.remove();
+
+    var wrapper = document.createElement('div');
+    wrapper.className = 'question-options';
+
+    for (var i = 0; i < questions.length; i++) {
+        var q = questions[i];
+        var text = q.text || q.label || '';
+        var field = q.field || '';
+        var allowCustom = q.allow_custom;
+        var isMulti = q.allow_multiple;
+
+        if (q.options && Array.isArray(q.options) && q.options.length > 0) {
+            var groupDiv = document.createElement('div');
+            groupDiv.className = 'question-group';
+            if (text) {
+                var label = document.createElement('div');
+                label.className = 'question-label';
+                label.textContent = text;
+                groupDiv.appendChild(label);
+            }
+            var btnGroup = document.createElement('div');
+            btnGroup.className = 'question-btn-group';
+            for (var j = 0; j < q.options.length; j++) {
+                var opt = q.options[j];
+                var btn = document.createElement('button');
+                btn.className = 'question-btn';
+                btn.textContent = typeof opt === 'object' ? (opt.label || opt.value || String(opt)) : String(opt);
+                btn.onclick = makeClickHandler(btn, typeof opt === 'object' ? (opt.value || opt.label || String(opt)) : String(opt), field, isMulti);
+                btnGroup.appendChild(btn);
+            }
+            if (allowCustom) {
+                var customDiv = document.createElement('div');
+                customDiv.className = 'question-custom';
+                var custInput = document.createElement('input');
+                custInput.type = 'text';
+                custInput.placeholder = '其他...';
+                custInput.className = 'question-custom-input';
+                var custBtn = document.createElement('button');
+                custBtn.className = 'question-custom-btn';
+                custBtn.textContent = '发送';
+                custBtn.onclick = function() {
+                    var val = custInput.value.trim();
+                    if (val) {
+                        disableAllButtons(wrapper);
+                        handleQuestionClick(val, field);
+                    }
+                };
+                custInput.onkeydown = function(e) {
+                    if (e.key === 'Enter') {
+                        var val = custInput.value.trim();
+                        if (val) {
+                            disableAllButtons(wrapper);
+                            handleQuestionClick(val, field);
+                        }
+                    }
+                };
+                customDiv.appendChild(custInput);
+                customDiv.appendChild(custBtn);
+                btnGroup.appendChild(customDiv);
+            }
+            groupDiv.appendChild(btnGroup);
+            wrapper.appendChild(groupDiv);
+        } else if (text) {
+            if (allowCustom) {
+                // 无选项但允许自定义输入 → 渲染文本输入框
+                var groupDiv = document.createElement('div');
+                groupDiv.className = 'question-group';
+                var label = document.createElement('div');
+                label.className = 'question-label';
+                label.textContent = text;
+                groupDiv.appendChild(label);
+                var customDiv = document.createElement('div');
+                customDiv.className = 'question-custom';
+                var custInput = document.createElement('input');
+                custInput.type = 'text';
+                custInput.placeholder = '请输入...';
+                custInput.className = 'question-custom-input';
+                var custBtn = document.createElement('button');
+                custBtn.className = 'question-custom-btn';
+                custBtn.textContent = '发送';
+                custBtn.onclick = function(cv, cf) {
+                    return function() {
+                        var val = cv.value.trim();
+                        if (val) {
+                            disableAllButtons(wrapper);
+                            handleQuestionClick(val, cf);
+                        }
+                    };
+                }(custInput, field);
+                custInput.onkeydown = function(cv, cf) {
+                    return function(e) {
+                        if (e.key === 'Enter') {
+                            var val = cv.value.trim();
+                            if (val) {
+                                disableAllButtons(wrapper);
+                                handleQuestionClick(val, cf);
+                            }
+                        }
+                    };
+                }(custInput, field);
+                customDiv.appendChild(custInput);
+                customDiv.appendChild(custBtn);
+                groupDiv.appendChild(customDiv);
+                wrapper.appendChild(groupDiv);
+            } else {
+                var btn = document.createElement('button');
+                btn.className = 'question-btn';
+                btn.textContent = text;
+                btn.onclick = makeClickHandler(btn, text, field, false);
+                wrapper.appendChild(btn);
+            }
+        }
+    }
+
+    container.appendChild(wrapper);
+}
+
+/** 创建按钮点击闭包 */
+function makeClickHandler(btn, value, field, isMulti) {
+    return function() {
+        var wrapper = btn.closest('.question-options');
+        disableAllButtons(wrapper);
+        handleQuestionClick(value, field);
+    };
+}
+
+/** 禁用所有按钮 */
+function disableAllButtons(container) {
+    if (!container) return;
+    var btns = container.querySelectorAll('.question-btn, .question-custom-btn');
+    for (var i = 0; i < btns.length; i++) btns[i].disabled = true;
+    var inputs = container.querySelectorAll('.question-custom-input');
+    for (var i = 0; i < inputs.length; i++) inputs[i].disabled = true;
+}
+
+/** 处理可点击按钮点击 */
+window.handleQuestionClick = async function(value, field) {
+    // 添加用户消息到聊天
+    addChatMessage('user', value);
+
+    var progressId = 'progress-' + Date.now();
+    addChatMessage('system', '<div id="' + progressId + '">⏳ 正在处理...</div>');
+
+    try {
+        var result = await ApiClient.sendConsultation(value, user.id);
+        var loadingEl = document.getElementById(progressId);
+        if (loadingEl) {
+            var msgEl = loadingEl.closest('.chat-msg');
+            if (msgEl) msgEl.remove();
+        }
+
+        if (!result.success) {
+            addChatMessage('system', '⚠ 处理失败: ' + (result.error || '未知错误'));
+            return;
+        }
+
+        var phase = result.phase || 'drug_matching';
+        var cleanReply = result.reply.replace(/\*\*/g, '').replace(/```/g, '').replace(/`/g, '');
+        addChatMessage('agent', cleanReply);
+
+        // 表单收集阶段 — 渲染后续问题按钮
+        if (phase === 'form_collection' || phase === 'basics_collection') {
+            if (result.form_status) {
+                updateFormProgress(result.form_status);
+            }
+            if (result.questions && result.questions.length > 0) {
+                var lastMsg = document.querySelector('#chatMessages .chat-msg:last-child');
+                if (lastMsg) {
+                    renderQuestions(lastMsg.querySelector('.msg-bubble'), result.questions);
+                }
+            }
+            return;
+        }
+
+        // 确认阶段
+        if (phase === 'form_confirmation') {
+            var confirmId = 'confirm-' + Date.now();
+            addChatMessage('system',
+                '<div id="' + confirmId + '">' +
+                '<p>请确认以上信息是否准确？</p>' +
+                '<button class="btn btn-success btn-sm me-2" onclick="confirmForm()">✅ 确认无误</button>' +
+                '<button class="btn btn-outline-secondary btn-sm" onclick="editForm()">✏️ 需要修改</button>' +
+                '</div>'
+            );
+            window._pendingConfirm = true;
+            return;
+        }
+
+        // 药品匹配阶段（精简版）
+        if (result.approval_id) {
+            var drugName = result.drug_name || '未知';
+            var summary = '审批单已自动提交\n\n';
+            summary += '审批编号：' + result.approval_id + '\n';
+            summary += '推荐药品：' + drugName + ' x' + (result.quantity || 1) + '\n';
+            summary += '\n当前结果由 AI 生成，仅供参考，正在等待真人医生审批，请勿自行用药。';
+            addChatMessage('system', summary);
+
+            activeApprovals.push({
+                approval_id: result.approval_id,
+                drug_name: drugName,
+                quantity: result.quantity || 1,
+                symptoms: _lastFormSymptoms || value,
+                created_at: new Date().toISOString(),
+                status: 'pending',
+            });
+            saveState();
+            updateApprovalPanel({ approval_id: result.approval_id, status: 'pending', drug_name: drugName, quantity: result.quantity || 1 });
+            startApprovalPolling(result.approval_id);
+        }
+    } catch (err) {
+        var loadingEl = document.getElementById(progressId);
+        if (loadingEl) {
+            var msgEl = loadingEl.closest('.chat-msg');
+            if (msgEl) msgEl.remove();
+        }
+        addChatMessage('system', '⚠ 网络错误: ' + err.message);
+    }
+};
 
 // ===== 审批轮询 =====
 let pollingTimers = {};
@@ -610,6 +987,19 @@ window.confirmPickup = async function(approvalId, taskId) {
     activeApprovals.forEach(a => {
         if (a.status === 'pending') startApprovalPolling(a.approval_id);
     });
+})();
+
+// 自动启动问卷
+(async function startQuestionnaire() {
+    const result = await ApiClient.sendConsultation("开始", user.id);
+    if (result.success) {
+        const cleanReply = result.reply.replace(/\*\*/g, '').replace(/```/g, '').replace(/`/g, '');
+        addChatMessage('agent', cleanReply);
+        if (result.questions && result.questions.length > 0) {
+            const lastMsg = document.querySelector('#chatMessages .chat-msg:last-child');
+            if (lastMsg) renderQuestions(lastMsg.querySelector('.msg-bubble'), result.questions);
+        }
+    }
 })();
 
 // Focus input on load

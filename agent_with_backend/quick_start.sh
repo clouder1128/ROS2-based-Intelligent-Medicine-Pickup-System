@@ -62,6 +62,14 @@ for port in $BACKEND_PORT $FRONTEND_PORT; do
     fi
 done
 
+# ---- 清理持久化会话状态 ----
+SESSION_DIR="${ROOT_DIR}/sessions"
+if [ -d "$SESSION_DIR" ]; then
+    echo -e "${YELLOW}[清理] 清除持久化会话状态...${NC}"
+    rm -f "${SESSION_DIR}"/*.pkl
+    echo -e "${GREEN}  - 会话状态已重置${NC}"
+fi
+
 # ---- 初始化数据库 ----
 if [ ! -f "$DB_FILE" ]; then
     echo -e "${YELLOW}[初始化] 数据库不存在，正在创建...${NC}"

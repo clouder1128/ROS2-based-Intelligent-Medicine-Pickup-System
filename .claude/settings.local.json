@@ -20,7 +20,8 @@
       "Bash(sqlite3 /home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/agent_with_backend/pharmacy.db 'DELETE FROM order_log;')",
       "Bash(sqlite3 /home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/agent_with_backend/pharmacy.db 'SELECT COUNT\\(*\\) FROM order_log;')",
       "Bash(sqlite3 /home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/agent_with_backend/pharmacy.db 'DELETE FROM approvals;')",
-      "Bash(node -e ' *)"
+      "Bash(node -e ' *)",
+      "Bash(xxd)"
     ],
     "additionalDirectories": [
       "/home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/.worktrees/llm-thought-logging",

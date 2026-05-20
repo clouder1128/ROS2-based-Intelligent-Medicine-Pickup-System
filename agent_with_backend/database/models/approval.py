@@ -25,6 +25,12 @@ class Approval:
     doctor_id: Optional[str] = None
     reject_reason: Optional[str] = None
     approved_at: Optional[str] = None
+    gender: Optional[str] = None
+    pregnant: Optional[str] = None
+    drug_allergies: Optional[str] = None
+    food_allergies: Optional[str] = None
+    medical_history: Optional[str] = None
+    vital_signs: Optional[str] = None
 
     @classmethod
     def from_dict(cls, data: dict) -> "Approval":
@@ -43,6 +49,12 @@ class Approval:
             doctor_id=data.get("doctor_id"),
             reject_reason=data.get("reject_reason"),
             approved_at=data.get("approved_at"),
+            gender=data.get("gender"),
+            pregnant=data.get("pregnant"),
+            drug_allergies=data.get("drug_allergies"),
+            food_allergies=data.get("food_allergies"),
+            medical_history=data.get("medical_history"),
+            vital_signs=data.get("vital_signs"),
         )
 
     def to_dict(self) -> dict:
@@ -58,6 +70,8 @@ class Approval:
             "patient_age", "patient_weight", "symptoms",
             "drug_name", "drug_type", "doctor_id",
             "reject_reason", "approved_at",
+            "gender", "pregnant", "drug_allergies",
+            "food_allergies", "medical_history", "vital_signs",
         ]
         for field in optional_fields:
             value = getattr(self, field)
