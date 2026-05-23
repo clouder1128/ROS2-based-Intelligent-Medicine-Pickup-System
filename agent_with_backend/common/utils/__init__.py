@@ -1,3 +1,6 @@
+# 第三周：缓存层接口（组件1）
+from .cache import get_drug_cache, DrugCache, SimpleCache
+
 # 第一周：暴露统一响应格式工具，方便其他组件直接 from common.utils import ...
 from .response import (
     success_response,
@@ -27,6 +30,10 @@ from .validation import (
 )
 
 __all__ = [
+    # cache
+    "get_drug_cache",
+    "DrugCache",
+    "SimpleCache",
     # response
     "success_response",
     "paginated_response",
