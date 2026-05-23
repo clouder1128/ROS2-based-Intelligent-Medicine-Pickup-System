@@ -487,7 +487,26 @@ function renderQuestions(container, questions) {
                 var btn = document.createElement('button');
                 btn.className = 'question-btn';
                 btn.textContent = typeof opt === 'object' ? (opt.label || opt.value || String(opt)) : String(opt);
-                btn.onclick = makeClickHandler(btn, typeof opt === 'object' ? (opt.value || opt.label || String(opt)) : String(opt), field, isMulti);
+                var optValue = typeof opt === 'object' ? (opt.value || opt.label || String(opt)) : String(opt);
+                // __custom__ 选项不直接提交，而是聚焦到自定义输入框
+                if (allowCustom && optValue === '__custom__') {
+                    btn.onclick = function(b) {
+                        return function() {
+                            var wrapper = b.closest('.question-options');
+                            if (wrapper) {
+                                var inp = wrapper.querySelector('.question-custom-input');
+                                if (inp) {
+                                    inp.focus();
+                                    inp.style.borderColor = '#e74c3c';
+                                    inp.style.outline = 'none';
+                                    inp.placeholder = '请输入内容后再发送';
+                                }
+                            }
+                        };
+                    }(btn);
+                } else {
+                    btn.onclick = makeClickHandler(btn, optValue, field, isMulti);
+                }
                 btnGroup.appendChild(btn);
             }
             if (allowCustom) {

@@ -1495,6 +1495,8 @@ def rule_extract_basics(form: ConsultationForm, message: str, target_field: str)
     elif target_field == "allergies.drug_allergies":
         if not msg or any(kw in msg for kw in ["无", "没"]):
             form.allergies.drug_allergies = []
+        elif msg == "__custom__":
+            return
         else:
             parts = re.split(r"[,，、\s]+", msg)
             form.allergies.drug_allergies = [p.strip() for p in parts if p.strip()]
@@ -1502,6 +1504,8 @@ def rule_extract_basics(form: ConsultationForm, message: str, target_field: str)
     elif target_field == "current_medications":
         if not msg or any(kw in msg for kw in ["无", "没"]):
             form.current_medications = []
+        elif msg == "__custom__":
+            return
         else:
             parts = re.split(r"[,，、\s]+", msg)
             form.current_medications = [
