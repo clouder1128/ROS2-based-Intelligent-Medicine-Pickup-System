@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import sqlite3
 from typing import Any, Optional
 
 from auth.db import get_db_connection
@@ -16,9 +17,13 @@ def write_audit(
     resource: Optional[str] = None,
     details: Optional[dict[str, Any]] = None,
     ip: Optional[str] = None,
+    conn: Optional[sqlite3.Connection] = None,
 ) -> None:
+    """写入审计日志。可传入现有 conn 复用连接，避免每次都新建。"""
     details_s = json.dumps(details, ensure_ascii=False) if details else None
-    conn = get_db_connection()
+    own = conn is None
+    if own:
+        conn = get_db_connection()
     try:
         conn.execute(
             """
@@ -27,6 +32,8 @@ def write_audit(
             """,
             (user_id, username, action, resource, details_s, ip),
         )
-        conn.commit()
+        if own:
+            conn.commit()
     finally:
-        conn.close()
+        if own:
+            conn.close()

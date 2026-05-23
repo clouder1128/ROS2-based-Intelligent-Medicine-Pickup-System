@@ -77,7 +77,7 @@ class Config:
     NEGATION_WORDS = ["无", "没有", "不", "否", "非", "未"]
 
     # === 调试日志配置 ===
-    DEBUG_MODE: bool = os.getenv("DEBUG_MODE", "1") == "1"
+    DEBUG_MODE: bool = os.getenv("DEBUG_MODE", "0") == "1"
     # === 日志配置 ===
     LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO")
 

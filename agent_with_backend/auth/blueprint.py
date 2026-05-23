@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import sqlite3
 from datetime import datetime, timezone
 from typing import Any, Optional
 
@@ -24,7 +25,7 @@ from auth.middleware import (
     require_auth,
     require_permissions,
 )
-from auth.schema import ensure_auth_schema, permission_codes_for_user
+from auth.schema import permission_codes_for_user
 from auth.tokens import (
     ACCESS_TTL_SECONDS,
     JWT_ALG,
@@ -65,13 +66,21 @@ def _paginate_meta(total: int, page: int, limit: int) -> dict[str, Any]:
     }
 
 
-def _issue_tokens(user_row: Any) -> tuple[str, str, list[str]]:
-    conn = get_db_connection()
+def _issue_tokens(
+    user_row: Any,
+    *,
+    conn: Optional[sqlite3.Connection] = None,
+    role_code: Optional[str] = None,
+) -> tuple[str, str, list[str]]:
+    own = conn is None
+    if own:
+        conn = get_db_connection()
     try:
-        role_row = conn.execute(
-            "SELECT code FROM auth_roles WHERE id = ?", (user_row["role_id"],)
-        ).fetchone()
-        role_code = role_row["code"] if role_row else ""
+        if role_code is None:
+            role_row = conn.execute(
+                "SELECT code FROM auth_roles WHERE id = ?", (user_row["role_id"],)
+            ).fetchone()
+            role_code = role_row["code"] if role_row else ""
         perms = permission_codes_for_user(conn, int(user_row["id"]))
         access = create_access_token(
             int(user_row["id"]),
@@ -88,7 +97,8 @@ def _issue_tokens(user_row: Any) -> tuple[str, str, list[str]]:
             """,
             (int(user_row["id"]), jti, exp.isoformat()),
         )
-        conn.commit()
+        if own:
+            conn.commit()
         refresh_payload = {
             "sub": str(user_row["id"]),
             "type": "refresh",
@@ -99,7 +109,8 @@ def _issue_tokens(user_row: Any) -> tuple[str, str, list[str]]:
         refresh = jwt.encode(refresh_payload, _secret(), algorithm=JWT_ALG)
         return access, refresh, perms
     finally:
-        conn.close()
+        if own:
+            conn.close()
 
 
 def _user_info(conn: Any, user_id: int) -> Optional[dict[str, Any]]:
@@ -128,7 +139,6 @@ def _user_info(conn: Any, user_id: int) -> Optional[dict[str, Any]]:
 
 @auth_bp.route("/auth/register", methods=["POST"])
 def register():
-    ensure_auth_schema()
     data = request.get_json(silent=True) or {}
     username = (data.get("username") or "").strip()
     password = data.get("password") or ""
@@ -190,7 +200,9 @@ def register():
             action="register",
             resource="/api/auth/register",
             ip=request.remote_addr,
+            conn=conn,
         )
+        conn.commit()
         return jsonify({"success": True, "user_id": int(uid), "message": "注册成功"})
     finally:
         conn.close()
@@ -198,7 +210,6 @@ def register():
 
 @auth_bp.route("/auth/login", methods=["POST"])
 def login():
-    ensure_auth_schema()
     data = request.get_json(silent=True) or {}
     username = (data.get("username") or "").strip()
     password = data.get("password") or ""
@@ -231,7 +242,9 @@ def login():
                 action="login_failed",
                 resource="/api/auth/login",
                 ip=request.remote_addr,
+                conn=conn,
             )
+            conn.commit()
             return (
                 jsonify(
                     {
@@ -249,7 +262,9 @@ def login():
                 action="login_failed",
                 resource="/api/auth/login",
                 ip=request.remote_addr,
+                conn=conn,
             )
+            conn.commit()
             return (
                 jsonify(
                     {
@@ -260,7 +275,9 @@ def login():
                 ),
                 401,
             )
-        access, refresh, perms = _issue_tokens(row)
+        access, refresh, perms = _issue_tokens(
+            row, conn=conn, role_code=row["role_code"]
+        )
         disp = (row["display_name"] or "").strip() or row["username"]
         user_info = {
             "id": int(row["id"]),
@@ -276,7 +293,9 @@ def login():
             action="login",
             resource="/api/auth/login",
             ip=request.remote_addr,
+            conn=conn,
         )
+        conn.commit()
         return jsonify(
             {
                 "success": True,
@@ -296,7 +315,6 @@ def login():
 @auth_bp.route("/auth/verify", methods=["POST"])
 def verify_token():
     """校验 JWT，供前端刷新/路由守卫使用。"""
-    ensure_auth_schema()
     data = request.get_json(silent=True) or {}
     tok = (
         get_bearer_token(request)
@@ -351,7 +369,6 @@ def verify_token():
 @require_auth
 def profile():
     """当前登录用户信息（需 Bearer access token）。"""
-    ensure_auth_schema()
     actor = request.auth_user  # type: ignore[attr-defined]
     uid = int(actor["id"])
     conn = get_db_connection()
@@ -375,7 +392,6 @@ def profile():
 
 @auth_bp.route("/auth/logout", methods=["POST"])
 def logout():
-    ensure_auth_schema()
     data = request.get_json(silent=True) or {}
     refresh_tok = data.get("token") or data.get("refresh_token")
     user_id: Optional[int] = None
@@ -421,7 +437,6 @@ def logout():
 
 @auth_bp.route("/auth/refresh", methods=["POST"])
 def refresh():
-    ensure_auth_schema()
     data = request.get_json(silent=True) or {}
     refresh_tok = data.get("refresh_token") or data.get("token")
     if not refresh_tok:
@@ -497,13 +512,14 @@ def refresh():
                 401,
             )
         conn.execute("UPDATE auth_refresh_tokens SET revoked = 1 WHERE id = ?", (row["id"],))
-        conn.commit()
         access, new_refresh, perms = _issue_tokens(
             {
                 "id": row["uid"],
                 "username": row["username"],
                 "role_id": row["role_id"],
-            }
+            },
+            conn=conn,
+            role_code=row["role_code"],
         )
         write_audit(
             user_id=user_id,
@@ -511,7 +527,9 @@ def refresh():
             action="token_refresh",
             resource="/api/auth/refresh",
             ip=request.remote_addr,
+            conn=conn,
         )
+        conn.commit()
         return jsonify(
             {
                 "success": True,
@@ -538,7 +556,6 @@ def refresh():
 @auth_bp.route("/users", methods=["GET"])
 @require_permissions(PERM_READ_USERS)
 def list_users():
-    ensure_auth_schema()
     role_filter = request.args.get("role")
     status_filter = request.args.get("status")
     page, limit = _pagination_params()
@@ -585,7 +602,6 @@ def list_users():
 @auth_bp.route("/users/<int:user_id>", methods=["GET"])
 @require_auth
 def get_user(user_id: int):
-    ensure_auth_schema()
     actor = request.auth_user  # type: ignore[attr-defined]
     actor_id = int(actor["id"])
     conn = get_db_connection()
@@ -630,7 +646,6 @@ def get_user(user_id: int):
 @auth_bp.route("/users/<int:user_id>", methods=["PUT"])
 @require_auth
 def update_user(user_id: int):
-    ensure_auth_schema()
     actor = request.auth_user  # type: ignore[attr-defined]
     actor_id = int(actor["id"])
     data = request.get_json(silent=True) or {}
@@ -734,7 +749,6 @@ def update_user(user_id: int):
 @auth_bp.route("/roles", methods=["GET"])
 @require_auth
 def list_roles():
-    ensure_auth_schema()
     conn = get_db_connection()
     try:
         rows = conn.execute(
@@ -748,7 +762,6 @@ def list_roles():
 @auth_bp.route("/permissions", methods=["GET"])
 @require_auth
 def list_permissions():
-    ensure_auth_schema()
     role_id = request.args.get("role_id")
     conn = get_db_connection()
     try:
@@ -788,7 +801,6 @@ def list_permissions():
 @auth_bp.route("/users/<int:user_id>/permissions", methods=["GET"])
 @require_auth
 def user_permissions(user_id: int):
-    ensure_auth_schema()
     actor = request.auth_user  # type: ignore[attr-defined]
     actor_id = int(actor["id"])
     conn = get_db_connection()
@@ -814,7 +826,6 @@ def user_permissions(user_id: int):
 @auth_bp.route("/audit/logs", methods=["GET"])
 @require_permissions(PERM_READ_AUDIT)
 def audit_logs():
-    ensure_auth_schema()
     page, limit = _pagination_params()
     offset = (page - 1) * limit
     user_id = request.args.get("user_id")
@@ -874,7 +885,6 @@ def audit_logs():
 @auth_bp.route("/audit/stats", methods=["GET"])
 @require_permissions(PERM_READ_AUDIT)
 def audit_stats():
-    ensure_auth_schema()
     period = request.args.get("period", "7d")
     conn = get_db_connection()
     try:
