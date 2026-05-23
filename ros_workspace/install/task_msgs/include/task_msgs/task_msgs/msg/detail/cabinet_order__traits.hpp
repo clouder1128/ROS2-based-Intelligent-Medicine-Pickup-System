@@ -1,0 +1,1 @@
+/home/tang/ROS2-based-Intelligent-Medicine-Pickup-System/ros_workspace/build/task_msgs/rosidl_generator_cpp/task_msgs/msg/detail/cabinet_order__traits.hpp

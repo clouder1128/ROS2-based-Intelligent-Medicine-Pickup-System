@@ -97,10 +97,18 @@ async function handleLogin() {
     }
     document.getElementById('loginHint').style.display = 'none';
 
+    // 按钮 loading 状态，防止重复点击
+    const btn = document.querySelector('.btn-primary');
+    const btnHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="bi bi-hourglass"></i> 登录中...';
+
     const result = await ApiClient.login(username, password);
     if (!result.success) {
+        btn.disabled = false;
+        btn.innerHTML = btnHtml;
         document.getElementById('loginHint').style.display = 'block';
-        document.getElementById('loginHint').textContent = result.message || '登录失败，请检查用户名和密码';
+        document.getElementById('loginHint').textContent = result.message || result.error || '登录失败，请检查用户名和密码';
         return;
     }
     localStorage.setItem('auth_token', result.access_token);

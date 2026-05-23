@@ -8,6 +8,8 @@ import time
 import signal
 from typing import Dict, Any, Optional
 
+from common.utils.debug_logger import debug_log
+
 # Thread-safe global variables with locks
 ros2_available = False
 task_publisher_instance = None
@@ -18,6 +20,7 @@ shutdown_requested = False
 try:
     from ros_integration.node_manager import RosNodeManager
     from ros_integration.task_publisher import TaskPublisher
+    from ros_integration.state_subscriber import StateSubscriber
     from ros_integration.config import Config
     NEW_MODULES_AVAILABLE = True
 except ImportError as e:
@@ -47,6 +50,7 @@ def init_ros2() -> None:
         node_manager.start()
 
         publisher = TaskPublisher()
+        subscriber = StateSubscriber()
 
         with ros2_lock:
             task_publisher_instance = publisher
@@ -54,6 +58,9 @@ def init_ros2() -> None:
 
         print("[ROS2 Bridge] Initialized with new integration modules")
         print(f"[ROS2 Bridge] Integration mode: {Config().INTEGRATION_MODE}")
+        debug_log("[ROS→PUB]", "INIT",
+                  f"mode={Config().INTEGRATION_MODE}",
+                  "ok")
 
         time.sleep(1)
 
@@ -69,6 +76,9 @@ def init_ros2() -> None:
 
     except Exception as e:
         print(f"[ROS2 Bridge] Failed to initialize: {e}")
+        debug_log("[STATE!]", "INIT",
+                  f"mode={Config().INTEGRATION_MODE}",
+                  f"error={e}")
         with ros2_lock:
             ros2_available = False
             task_publisher_instance = None
@@ -97,8 +107,14 @@ def publish_task(task_id: int, drug: Dict[str, Any], quantity: int) -> None:
 
         if success:
             print(f'[ROS2 Bridge] Published task task_id={task_id} -> ({drug["shelf_x"]},{drug["shelf_y"]})')
+            debug_log("[ROS→PUB]", "TASK",
+                      f"task_id={task_id} drug={drug.get('name')} from=({drug['shelf_x']},{drug['shelf_y']})",
+                      "ok")
         else:
             print(f'[ROS2 Bridge] Failed to publish task {task_id} (see TaskPublisher logs)')
+            debug_log("[STATE!]", "TASK",
+                      f"task_id={task_id} drug={drug.get('name')}",
+                      "FAILED")
 
     except Exception as e:
         print(f"[ROS2 Bridge] Publish failed: {e}")
@@ -127,8 +143,14 @@ def publish_expiry_removal(drug: Dict[str, Any], remove_quantity: int) -> None:
 
         if success:
             print(f'[ROS2 Bridge] Published expiry removal drug_id={drug["drug_id"]} qty={remove_quantity}')
+            debug_log("[ROS→PUB]", "EXPIRY",
+                      f"drug_id={drug.get('drug_id')} qty={remove_quantity}",
+                      "ok")
         else:
             print(f'[ROS2 Bridge] Failed to publish expiry removal (see TaskPublisher logs)')
+            debug_log("[STATE!]", "EXPIRY",
+                      f"drug_id={drug.get('drug_id')}",
+                      "FAILED")
 
     except Exception as e:
         print(f"[ROS2 Bridge] Expiry removal publish failed: {e}")
@@ -156,8 +178,14 @@ def publish_return_to_queue(car_id: str = "default") -> None:
         success = task_publisher_instance.publish_return_to_queue(car_id)
         if success:
             print(f"[ROS2 Bridge] Published return_to_queue for car {car_id}")
+            debug_log("[ROS→PUB]", "RETURN",
+                      f"car={car_id}",
+                      "ok")
         else:
             print(f"[ROS2 Bridge] Failed to publish return_to_queue (see TaskPublisher logs)")
+            debug_log("[STATE!]", "RETURN",
+                      f"car={car_id}",
+                      "FAILED")
     except Exception as e:
         print(f"[ROS2 Bridge] Return-to-queue publish failed: {e}")
 

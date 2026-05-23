@@ -78,14 +78,16 @@ class SessionManager:
         return False
 
     def delete_session(self, patient_id: str) -> bool:
-        """删除会话（内存和磁盘）"""
+        """删除会话（内存和磁盘），同时清理表单文件"""
         if patient_id in self._sessions:
             del self._sessions[patient_id]
         state_file = os.path.join(self.state_dir, f"{patient_id}.pkl")
         if os.path.exists(state_file):
             os.unlink(state_file)
-            return True
-        return False
+        form_file = os.path.join(self.state_dir, f"{patient_id}_form.pkl")
+        if os.path.exists(form_file):
+            os.unlink(form_file)
+        return True
 
     def list_sessions(self) -> list:
         """列出所有已加载的会话ID"""

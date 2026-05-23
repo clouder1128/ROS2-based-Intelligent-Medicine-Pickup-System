@@ -7,6 +7,8 @@ import threading
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
+from common.utils.debug_logger import debug_log
+
 
 class RosStateStore:
     """ROS2 订阅状态内存存储（单例）"""
@@ -59,6 +61,11 @@ class RosStateStore:
                 "car_id": car_id,
                 "updated_at": self._now_iso(),
             }
+        if task_state != 0:
+            state_name = {0: 'pending', 1: 'in_progress', 2: 'delivered', 3: 'failed'}.get(task_state, 'unknown')
+            debug_log("[STATE]", "TASK",
+                      f"task_id={task_id} state={task_state}({state_name})",
+                      f"car={car_id}")
 
     def get_all_tasks(self) -> List[Dict[str, Any]]:
         with self._data_lock:

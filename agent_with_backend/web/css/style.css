@@ -867,6 +867,7 @@ body {
 .badge-approved  { background: #eafaf1; color: #1d8348; border: 1px solid #d5f5e3; }
 .badge-rejected  { background: #fdedec; color: #922b21; border: 1px solid #fadbd8; }
 .badge-completed { background: #ebf5fb; color: #1a5276; border: 1px solid #d6eaf8; }
+.badge-info      { background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
 .badge-warning   { background: #fef9e7; color: #9a5f0c; border: 1px solid #fdebd0; }
 .badge-danger    { background: #fdedec; color: #922b21; border: 1px solid #fadbd8; }
 

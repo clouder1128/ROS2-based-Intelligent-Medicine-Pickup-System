@@ -21,7 +21,16 @@
       "Bash(sqlite3 /home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/agent_with_backend/pharmacy.db 'SELECT COUNT\\(*\\) FROM order_log;')",
       "Bash(sqlite3 /home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/agent_with_backend/pharmacy.db 'DELETE FROM approvals;')",
       "Bash(node -e ' *)",
-      "Bash(xxd)"
+      "Bash(xxd)",
+      "Bash(kill 34028)",
+      "Bash(lsof -ti:8001)",
+      "Bash(kill -9 34028)",
+      "Bash(lsof -ti:8080)",
+      "Bash(lsof -ti:10000)",
+      "Bash(curl -s http://localhost:8080/index.html)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:8080/patient.html)",
+      "Bash(curl -s -X OPTIONS http://localhost:8001/api/auth/login -H 'Origin: http://localhost:8080' -H 'Access-Control-Request-Method: POST' -H 'Access-Control-Request-Headers: Content-Type' -I)",
+      "Bash(curl -s -X POST http://localhost:8001/api/auth/login -H 'Content-Type: application/json' -d '{\"username\":\"patient1\",\"password\":\"wrong\"}')"
     ],
     "additionalDirectories": [
       "/home/clouder/ROS2-based-Intelligent-Medicine-Pickup-System/.worktrees/llm-thought-logging",

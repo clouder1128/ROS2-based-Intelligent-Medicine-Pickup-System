@@ -11,6 +11,7 @@ from .config import Config, TopicConfig
 from .message_adapter import MessageAdapter
 from .node_manager import RosNodeManager
 from .error_handler import ErrorHandler, GracefulDegradation
+from common.utils.debug_logger import debug_log
 
 # 条件导入ROS2模块
 try:
@@ -118,6 +119,9 @@ class TaskPublisher:
 
             self._initialized = True
             print(f"[TaskPublisher] Initialized with mode: {mode}")
+            debug_log("[ROS→PUB]", "INIT",
+                      f"mode={mode} new={self._new_publisher is not None} legacy={self._legacy_publisher is not None}",
+                      "ok")
 
         except Exception as e:
             print(f"[TaskPublisher] Failed to initialize publishers: {e}")
@@ -193,10 +197,16 @@ class TaskPublisher:
             # 记录成功
             if success:
                 self._degradation.record_success()
+                debug_log("[ROS→PUB]", "PUBLISH",
+                          f"task_id={task_id} topic={TopicConfig.TASK_TOPIC_NEW if mode != 'legacy' else TopicConfig.TASK_TOPIC_LEGACY}",
+                          "ok")
                 return True
             else:
                 print(f"[TaskPublisher] Failed to publish in mode {mode}: no publishers available")
                 self._degradation.record_failure()
+                debug_log("[STATE!]", "PUBLISH",
+                          f"task_id={task_id} mode={mode}",
+                          "no publishers available")
                 return False
 
         except Exception as e:

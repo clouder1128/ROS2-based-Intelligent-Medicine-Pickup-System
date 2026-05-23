@@ -7,6 +7,7 @@ from flask import Blueprint, jsonify, request
 from common.utils.database import get_db_connection
 from ros_integration.bridge import publish_task
 from common.utils.drug_helpers import validate_and_get_drug, find_drug_id_by_name
+from common.utils.debug_logger import debug_log
 
 from auth.middleware import require_auth, require_permission
 from auth.constants import PERM_READ_ORDER
@@ -34,6 +35,9 @@ def create_order_for_drug(
         if publish_now:
             publish_task(task_id, drug, quantity)
 
+        debug_log("[ORDER]", "CREATE",
+                  f"task_id={task_id} drug_id={drug_id} name={drug.get('name')} qty={quantity}",
+                  f"publish={publish_now}")
         return task_id, ""
     except Exception as e:
         return None, f"创建订单失败: {str(e)}"
@@ -90,6 +94,8 @@ def order():
         conn.commit()
         for (drug_id, num, drug), task_id in zip(tasks, task_ids):
             publish_task(task_id, drug, num)
+        debug_log("[ORDER]", "BATCH",
+                  f"task_ids={task_ids} count={len(task_ids)}")
         return jsonify({"success": True, "ok": True, "task_ids": task_ids, "message": f"已下发 {len(task_ids)} 个取药任务，库存已扣减"})
     except Exception as e:
         print(f"Database error in order function: {e}")
@@ -131,6 +137,8 @@ def pickup():
             conn.rollback()
             return (jsonify({"success": False, "ok": False, "error": err, "code": "INSUFFICIENT_INVENTORY"}), 400)
         conn.commit()
+        debug_log("[ORDER]", "PICKUP",
+                  f"task_id={task_id} drug={drug['name']} qty={num}")
         return jsonify({"success": True, "ok": True, "task_id": task_id, "drug_id": drug_id, "name": drug["name"], "quantity": num, "shelve_id": drug["shelve_id"], "x": drug["shelf_x"], "y": drug["shelf_y"]})
     except Exception as e:
         print(f"Database error in pickup function: {e}")
@@ -203,6 +211,8 @@ def dispense():
             if drug:
                 publish_task(task_id, drug, quantity)
 
+        debug_log("[ORDER]", "DISPENSE",
+                  f"prescription={prescription_id} patient={patient_name} task_ids={task_ids}")
         return jsonify({"success": True, "ok": True, "prescription_id": prescription_id, "patient_name": patient_name, "task_ids": task_ids, "message": f"处方配药成功，创建了{len(task_ids)}个取药任务", "mode": "real_api"})
     except Exception as e:
         if conn:
@@ -277,6 +287,8 @@ def list_orders():
                 "has_next": page < pages,
                 "has_prev": page > 1,
             }
+        debug_log("[ORDER]", "LIST",
+                  f"returned={len(orders)} total={total} page={page}")
         return jsonify(resp)
 
     except Exception as e:
@@ -308,6 +320,8 @@ def complete_order(task_id):
         conn.commit()
         if cur.rowcount == 0:
             return jsonify({"success": False, "error": "订单不存在", "code": "NOT_FOUND"}), 404
+        debug_log("[ORDER]", "COMPLETE",
+                  f"task_id={task_id}")
         return jsonify({"success": True, "message": "订单已标记为已完成", "task_id": task_id})
     except Exception as e:
         return jsonify({"success": False, "error": f"更新订单失败: {str(e)}", "code": "DB_ERROR"}), 500

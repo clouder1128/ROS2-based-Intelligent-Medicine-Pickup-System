@@ -239,7 +239,11 @@ window.doApprove = async function(approvalId) {
 
     const result = await ApiClient.approveApproval(approvalId, user.id, notes);
     if (result.success) {
-        showToast('审批已通过！订单已自动创建', 'success');
+        if (result.order_created) {
+            showToast('审批已通过！订单已自动创建', 'success');
+        } else {
+            showToast(`审批已通过，但订单创建失败: ${result.order_message || '未知原因'}`, 'warning');
+        }
 
         // Save to history
         const approval = pendingApprovals.find(a => (a.approval_id || a.id) === approvalId);

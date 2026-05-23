@@ -36,8 +36,7 @@ class SymptomEntry:
     location: Optional[str] = None
     quality: Optional[str] = None
     severity_0_10: Optional[int] = None
-    onset_time: Optional[str] = None
-    duration: Optional[str] = None
+    onset_time: Optional[str] = None       # 包含"X天前""X天了"等时间表述
     pattern: Optional[str] = None            # 持续性/间歇性/夜间加重等
     trigger_factors: Optional[str] = None
     relieving_factors: Optional[str] = None
@@ -266,8 +265,6 @@ class ConsultationForm:
                     desc.append(f"性质：{s.quality}")
                 if s.severity_0_10 is not None:
                     desc.append(f"程度：{s.severity_0_10}/10")
-                if s.duration:
-                    desc.append(f"持续：{s.duration}")
                 if s.onset_time:
                     desc.append(f"起病：{s.onset_time}")
                 if s.accompanying_symptoms:
@@ -592,7 +589,6 @@ def _get_symptom_field(symptom: SymptomEntry, field_path: str) -> Any:
         "symptoms[].quality": symptom.quality,
         "symptoms[].severity_0_10": symptom.severity_0_10,
         "symptoms[].onset_time": symptom.onset_time,
-        "symptoms[].duration": symptom.duration,
     }
     return mapping.get(field_path)
 
@@ -853,8 +849,6 @@ def generate_form_summary(form: ConsultationForm) -> str:
                 desc.append(f"性质：{s.quality}")
             if s.severity_0_10 is not None:
                 desc.append(f"程度：{s.severity_0_10}/10分")
-            if s.duration:
-                desc.append(f"持续：{s.duration}")
             if s.onset_time:
                 desc.append(f"起病：{s.onset_time}")
             if s.accompanying_symptoms:
@@ -952,8 +946,7 @@ EXTRACTION_SYSTEM_PROMPT = """你是一名医疗信息提取专家。
             "location": "部位"或null,
             "quality": "性质"或null,
             "severity_0_10": 数值或null,
-            "onset_time": "起病时间"或null,
-            "duration": "持续时间"或null,
+            "onset_time": "起病时间（患者说的\"X天前\"\"X天了\"\"X小时了\"等时间都往这里填）"或null,
             "pattern": "时间模式"或null,
             "trigger_factors": "诱发因素"或null,
             "relieving_factors": "缓解因素"或null,
@@ -1248,7 +1241,7 @@ def _merge_symptoms(data: Optional[List[Dict[str, Any]]], form: ConsultationForm
     for i, s_data in enumerate(data):
         if not any(k in s_data and s_data[k] is not None for k in
                     ["location", "quality", "severity_0_10", "onset_time",
-                     "pattern", "duration", "trigger_factors", "accompanying_symptoms"]):
+                     "pattern", "trigger_factors", "accompanying_symptoms"]):
             continue
 
         if i < existing_count:
@@ -1265,8 +1258,6 @@ def _merge_symptoms(data: Optional[List[Dict[str, Any]]], form: ConsultationForm
             target.severity_0_10 = int(s_data["severity_0_10"])
         if s_data.get("onset_time") is not None:
             target.onset_time = s_data["onset_time"]
-        if s_data.get("duration") is not None:
-            target.duration = s_data["duration"]
         if s_data.get("pattern") is not None:
             target.pattern = s_data["pattern"]
         if s_data.get("trigger_factors") is not None:

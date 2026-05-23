@@ -1,0 +1,1 @@
+/home/tang/ROS2-based-Intelligent-Medicine-Pickup-System/ros_workspace/build/task_msgs/rosidl_typesupport_introspection_c/task_msgs/msg/detail/task_state__rosidl_typesupport_introspection_c.h

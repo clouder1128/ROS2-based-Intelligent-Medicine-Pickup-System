@@ -133,8 +133,8 @@
 const user = requireAuth('patient');
 if (!user) throw new Error('Auth required');
 
-// 启动时校验 token 有效性
-ApiClient.getProfile().then(r => { if (!r.success) { localStorage.clear(); window.location.href = 'index.html'; } });
+// 启动时校验 token 有效性（静默失败，不主动清除登录态）
+ApiClient.getProfile().catch(() => {});
 
 let consultHistory = JSON.parse(localStorage.getItem(`consultHistory_${user.id}`) || '[]');
 let pickupHistory = JSON.parse(localStorage.getItem(`pickupHistory_${user.id}`) || '[]');
@@ -161,13 +161,24 @@ document.getElementById('sidebarFooter').innerHTML = `
 document.getElementById('topUserBadge').innerHTML = `<i class="bi bi-person-circle"></i> ${getUserDisplay(user)}`;
 
 // ===== Tab切换 =====
+let _statusRefreshTimer = null;
 window.switchTab = function(tab) {
     document.querySelectorAll('.tab-nav button').forEach(b => b.classList.remove('active'));
     event.target.classList.add('active');
     document.getElementById('tab-consult').style.display = tab === 'consult' ? '' : 'none';
     document.getElementById('tab-status').style.display = tab === 'status' ? '' : 'none';
     document.getElementById('tab-history').style.display = tab === 'history' ? '' : 'none';
-    if (tab === 'status') refreshStatusTracking();
+    if (tab === 'status') {
+        refreshStatusTracking();
+        // 独立定时器刷新状态跟踪（每3秒）
+        if (_statusRefreshTimer) clearInterval(_statusRefreshTimer);
+        _statusRefreshTimer = setInterval(refreshStatusTracking, 3000);
+    } else {
+        if (_statusRefreshTimer) {
+            clearInterval(_statusRefreshTimer);
+            _statusRefreshTimer = null;
+        }
+    }
     if (tab === 'history') refreshHistory();
 };
 
@@ -309,6 +320,7 @@ window.sendMessage = async function() {
                 symptoms: _lastFormSymptoms || text,
                 created_at: new Date().toISOString(),
                 status: 'pending',
+                tracking_status: 'waiting_approval',
             });
 
             consultHistory.unshift({
@@ -408,10 +420,17 @@ window.confirmForm = async function() {
                 symptoms: _lastFormSymptoms,
                 created_at: new Date().toISOString(),
                 status: 'pending',
+                tracking_status: 'waiting_approval',
+            });
+            consultHistory.unshift({
+                date: new Date().toISOString(),
+                symptoms: _lastFormSymptoms,
+                drug: drugName,
+                approval_id: result.approval_id,
             });
             saveState();
             _lastFormSymptoms = '';
-            updateApprovalPanel({ approval_id: result.approval_id, status: 'pending', drug_name: drugName, quantity: result.quantity || 1 });
+            updateApprovalPanel({ approval_id: result.approval_id, status: 'pending', tracking_status: 'waiting_approval', drug_name: drugName, quantity: result.quantity || 1 });
             startApprovalPolling(result.approval_id);
         }
     } catch (err) {
@@ -645,6 +664,13 @@ window.handleQuestionClick = async function(value, field) {
                 symptoms: _lastFormSymptoms || value,
                 created_at: new Date().toISOString(),
                 status: 'pending',
+                tracking_status: 'waiting_approval',
+            });
+            consultHistory.unshift({
+                date: new Date().toISOString(),
+                symptoms: _lastFormSymptoms || value,
+                drug: drugName,
+                approval_id: result.approval_id,
             });
             saveState();
             updateApprovalPanel({ approval_id: result.approval_id, status: 'pending', drug_name: drugName, quantity: result.quantity || 1 });
@@ -660,7 +686,7 @@ window.handleQuestionClick = async function(value, field) {
     }
 };
 
-// ===== 审批轮询 =====
+// ===== 审批轮询（统一状态跟踪） =====
 let pollingTimers = {};
 
 function startApprovalPolling(approvalId) {
@@ -681,95 +707,23 @@ function startApprovalPolling(approvalId) {
         failCount = 0;
 
         const approval = result.approval;
-        // Update active approvals
+        // Update active approvals with tracking_status from backend
         const idx = activeApprovals.findIndex(a => a.approval_id === approvalId);
         if (idx >= 0) {
             activeApprovals[idx].status = approval.status;
+            activeApprovals[idx].tracking_status = approval.tracking_status || null;
+            if (approval.task_id) activeApprovals[idx].task_id = approval.task_id;
             if (approval.quantity) activeApprovals[idx].quantity = approval.quantity;
-            if (approval.status === 'approved') {
-                activeApprovals[idx].approved_at = approval.approved_at;
-                // task_id 由后端在审批通过时直接存入审批记录
-                if (approval.task_id) {
-                    activeApprovals[idx].task_id = approval.task_id;
-                    startRosTaskPolling(approvalId, approval.task_id, approval.drug_name);
-                }
-            }
             saveState();
         }
 
-        // Update UI if on status tab
-        if (document.getElementById('tab-status').style.display !== 'none') {
-            refreshStatusTracking();
-        }
         updateApprovalPanel(approval);
 
-        if (approval.status !== 'pending') {
+        // 只在终态停止轮询，确保 tracking_status 状态变化全程可同步
+        const terminalStates = ['completed', 'failed', 'rejected'];
+        if (terminalStates.includes(approval.tracking_status) || approval.status === 'rejected') {
             clearInterval(pollingTimers[approvalId]);
             delete pollingTimers[approvalId];
-        }
-    }, 3000);
-}
-
-// ===== ROS2 Task Status Polling =====
-function startRosTaskPolling(approvalId, taskId, drugName) {
-    if (pollingTimers[`ros_${approvalId}`]) clearInterval(pollingTimers[`ros_${approvalId}`]);
-
-    const stages = [
-        { task_state: 0, title: '任务已创建', desc: '取药任务已创建，等待AGV小车执行', icon: 'bi-file-text' },
-        { task_state: 1, title: '执行中', desc: 'AGV小车正在前往货架取药...', icon: 'bi-truck' },
-        { task_state: 2, title: '已送达', desc: '药品已送达取药台，请前往领取', icon: 'bi-box-arrow-down' },
-    ];
-
-    const idx = activeApprovals.findIndex(a => a.approval_id === approvalId);
-    if (idx >= 0) {
-        activeApprovals[idx].robotStages = stages.map(s => ({
-            ...s, completed: false, active: false,
-        }));
-        activeApprovals[idx].robotStages[0].active = true;
-        saveState();
-    }
-
-    pollingTimers[`ros_${approvalId}`] = setInterval(async () => {
-        const result = await ApiClient.getTaskState(taskId);
-        if (!result.success) return;
-
-        const taskState = result.data;
-        if (!taskState || taskState.task_state === undefined) return;
-        const stateVal = taskState.task_state;
-
-        const idx = activeApprovals.findIndex(a => a.approval_id === approvalId);
-        if (idx < 0) { clearInterval(pollingTimers[`ros_${approvalId}`]); return; }
-
-        // Map ROS2 task_state (0=pending, 1=running, 2=completed, 3=failed)
-        const stageIdx = Math.min(stateVal, stages.length - 1);
-        activeApprovals[idx].robotStages.forEach((s, j) => {
-            if (j < stageIdx) { s.completed = true; s.active = false; }
-            else if (j === stageIdx) { s.active = true; s.completed = false; }
-            else { s.active = false; s.completed = false; }
-        });
-
-        if (stateVal >= 2) {
-            activeApprovals[idx].pickupReady = (stateVal === 2);
-            if (stateVal === 3) {
-                activeApprovals[idx].robotStages[stageIdx].title = '任务失败';
-                activeApprovals[idx].robotStages[stageIdx].desc = '取药任务执行失败，请联系管理员';
-            }
-            if (stateVal === 2) {
-                pickupHistory.unshift({
-                    date: new Date().toISOString(),
-                    drug_name: drugName,
-                    task_id: taskId,
-                    status: 'waiting_pickup',
-                });
-            }
-            saveState();
-            clearInterval(pollingTimers[`ros_${approvalId}`]);
-            delete pollingTimers[`ros_${approvalId}`];
-        }
-        saveState();
-
-        if (document.getElementById('tab-status').style.display !== 'none') {
-            refreshStatusTracking();
         }
     }, 3000);
 }
@@ -829,17 +783,30 @@ function updateApprovalPanel(approval) {
         return;
     }
     const statusMap = {
-        pending: { cls: 'badge-pending', text: '待审批', icon: 'bi-hourglass-split' },
-        approved: { cls: 'badge-approved', text: '已通过', icon: 'bi-check-circle' },
-        rejected: { cls: 'badge-rejected', text: '已拒绝', icon: 'bi-x-circle' },
+        pending: { cls: 'badge-pending', text: '待审批' },
+        approved: { cls: 'badge-approved', text: '已通过' },
+        rejected: { cls: 'badge-rejected', text: '已拒绝' },
     };
     const s = statusMap[approval.status] || statusMap.pending;
+
+    // tracking_status 显示文本映射
+    const tsMap = {
+        waiting_approval: '等待医生审批',
+        pending_dispatch: '取药任务待分配',
+        in_progress: '取药任务进行中',
+        delivered: '药品送达取药台',
+        completed: '取药完成',
+        failed: '取药失败',
+        rejected: '审批被拒绝',
+    };
+    const tsText = tsMap[approval.tracking_status] || '';
+
     panel.innerHTML = `
         <div style="font-size:14px;">
             <div><strong>审批ID:</strong> ${approval.approval_id || '-'}</div>
             <div class="mt-2"><strong>状态:</strong> <span class="badge ${s.cls}">${s.text}</span></div>
+            ${tsText ? `<div class="mt-1"><strong>进度:</strong> ${tsText}</div>` : ''}
             ${approval.drug_name ? `<div class="mt-2"><strong>药品:</strong> ${approval.drug_name} x${approval.quantity || 1}</div>` : ''}
-            ${approval.status === 'approved' ? '<div class="alert alert-success mt-2">审批已通过，订单已自动创建！</div>' : ''}
             ${approval.status === 'rejected' ? `<div class="alert alert-danger mt-2">审批被拒绝: ${approval.reject_reason || '无'}</div>` : ''}
             ${approval.status === 'pending' ? '<div class="alert alert-info mt-2">等待医生审批中...</div>' : ''}
         </div>
@@ -847,6 +814,24 @@ function updateApprovalPanel(approval) {
 }
 
 // ===== Status Tracking Tab =====
+const TRACKING_STATUS_MAP = {
+    waiting_approval:  { text: '等待医生审批',      badge: 'badge-pending',  icon: 'bi-file-text',     step: 0 },
+    pending_dispatch:  { text: '取药任务待分配',    badge: 'badge-info',     icon: 'bi-box-arrow-in-right', step: 1 },
+    in_progress:       { text: '取药任务进行中',    badge: 'badge-warning',  icon: 'bi-truck',         step: 2 },
+    delivered:         { text: '药品送达取药台',    badge: 'badge-success',  icon: 'bi-box-arrow-down', step: 3 },
+    completed:         { text: '取药完成',          badge: 'badge-completed', icon: 'bi-check-circle', step: 4 },
+    failed:            { text: '取药失败',          badge: 'badge-danger',   icon: 'bi-x-circle',      step: -1 },
+    rejected:          { text: '审批被拒绝',        badge: 'badge-danger',   icon: 'bi-x-circle',      step: -1 },
+};
+
+const TRACKING_STEPS = [
+    { title: '等待医生审批',   desc: 'AI 咨询已完成，审批单已提交，等待医生审核',          icon: 'bi-file-text' },
+    { title: '取药任务待分配', desc: '审批已通过，取药任务已创建，等待 AGV 小车调度',       icon: 'bi-box-arrow-in-right' },
+    { title: '取药任务进行中', desc: 'AGV 小车正在前往货架取药...',                        icon: 'bi-truck' },
+    { title: '药品送达取药台', desc: '药品已送达取药台，请前往领取',                        icon: 'bi-box-arrow-down' },
+    { title: '取药完成',       desc: '您已成功取药，祝早日康复',                           icon: 'bi-check-circle' },
+];
+
 function refreshStatusTracking() {
     const container = document.getElementById('statusTracking');
     if (activeApprovals.length === 0) {
@@ -855,41 +840,58 @@ function refreshStatusTracking() {
     }
 
     container.innerHTML = activeApprovals.map(a => {
-        const statusHtml = a.robotStages ? `
-            <div class="status-timeline mt-2">
-                ${a.robotStages.map(s => `
-                    <div class="status-step ${s.completed ? 'completed' : s.active ? 'active' : ''}">
-                        <div class="step-dot"><i class="bi ${s.icon}"></i></div>
-                        <div class="step-content">
-                            <div class="step-title">${s.title}</div>
-                            <div class="step-desc">${s.desc}</div>
+        const ts = a.tracking_status || 'waiting_approval';
+        const info = TRACKING_STATUS_MAP[ts] || TRACKING_STATUS_MAP.waiting_approval;
+        const isRejected = ts === 'rejected';
+        const isFailed = ts === 'failed';
+        const isCompleted = ts === 'completed';
+        const isDelivered = ts === 'delivered';
+
+        // 构建步骤进度条（仅正常进度显示）
+        const stepHtml = (!isRejected && !isFailed) ? `
+            <div class="status-timeline mt-3">
+                ${TRACKING_STEPS.map((s, i) => {
+                    const stepNum = info.step;
+                    const isDone = i < stepNum;
+                    const isActive = i === stepNum && !isCompleted;
+                    const cls = isDone || (isCompleted && i <= stepNum) ? 'completed' : isActive ? 'active' : '';
+                    // delivered 步骤特殊高亮待取药按钮
+                    const showPickupBtn = i === 3 && isDelivered;
+                    return `
+                        <div class="status-step ${cls}">
+                            <div class="step-dot"><i class="bi ${s.icon}"></i></div>
+                            <div class="step-content">
+                                <div class="step-title">${s.title}</div>
+                                <div class="step-desc">${s.desc}</div>
+                                ${showPickupBtn ? `
+                                    <div class="pickup-notice mt-2">
+                                        <i class="bi bi-bell-fill" style="font-size:20px;color:#f59e0b;"></i>
+                                        <strong>药品已送达取药台，请取药！</strong>
+                                        <button class="btn btn-success mt-2" onclick="confirmPickup('${a.approval_id}', '${a.task_id}')">
+                                            <i class="bi bi-hand-thumbs-up"></i> 成功取药
+                                        </button>
+                                    </div>` : ''}
+                            </div>
                         </div>
-                    </div>
-                `).join('')}
+                    `;
+                }).join('')}
             </div>
-            ${a.pickupReady ? `
-                <div class="pickup-notice mt-2">
-                    <i class="bi bi-bell-fill" style="font-size:20px;color:#f59e0b;"></i>
-                    <strong>药品已送达取药台！</strong>
-                    <button class="btn btn-success mt-2" onclick="confirmPickup('${a.approval_id}', '${a.task_id}')">
-                        <i class="bi bi-hand-thumbs-up"></i> 成功取药
-                    </button>
-                </div>` : ''}
-        ` : (a.status === 'approved' ? '<div class="alert alert-success mt-2">审批已通过，等待 ROS2 任务调度...</div>'
-            : a.status === 'rejected' ? '<div class="alert alert-danger mt-2">审批已被拒绝</div>'
-            : '<div class="alert alert-info mt-2">等待医生审批...</div>');
+        ` : '';
 
         return `
             <div class="drug-recommendation">
                 <div class="drug-rec-header">
                     <span class="drug-rec-name">审批: ${a.approval_id}</span>
-                    <span class="badge ${a.status === 'approved' ? 'badge-approved' : a.status === 'rejected' ? 'badge-rejected' : 'badge-pending'}">${a.status === 'approved' ? '已通过' : a.status === 'rejected' ? '已拒绝' : '待审批'}</span>
+                    <span class="badge ${info.badge}">${info.text}</span>
                 </div>
                 <div class="drug-rec-details">
                     <span>药品: ${a.drug_name || '-'} x${a.quantity || 1}</span>
                     <span>症状: ${a.symptoms || '-'}</span>
                 </div>
-                ${statusHtml}
+                ${stepHtml}
+                ${isFailed ? '<div class="alert alert-danger mt-2">取药任务执行失败，请联系管理员</div>' : ''}
+                ${isRejected ? '<div class="alert alert-danger mt-2">审批已被拒绝</div>' : ''}
+                ${isCompleted ? '<div class="alert alert-success mt-2">取药已完成，祝早日康复！</div>' : ''}
             </div>
         `;
     }).join('');
@@ -953,16 +955,18 @@ window.confirmPickup = async function(approvalId, taskId) {
 
     const drugName = activeApprovals[idx].drug_name || '未知';
 
-    // 1. Mark order complete
+    // 1. Mark order complete + approval complete
     if (taskId) await ApiClient.confirmPickup(taskId);
-    // 2. Mark approval complete & trigger ROS2 return-to-queue
     await ApiClient.completeApproval(approvalId);
-    // 3. Notify ROS2 car to return to queue
+    // 2. Notify ROS2 car to return to queue
     await ApiClient.returnToQueue();
-    // 4. Update local state — remove from active, add to history
-    activeApprovals[idx].pickupReady = false;
-    activeApprovals[idx].status = 'completed';
-    activeApprovals.splice(idx, 1);
+    // 3. Cleanup polling timer
+    if (pollingTimers[approvalId]) {
+        clearInterval(pollingTimers[approvalId]);
+        delete pollingTimers[approvalId];
+    }
+    // 4. 保留审批单显示，标记为已完成
+    activeApprovals[idx].tracking_status = 'completed';
     pickupHistory.unshift({
         date: new Date().toISOString(),
         drug_name: drugName,
@@ -976,16 +980,20 @@ window.confirmPickup = async function(approvalId, taskId) {
 
 // ===== 启动时校验并恢复活跃审批轮询 =====
 (async function validateActiveApprovals() {
+    const terminalStates = ['completed', 'failed', 'rejected'];
     const valid = [];
     for (const a of activeApprovals) {
-        if (a.status !== 'pending') { valid.push(a); continue; }
+        // 对非 pending 状态也向后端验证，确保 approval 仍然有效
         const res = await ApiClient.getApproval(a.approval_id);
         if (res.success) valid.push(a);
     }
     activeApprovals = valid;
     saveState();
     activeApprovals.forEach(a => {
-        if (a.status === 'pending') startApprovalPolling(a.approval_id);
+        // 对所有非终态 approval 都启动 polling，不限于 status === 'pending'
+        if (!terminalStates.includes(a.tracking_status)) {
+            startApprovalPolling(a.approval_id);
+        }
     });
 })();
 

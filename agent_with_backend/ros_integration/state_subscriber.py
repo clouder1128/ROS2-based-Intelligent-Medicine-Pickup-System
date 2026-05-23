@@ -5,11 +5,14 @@
 
 import threading
 import time
+import sqlite3
 from typing import Dict, Any, Optional
 from .config import Config, TopicConfig
 from .node_manager import RosNodeManager
 from .message_adapter import MessageAdapter
 from .error_handler import ErrorHandler
+from common.utils.database import get_db_connection
+from common.utils.debug_logger import debug_log
 
 # 条件导入ROS2模块
 try:
@@ -117,7 +120,7 @@ class StateSubscriber:
         self._cabinet_state_callback = callback
 
     def _task_state_callback_wrapper(self, msg):
-        """任务状态回调包装器 - 写入 RosStateStore"""
+        """任务状态回调包装器 - 写入 RosStateStore 和数据库"""
         try:
             from ros_integration.state_store import RosStateStore
             store = RosStateStore()
@@ -125,6 +128,76 @@ class StateSubscriber:
             task_state = int(msg.task_state) if hasattr(msg, 'task_state') else 0
             car_id = int(msg.car_id) if hasattr(msg, 'car_id') else 0
             store.update_task(task_id, task_state, car_id)
+
+            state_name = {0: 'pending', 1: 'in_progress', 2: 'delivered', 3: 'failed'}.get(task_state, 'unknown')
+            debug_log("[ROS←SUB]", "TASK",
+                      f"task_id={task_id} state={task_state}({state_name}) car={car_id}")
+
+            # 更新数据库中的订单状态和审批跟踪状态
+            if task_state >= 1:
+                try:
+                    conn = get_db_connection()
+                    # task_state=1 → in_progress, =2 → delivered, =3 → failed
+                    tracking_map = {1: 'in_progress', 2: 'delivered', 3: 'failed'}
+                    tracking_status = tracking_map.get(task_state)
+                    if tracking_status:
+                        conn.execute(
+                            "UPDATE approvals SET tracking_status = ? WHERE task_id = ? "
+                            "AND tracking_status IN ('pending_dispatch', 'in_progress', 'delivered')",
+                            (tracking_status, task_id),
+                        )
+
+                    # 任务进行中时更新 order_log
+                    if task_state == 1:
+                        conn.execute(
+                            "UPDATE order_log SET status = 'in_progress' WHERE task_id = ? AND status = 'pending'",
+                            (int(task_id),),
+                        )
+
+                    # 任务完成或失败时更新 order_log
+                    if task_state >= 2:
+                        new_status = "failed" if task_state == 3 else "delivered"
+                        conn.execute(
+                            "UPDATE order_log SET status = ? WHERE task_id = ? AND status IN ('pending', 'in_progress')",
+                            (new_status, int(task_id)),
+                        )
+
+                    # 构建 order_log 状态描述
+                    if task_state == 1:
+                        order_status_desc = "in_progress"
+                    elif task_state >= 2:
+                        order_status_desc = new_status
+                    else:
+                        order_status_desc = "unchanged"
+
+                    conn.commit()
+                    debug_log("[STATE]", "DB_UPDATE",
+                              f"task_id={task_id}",
+                              f"tracking={tracking_status} order={order_status_desc}")
+                    conn.close()
+                except Exception as db_e:
+                    err_msg = str(db_e)
+                    debug_log("[STATE!]", "DB_UPDATE",
+                              f"task_id={task_id}",
+                              f"error={err_msg}")
+                    # 自动修复: approvals 表缺少 tracking_status 列时补充迁移
+                    if "no such column: tracking_status" in err_msg:
+                        try:
+                            conn2 = get_db_connection()
+                            conn2.execute(
+                                "ALTER TABLE approvals ADD COLUMN tracking_status TEXT DEFAULT 'waiting_approval'"
+                            )
+                            conn2.commit()
+                            conn2.close()
+                            debug_log("[STATE]", "DB_MIGRATE",
+                                      "approvals.tracking_status",
+                                      "auto-migrated")
+                        except Exception as migrate_e:
+                            debug_log("[STATE!]", "DB_MIGRATE",
+                                      "approvals.tracking_status",
+                                      f"failed: {migrate_e}")
+                    else:
+                        print(f"[StateSubscriber] Failed to update database: {db_e}")
         except Exception as e:
             print(f"[StateSubscriber] Error in task state store update: {e}")
         if self._task_state_callback is not None:
@@ -146,6 +219,9 @@ class StateSubscriber:
             y = float(msg.y) if hasattr(msg, 'y') else 0.0
             isrunning = int(msg.isrunning) if hasattr(msg, 'isrunning') else 0
             store.update_car(car_id, x, y, isrunning)
+            debug_log("[ROS←SUB]", "CAR",
+                      f"car_id={car_id} pos=({x:.1f},{y:.1f})",
+                      f"running={isrunning}")
         except Exception as e:
             print(f"[StateSubscriber] Error in car state callback: {e}")
         if self._car_state_callback is not None:
@@ -169,6 +245,9 @@ class StateSubscriber:
                         "count": int(md.count) if hasattr(md, 'count') else 0,
                     })
             store.update_cabinet(cabinet_id, medicine_list)
+            debug_log("[ROS←SUB]", "CABINET",
+                      f"cabinet={cabinet_id}",
+                      f"items={len(medicine_list)}")
         except Exception as e:
             print(f"[StateSubscriber] Error in cabinet state callback: {e}")
         if self._cabinet_state_callback is not None:

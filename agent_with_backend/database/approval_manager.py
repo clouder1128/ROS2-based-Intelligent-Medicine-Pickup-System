@@ -12,6 +12,8 @@ import threading
 from datetime import date, datetime, timezone
 from typing import Any
 
+from common.utils.debug_logger import debug_log
+
 _logger = logging.getLogger(__name__)
 
 _DEFAULT_DB = os.path.join(os.path.dirname(os.path.dirname(__file__)), "pharmacy.db")
@@ -67,6 +69,11 @@ class ApprovalManager:
             conn.execute("ALTER TABLE approvals ADD COLUMN task_id TEXT")
         except sqlite3.OperationalError:
             pass
+        try:
+            conn.execute("ALTER TABLE approvals ADD COLUMN tracking_status TEXT DEFAULT 'waiting_approval'")
+        except sqlite3.OperationalError:
+            pass
+
         for col, dtype in [
             ("gender", "TEXT"),
             ("pregnant", "TEXT"),
@@ -116,16 +123,18 @@ class ApprovalManager:
                 conn.execute(
                     """INSERT INTO approvals (
                         id, patient_name, patient_age, patient_weight, symptoms,
-                        advice, drug_name, drug_type, quantity, status,
+                        advice, drug_name, drug_type, quantity, status, tracking_status,
                         gender, pregnant, drug_allergies, food_allergies,
                         medical_history, vital_signs
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                     (aid, patient_name, patient_age, patient_weight, symptoms,
-                     advice, drug_name, drug_type, quantity, self.STATUS_PENDING,
+                     advice, drug_name, drug_type, quantity, self.STATUS_PENDING, 'waiting_approval',
                      gender, pregnant, drug_allergies, food_allergies,
                      medical_history, vital_signs),
                 )
                 conn.commit()
+                debug_log("[APPROVAL]", "CREATE",
+                          f"id={aid} patient={patient_name} drug={drug_name} qty={quantity}")
                 return aid
             finally:
                 conn.close()
@@ -179,7 +188,11 @@ class ApprovalManager:
                          approval_id, self.STATUS_PENDING),
                     )
                 conn.commit()
-                return cur.rowcount == 1
+                ok = cur.rowcount == 1
+                if ok:
+                    debug_log("[APPROVAL]", "APPROVE",
+                              f"id={approval_id} doctor={doctor_id} notes={notes!r}")
+                return ok
             finally:
                 conn.close()
 
@@ -188,13 +201,18 @@ class ApprovalManager:
             conn = self._connect()
             try:
                 cur = conn.execute(
-                    """UPDATE approvals SET status = ?, doctor_id = ?, reject_reason = ?, approved_at = ?
+                    """UPDATE approvals SET status = ?, tracking_status = ?,
+                       doctor_id = ?, reject_reason = ?, approved_at = ?
                        WHERE id = ? AND status = ?""",
-                    (self.STATUS_REJECTED, doctor_id, reason, _utc_iso(),
+                    (self.STATUS_REJECTED, 'rejected', doctor_id, reason, _utc_iso(),
                      approval_id, self.STATUS_PENDING),
                 )
                 conn.commit()
-                return cur.rowcount == 1
+                ok = cur.rowcount == 1
+                debug_log("[APPROVAL]", "REJECT",
+                          f"id={approval_id} doctor={doctor_id}",
+                          f"ok={ok} reason={reason}")
+                return ok
             finally:
                 conn.close()
 
@@ -208,7 +226,37 @@ class ApprovalManager:
                     (task_id, approval_id),
                 )
                 conn.commit()
-                return cur.rowcount == 1
+                ok = cur.rowcount == 1
+                debug_log("[APPROVAL]", "SET_TASK_ID",
+                          f"id={approval_id} task_id={task_id}",
+                          f"ok={ok}")
+                return ok
+            finally:
+                conn.close()
+
+    def set_tracking_status(self, approval_id: str, tracking_status: str) -> bool:
+        with _lock:
+            conn = self._connect()
+            try:
+                # 查询旧值用于日志
+                old = None
+                try:
+                    row = conn.execute(
+                        "SELECT tracking_status FROM approvals WHERE id = ?", (approval_id,)
+                    ).fetchone()
+                    old = row["tracking_status"] if row else None
+                except Exception:
+                    pass
+                cur = conn.execute(
+                    "UPDATE approvals SET tracking_status = ? WHERE id = ?",
+                    (tracking_status, approval_id),
+                )
+                conn.commit()
+                ok = cur.rowcount == 1
+                debug_log("[STATE]", "TRACKING",
+                          f"id={approval_id}",
+                          f"{old or '?'} → {tracking_status} [{'ok' if ok else 'noop'}]")
+                return ok
             finally:
                 conn.close()
 
@@ -218,12 +266,16 @@ class ApprovalManager:
             conn = self._connect()
             try:
                 cur = conn.execute(
-                    """UPDATE approvals SET status = ?
+                    """UPDATE approvals SET status = ?, tracking_status = ?
                        WHERE id = ? AND status = ?""",
-                    (self.STATUS_COMPLETED, approval_id, self.STATUS_APPROVED),
+                    (self.STATUS_COMPLETED, 'completed', approval_id, self.STATUS_APPROVED),
                 )
                 conn.commit()
-                return cur.rowcount == 1
+                ok = cur.rowcount == 1
+                debug_log("[APPROVAL]", "COMPLETE",
+                          f"id={approval_id}",
+                          f"ok={ok}")
+                return ok
             finally:
                 conn.close()
 

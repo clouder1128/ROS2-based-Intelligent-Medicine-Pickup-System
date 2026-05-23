@@ -29,8 +29,22 @@ fi
 export PYTHONPATH="$PROJECT_ROOT:$PYTHONPATH"
 
 # Add ROS2 workspace for task_msgs support
-export ROS2_WS_PATH="$(cd "$PROJECT_ROOT/.." && pwd)/ros-todo/ros_workspace"
+export ROS2_WS_PATH="${ROS2_WS_PATH:-$PROJECT_ROOT/ros_workspace}"
+if [ -z "$ROS_DISTRO" ]; then
+    if [ -d "/opt/ros/humble" ]; then
+        ROS_DISTRO=humble
+    elif [ -d "/opt/ros/jazzy" ]; then
+        ROS_DISTRO=jazzy
+    elif [ -d "/opt/ros/iron" ]; then
+        ROS_DISTRO=iron
+    fi
+fi
 if [ -d "$ROS2_WS_PATH" ]; then
+    if [ -n "$ROS_DISTRO" ]; then
+        if [ -f "/opt/ros/$ROS_DISTRO/setup.bash" ]; then
+            source "/opt/ros/$ROS_DISTRO/setup.bash"
+        fi
+    fi
     # Add task_msgs Python package to PYTHONPATH
     export PYTHONPATH="$ROS2_WS_PATH/install/task_msgs/lib/python3.12/site-packages:$PYTHONPATH"
     # Source ROS2 workspace setup if available
@@ -39,10 +53,12 @@ if [ -d "$ROS2_WS_PATH" ]; then
         echo "✓ ROS2 workspace configured: $ROS2_WS_PATH"
     else
         echo "⚠ ROS2 workspace setup.sh not found, continuing without sourcing"
+        echo "  提示：请在 $ROS2_WS_PATH 下执行 colcon build --packages-select ros_tcp_endpoint task_msgs --symlink-install"
     fi
 else
     echo "⚠ ROS2 workspace not found at $ROS2_WS_PATH"
     echo "⚠ TaskPublisher may operate in fallback mode"
+    echo "  提示：请创建并构建顶层 ros_workspace，然后重新运行此脚本"
 fi
 
 # Lock file for backend coordination

@@ -102,6 +102,7 @@ async function loadOrders() {
 
     // Stats
     const pending = orders.filter(o => o.status === 'pending').length;
+    const delivered = orders.filter(o => o.status === 'delivered').length;
     const completed = orders.filter(o => o.status === 'completed').length;
     const failed = orders.filter(o => o.status === 'failed').length;
     document.getElementById('orderStats').innerHTML = `
@@ -112,6 +113,10 @@ async function loadOrders() {
         <div class="stat-card">
             <div class="stat-icon yellow"><i class="bi bi-hourglass-split"></i></div>
             <div><div class="stat-value">${pending}</div><div class="stat-label">处理中</div></div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon info"><i class="bi bi-box-seam"></i></div>
+            <div><div class="stat-value">${delivered}</div><div class="stat-label">已送达待确认</div></div>
         </div>
         <div class="stat-card">
             <div class="stat-icon green"><i class="bi bi-check-circle"></i></div>
@@ -127,11 +132,13 @@ async function loadOrders() {
     tbody.innerHTML = orders.map(o => {
         const statusMap = {
             'pending': 'badge-pending',
+            'delivered': 'badge-warning',
             'completed': 'badge-approved',
             'failed': 'badge-danger',
         };
         const statusText = {
             'pending': '处理中',
+            'delivered': '已送达待确认',
             'completed': '已完成',
             'failed': '失败',
         };

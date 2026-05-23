@@ -17,6 +17,7 @@ from auth.constants import (
 )
 from auth.middleware import require_auth, require_permission
 from common.config import Config
+from common.utils.debug_logger import debug_log
 from agent.session.manager import SessionManager
 
 _session_manager = SessionManager()
@@ -57,6 +58,8 @@ def create_approval():
             quantity=quantity,
         )
 
+        debug_log("[APPROVAL]", "CREATE",
+                  f"id={approval_id} patient={data.get('patient_name')} drug={data.get('drug_name')} via=API")
         return (jsonify({"success": True, "approval_id": approval_id, "message": "Approval created successfully", "created_at": datetime.now().isoformat()}), 201)
 
     except Exception as e:
@@ -96,9 +99,15 @@ def get_approval(approval_id):
         if "id" in approval:
             approval["approval_id"] = approval.pop("id")
 
+        debug_log("[APPROVAL]", "GET",
+                  f"id={approval_id}",
+                  f"found=True status={approval.get('status')} tracking={approval.get('tracking_status')}")
         return jsonify({"success": True, "approval": approval}), 200
 
     except Exception as e:
+        debug_log("[STATE!]", "GET",
+                  f"id={approval_id}",
+                  f"error={str(e)}")
         return (jsonify({"success": False, "ok": False, "error": f"Failed to get approval: {str(e)}", "code": "RETRIEVAL_ERROR"}), 500)
 
 
@@ -121,9 +130,14 @@ def get_pending_approvals():
             if "id" in approval:
                 approval["approval_id"] = approval.pop("id")
 
+        debug_log("[APPROVAL]", "LIST",
+                  f"pending_count={len(approvals)} limit={limit}")
         return (jsonify({"success": True, "approvals": approvals, "count": len(approvals), "limit": limit}), 200)
 
     except Exception as e:
+        debug_log("[STATE!]", "LIST",
+                  "pending",
+                  f"error={str(e)}")
         return (jsonify({"success": False, "ok": False, "error": f"Failed to get pending approvals: {str(e)}", "code": "RETRIEVAL_ERROR"}), 500)
 
 
@@ -140,7 +154,13 @@ def approve_approval(approval_id):
         success = manager.approve(approval_id, data["doctor_id"], notes=notes)
 
         if not success:
+            debug_log("[STATE!]", "APPROVE",
+                      f"id={approval_id} doctor={data['doctor_id']}",
+                      "FAILED: not found or not pending")
             return (jsonify({"success": False, "ok": False, "error": f"Cannot approve approval {approval_id}. It may not exist or not be pending.", "code": "APPROVAL_FAILED"}), 400)
+
+        # 审批通过后立即更新跟踪状态，使患者端能看到审批结果
+        manager.set_tracking_status(approval_id, 'pending_dispatch')
 
         order_created = False
         order_message = ""
@@ -205,6 +225,9 @@ def approve_approval(approval_id):
             response_data["notes"] = notes
         if task_id:
             response_data["task_id"] = task_id
+        debug_log("[APPROVAL]", "APPROVE",
+                  f"id={approval_id} doctor={data['doctor_id']}",
+                  f"order_created={order_created} task_id={task_id} msg={order_message}")
         return jsonify(response_data), 200
 
     except Exception as e:
@@ -226,8 +249,13 @@ def reject_approval(approval_id):
         success = manager.reject(approval_id, data["doctor_id"], data["reason"])
 
         if not success:
+            debug_log("[STATE!]", "REJECT",
+                      f"id={approval_id} doctor={data['doctor_id']}",
+                      "FAILED: not found or not pending")
             return (jsonify({"success": False, "ok": False, "error": f"Cannot reject approval {approval_id}. It may not exist or not be pending.", "code": "REJECTION_FAILED"}), 400)
 
+        debug_log("[APPROVAL]", "REJECT",
+                  f"id={approval_id} doctor={data['doctor_id']} reason={data.get('reason')}")
         return (jsonify({"success": True, "message": "Approval rejected successfully", "approval_id": approval_id, "doctor_id": data["doctor_id"], "reason": data["reason"], "rejected_at": datetime.now().isoformat()}), 200)
 
     except Exception as e:
@@ -291,6 +319,10 @@ def consultation():
         reply, steps = agent.run(message, patient_id)
         approval_id = agent.get_approval_id()
 
+        # 工作流完成后清除会话，防止下次登录自动重复提交
+        if agent.workflow_completed:
+            _session_manager.delete_session(patient_id)
+
         # 构建表单状态信息
         form_status = None
         phase = "drug_matching"
@@ -318,6 +350,9 @@ def consultation():
                     "filled_fields": list(cf.filled_fields),
                 }
 
+        debug_log("[APPROVAL]", "CONSULT",
+                  f"patient={patient_id} phase={phase}",
+                  f"completed={agent.workflow_completed} approval={approval_id} drug={getattr(agent, 'drug_name', None)}")
         return jsonify({
             "success": True,
             "reply": reply,
@@ -413,6 +448,9 @@ def complete_approval(approval_id):
                 "code": "COMPLETE_FAILED",
             }), 400
 
+        debug_log("[APPROVAL]", "COMPLETE",
+                  f"id={approval_id}",
+                  "ok")
         return jsonify({
             "success": True,
             "message": "审批单已标记为已完成",
@@ -420,6 +458,9 @@ def complete_approval(approval_id):
         }), 200
 
     except Exception as e:
+        debug_log("[STATE!]", "COMPLETE",
+                  f"id={approval_id}",
+                  f"error={str(e)}")
         return jsonify({
             "success": False,
             "error": f"标记审批完成失败: {str(e)}",

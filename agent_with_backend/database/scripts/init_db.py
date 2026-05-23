@@ -163,6 +163,7 @@ def init_db():
             drug_type TEXT,
             quantity INTEGER DEFAULT 1,
             status TEXT NOT NULL,
+            tracking_status TEXT DEFAULT 'waiting_approval',
             doctor_id TEXT,
             reject_reason TEXT,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,

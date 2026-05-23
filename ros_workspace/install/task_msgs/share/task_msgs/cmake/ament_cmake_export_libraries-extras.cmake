@@ -1,0 +1,1 @@
+/home/tang/ROS2-based-Intelligent-Medicine-Pickup-System/ros_workspace/build/task_msgs/ament_cmake_export_libraries/ament_cmake_export_libraries-extras.cmake

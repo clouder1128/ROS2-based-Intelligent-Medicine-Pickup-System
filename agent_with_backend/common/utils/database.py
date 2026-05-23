@@ -11,8 +11,9 @@ from common.config import Config
 
 def get_db_connection() -> sqlite3.Connection:
     """获取数据库连接"""
-    conn = sqlite3.connect(Config.DATABASE_PATH, check_same_thread=False)
+    conn = sqlite3.connect(Config.DATABASE_PATH, timeout=5, check_same_thread=False)
     conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA busy_timeout=5000")
     return conn
 
 
@@ -178,12 +179,14 @@ def init_database() -> None:
             drug_type TEXT,
             quantity INTEGER DEFAULT 1,
             status TEXT NOT NULL,
+            tracking_status TEXT DEFAULT 'waiting_approval',
             doctor_id TEXT,
             reject_reason TEXT,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             approved_at DATETIME
         )
     """)
+    _add_column_if_not_exists(conn, "approvals", "tracking_status", "TEXT DEFAULT 'waiting_approval'")
 
     # --- app_meta（元数据） ---
     cursor.execute("""
