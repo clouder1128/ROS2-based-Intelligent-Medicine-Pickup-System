@@ -107,6 +107,7 @@ def ensure_auth_schema(conn: sqlite3.Connection | None = None) -> None:
         conn.commit()
         _migrate_legacy_auth(conn)
         _seed_rbac_if_empty(conn)
+        _ensure_auth_role_rows(conn)
         _sync_permissions_and_role_mappings(conn)
         _ensure_default_admin_if_configured(conn)
     finally:
@@ -143,6 +144,47 @@ def _migrate_legacy_auth(conn: sqlite3.Connection) -> None:
             (ROLE_PATIENT, "患者", "患者/普通用户"),
         )
         conn.commit()
+    c.execute("DROP VIEW IF EXISTS users")
+    c.execute(
+        """
+        CREATE VIEW users AS
+        SELECT
+            u.id AS id,
+            u.username AS username,
+            u.password_hash AS password_hash,
+            r.code AS role,
+            u.display_name AS display_name,
+            u.created_at AS created_at
+        FROM auth_users u
+        JOIN auth_roles r ON r.id = u.role_id
+        WHERE r.code IN ('admin', 'doctor', 'pharmacist', 'patient')
+        """
+    )
+    conn.commit()
+
+
+def _ensure_auth_role_rows(conn: sqlite3.Connection) -> None:
+    """补全 ROLE_PERMISSION_MAP 中缺失的 auth_roles 行（如旧库曾删掉 doctor）。"""
+    defaults: dict[str, tuple[str, str]] = {
+        ROLE_ADMIN: ("管理员", "系统管理员，全部权限"),
+        ROLE_PHARMACIST: (
+            "药剂师（医务）",
+            "药品与库存维护及处方审批（与 doctor 同源权限）",
+        ),
+        ROLE_DOCTOR: ("医生", "与 pharmacist 同源权限，业务侧别名"),
+        ROLE_PATIENT: ("患者", "患者/普通用户"),
+    }
+    c = conn.cursor()
+    for code in ROLE_PERMISSION_MAP:
+        row = c.execute("SELECT 1 FROM auth_roles WHERE code = ?", (code,)).fetchone()
+        if row:
+            continue
+        name, desc = defaults[code]
+        c.execute(
+            "INSERT INTO auth_roles (code, name, description) VALUES (?, ?, ?)",
+            (code, name, desc),
+        )
+    conn.commit()
     c.execute("DROP VIEW IF EXISTS users")
     c.execute(
         """
@@ -217,8 +259,8 @@ def _seed_rbac_if_empty(conn: sqlite3.Connection) -> None:
 
     roles = [
         (ROLE_ADMIN, "管理员", "系统管理员，全部权限"),
-        (ROLE_PHARMACIST, "药剂师", "药品与库存维护"),
-        (ROLE_DOCTOR, "医生", "药品查询"),
+        (ROLE_PHARMACIST, "药剂师（医务）", "药品与库存维护及处方审批（与 doctor 同源权限）"),
+        (ROLE_DOCTOR, "医生", "与 pharmacist 同源权限"),
         (ROLE_PATIENT, "患者", "患者/普通用户"),
     ]
     c.executemany(

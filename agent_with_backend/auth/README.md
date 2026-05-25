@@ -20,7 +20,7 @@
 
 ## JWT 校验策略（为何不是「每个请求自动验」）
 
-当前 **没有** 全局 `before_request` 对所有 URL 强制 JWT：登录、注册、`verify`、健康检查等需匿名可达；药品、订单等路由通过 **`require_auth` / `require_permission`** 按需保护。
+当前 **没有** 全局 `before_request` 对所有 URL 强制 JWT：登录、注册、`verify`、健康检查等需匿名可达；药品、订单、**筛选、ROS HTTP** 等路由通过 **`require_auth` / `require_permission`** 按需保护。
 
 **不要求 Access JWT（Bearer）即可调用的示例**（仍可能有 Body 内 token，如 refresh）：
 
@@ -29,6 +29,14 @@
 | GET | `/api/health`、`/api/health/ros2` |
 | POST | `/api/auth/register`、`/api/auth/login`、`/api/auth/verify`、`/api/auth/logout`、`/api/auth/refresh` |
 | OPTIONS | `/api/order`（CORS 预检） |
+
+**需 Bearer 的补充说明**
+
+| 前缀 / 路径 | 策略 |
+|-------------|------|
+| `/api/screening/*` | 多数 **`read:drug`**；**`PUT /api/screening/config`** 为 **`update:drug`**（患者不可改全局配置） |
+| `/api/ros/*`（GET） | **`require_auth`**（任意角色，带有效 token） |
+| `POST /api/ros/return-to-queue` | **`update:inventory`**（patient 不可下发归队指令） |
 
 其余业务与 `/api/auth/profile`、`/api/users` 等多数需 **`Authorization: Bearer <access_token>`**。
 
@@ -82,20 +90,19 @@ Authorization: Bearer <access_token>
 
 - **物理表**：`auth_users`、`auth_roles`、`auth_permissions`、`auth_role_permissions`、`auth_refresh_tokens`、`auth_audit_logs`。
 - **视图 `users`**：`id, username, password_hash, role, display_name, created_at`（`role`：`admin` \| `doctor` \| `pharmacist` \| `patient`）。
-- **迁移**：旧角色码 `user` → `patient`；补 `display_name` 等。
+- **迁移**：旧角色码 `user` → `patient`；**`doctor` 与 `pharmacist` 共用同一权限矩阵**（`constants._STAFF_PERMISSIONS`），仅存不同 `auth_roles.code`；缺行时 **`_ensure_auth_role_rows`** 会补角色；补 `display_name` 等。
 
 ## 角色与权限（RBAC）
 
 权限码含：`read:drug`、`create:drug`、`update:drug`、`delete:drug`、`read:inventory`、`update:inventory`、`batch:drug`、`read:approval`、`approve:approval`、`reject:approval`、`read:order`、`read:users`、`write:users`、`read:audit`（完整定义见 `constants.py`）。
 
-默认映射概要（与《团队分工方案2（修订版）》对齐）：
+默认映射概要：
 
 - **admin**：全部上述权限  
-- **pharmacist**：药品读/建/改；库存读/改；`read:order`（不含 `delete:drug`、`batch:drug`）  
-- **doctor**：`read:drug`、`read:inventory`；审批读/通过/驳回；`read:order`  
+- **doctor** / **pharmacist**：同源权限——药品读/建/改；库存读/改；审批读/通过/驳回；`read:order`（不含 `delete:drug`、`batch:drug`，与 admin 相比）  
 - **patient**：仅 `read:drug`  
 
-启动时 **`ensure_auth_schema()`** 会执行 **`_sync_permissions_and_role_mappings`**，使库里角色—权限与 **`ROLE_PERMISSION_MAP`** 一致。
+启动时 **`ensure_auth_schema()`** 会 **`_ensure_auth_role_rows`**（补全表中缺失的角色行）、再 **`_sync_permissions_and_role_mappings`**。
 
 ## 与其它模块集成
 
@@ -120,7 +127,7 @@ TOKEN=$(echo "$RESP" | python3 -c "import sys,json; print(json.load(sys.stdin)['
 curl -sS http://127.0.0.1:8001/api/auth/profile -H "Authorization: Bearer ${TOKEN}"
 ```
 
-- **`patient`** 仅能读药品等 `read:drug` 接口；**药品 CRUD 冒烟脚本** `scripts/smoke_drug_api.sh` 需要 **`create:drug` / `update:drug` / `delete:drug`**，请使用 **admin 或 pharmacist** 的 token：
+- **`patient`** 仅能读药品等 `read:drug` 接口；**药品 CRUD 冒烟脚本** `scripts/smoke_drug_api.sh` 需要 **`create:drug` / `update:drug` / `delete:drug`**，请使用 **admin**，或 **`doctor` / `pharmacist` 账号**（二者业务角色码不同、权限相同）。
 
 ```bash
 AUTH_TOKEN='<具备上述权限的 access_token>' ./scripts/smoke_drug_api.sh
@@ -136,7 +143,7 @@ AUTH_TOKEN='<具备上述权限的 access_token>' ./scripts/smoke_drug_api.sh
 | `ModuleNotFoundError: No module named 'jwt'` | `pip install PyJWT`（已写入上一级 **`requirements.txt`**） |
 | `AUTH_005` 登录失败 | 用户名或密码错误；或使用占位字符串「你的用户名」未改成真实账号 |
 | `AUTH_VAL_003` 注册失败 | 用户名已存在，更换 `username` 或使用已有账号登录 |
-| `AUTH_403` 调药品写接口 | 当前角色无对应 `PERM_*`，换管理员/药剂师账号 |
+| `AUTH_403` 调药品写接口 | 当前角色无对应 `PERM_*`，换管理员或医生/药剂师演示账号 |
 | `Port ... is in use` | `PORT=9000 python3 main.py` 或结束占用端口的进程 |
 
 无 ROS2 时可能出现 `rclpy` 相关告警；HTTP 服务仍可在 fallback 下启动（详见 `ros_integration`）。

@@ -59,27 +59,24 @@ PERMISSION_DESCRIPTIONS: dict[str, str] = {
     PERM_READ_AUDIT: "审计日志",
 }
 
+# doctor 与 pharmacist 共用同一权限集（业务上两套角色码，矩阵一致）
+_STAFF_PERMISSIONS: frozenset[str] = frozenset(
+    {
+        PERM_READ_DRUG,
+        PERM_CREATE_DRUG,
+        PERM_UPDATE_DRUG,
+        PERM_READ_INVENTORY,
+        PERM_UPDATE_INVENTORY,
+        PERM_READ_ORDER,
+        PERM_READ_APPROVAL,
+        PERM_APPROVE_APPROVAL,
+        PERM_REJECT_APPROVAL,
+    }
+)
+
 ROLE_PERMISSION_MAP: dict[str, frozenset[str]] = {
     ROLE_ADMIN: frozenset(ALL_PERMISSION_CODES),
-    ROLE_PHARMACIST: frozenset(
-        {
-            PERM_READ_DRUG,
-            PERM_CREATE_DRUG,
-            PERM_UPDATE_DRUG,
-            PERM_READ_INVENTORY,
-            PERM_UPDATE_INVENTORY,
-            PERM_READ_ORDER,
-        }
-    ),
-    ROLE_DOCTOR: frozenset(
-        {
-            PERM_READ_DRUG,
-            PERM_READ_INVENTORY,
-            PERM_READ_APPROVAL,
-            PERM_APPROVE_APPROVAL,
-            PERM_REJECT_APPROVAL,
-            PERM_READ_ORDER,
-        }
-    ),
+    ROLE_PHARMACIST: _STAFF_PERMISSIONS,
+    ROLE_DOCTOR: _STAFF_PERMISSIONS,
     ROLE_PATIENT: frozenset({PERM_READ_DRUG}),
 }

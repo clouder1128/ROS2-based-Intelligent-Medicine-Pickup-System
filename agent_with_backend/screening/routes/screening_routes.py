@@ -15,6 +15,9 @@ from screening.services import (
     HistoryService,
 )
 
+from auth.constants import PERM_READ_DRUG, PERM_UPDATE_DRUG
+from auth.middleware import require_permission
+
 logger = logging.getLogger(__name__)
 
 
@@ -38,6 +41,7 @@ def create_screening_blueprint(db_session=None) -> Blueprint:
     # ==================== 症状处理接口 ====================
     
     @bp.route('/symptoms/standardize', methods=['POST'])
+    @require_permission(PERM_READ_DRUG)
     def standardize_symptoms():
         """POST /api/screening/symptoms/standardize
         
@@ -82,6 +86,7 @@ def create_screening_blueprint(db_session=None) -> Blueprint:
             }), 500
     
     @bp.route('/symptoms/synonyms', methods=['GET'])
+    @require_permission(PERM_READ_DRUG)
     def get_symptom_synonyms():
         """GET /api/screening/symptoms/synonyms
         
@@ -126,6 +131,7 @@ def create_screening_blueprint(db_session=None) -> Blueprint:
     # ==================== 筛选查询接口 ====================
     
     @bp.route('/query', methods=['POST'])
+    @require_permission(PERM_READ_DRUG)
     def screening_query():
         """POST /api/screening/query
         
@@ -199,6 +205,7 @@ def create_screening_blueprint(db_session=None) -> Blueprint:
             }), 500
     
     @bp.route('/batch', methods=['POST'])
+    @require_permission(PERM_READ_DRUG)
     def batch_screening():
         """POST /api/screening/batch
         
@@ -250,6 +257,7 @@ def create_screening_blueprint(db_session=None) -> Blueprint:
     # ==================== 配置管理接口 ====================
     
     @bp.route('/config', methods=['GET'])
+    @require_permission(PERM_READ_DRUG)
     def get_config():
         """GET /api/screening/config
         
@@ -287,6 +295,7 @@ def create_screening_blueprint(db_session=None) -> Blueprint:
             }), 500
     
     @bp.route('/config', methods=['PUT'])
+    @require_permission(PERM_UPDATE_DRUG)
     def update_config():
         """PUT /api/screening/config
         
@@ -328,6 +337,7 @@ def create_screening_blueprint(db_session=None) -> Blueprint:
     # ==================== 历史管理接口 ====================
     
     @bp.route('/history', methods=['GET'])
+    @require_permission(PERM_READ_DRUG)
     def get_history():
         """GET /api/screening/history
         
@@ -393,6 +403,7 @@ def create_screening_blueprint(db_session=None) -> Blueprint:
             }), 500
     
     @bp.route('/history/<int:history_id>', methods=['GET'])
+    @require_permission(PERM_READ_DRUG)
     def get_history_detail(history_id: int):
         """GET /api/screening/history/{id}
         
@@ -422,6 +433,7 @@ def create_screening_blueprint(db_session=None) -> Blueprint:
     # ==================== 状态监控接口 ====================
     
     @bp.route('/status', methods=['GET'])
+    @require_permission(PERM_READ_DRUG)
     def get_status():
         """GET /api/screening/status
         
