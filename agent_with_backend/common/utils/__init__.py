@@ -1,6 +1,15 @@
 # 第三周：缓存层接口（组件1）
 from .cache import get_drug_cache, DrugCache, SimpleCache
 
+# 第四周：症状/适应症查询服务（供组件3直接 import 替换硬编码数据）
+from .symptom_db_service import (
+    get_all_synonyms,
+    find_standard_term,
+    expand_symptom_list,
+    get_drugs_by_symptom,
+    get_drug_indications,
+)
+
 # 第一周：暴露统一响应格式工具，方便其他组件直接 from common.utils import ...
 from .response import (
     success_response,
@@ -34,6 +43,12 @@ __all__ = [
     "get_drug_cache",
     "DrugCache",
     "SimpleCache",
+    # symptom db service
+    "get_all_synonyms",
+    "find_standard_term",
+    "expand_symptom_list",
+    "get_drugs_by_symptom",
+    "get_drug_indications",
     # response
     "success_response",
     "paginated_response",

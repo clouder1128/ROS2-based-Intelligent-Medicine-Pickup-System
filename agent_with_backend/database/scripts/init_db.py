@@ -213,15 +213,21 @@ def init_db():
 
         conn.commit()
 
-    # 基础适应症
+    # 基础适应症（仅在表为空时写入；实际药品种子见 seed_drugs.py）
     c.execute("SELECT COUNT(*) FROM drug_indications")
     if c.fetchone()[0] == 0:
         base_indications = [
+            # 阿莫西林（drug_id=1）：细菌感染类
             (1, '感冒'), (1, '发热'), (1, '发烧'), (1, '呼吸道感染'),
-            (1, '扁桃体炎'), (1, '中耳炎'),
+            (1, '扁桃体炎'), (1, '中耳炎'), (1, '咽喉痛'), (1, '喉咙痛'),
+            (1, '咽炎'), (1, '支气管炎'),
+            # 布洛芬（drug_id=2）：解热镇痛
             (2, '头痛'), (2, '头疼'), (2, '牙痛'), (2, '关节痛'),
             (2, '痛经'), (2, '发热'), (2, '发烧'), (2, '肌肉痛'),
-            (3, '免疫力低下'), (3, '坏血病'),
+            (2, '肌肉酸痛'), (2, '关节炎'), (2, '腰痛'),
+            # 维生素C（drug_id=3）：营养补充
+            (3, '免疫力低下'), (3, '坏血病'), (3, '疲劳'), (3, '体虚'),
+            (3, '口腔溃疡'),
         ]
         c.executemany(
             "INSERT INTO drug_indications (drug_id, indication) VALUES (?, ?)",
@@ -229,46 +235,89 @@ def init_db():
         )
         conn.commit()
 
-    # 基础同义词
-    c.execute("SELECT COUNT(*) FROM symptom_synonyms")
-    if c.fetchone()[0] == 0:
-        base_synonyms = [
-            ('头痛', '头疼', 'similar'),
-            ('头痛', '偏头痛', 'related'),
-            ('头痛', '脑袋疼', 'related'),
-            ('头痛', '头部胀痛', 'related'),
-            ('发热', '发烧', 'similar'),
-            ('发热', '体温高', 'related'),
-            ('发热', '身体发烫', 'related'),
-            ('腹泻', '拉肚子', 'similar'),
-            ('腹泻', '拉稀', 'similar'),
-            ('腹痛', '肚子痛', 'similar'),
-            ('腹痛', '胃痛', 'related'),
-            ('恶心', '想吐', 'similar'),
-            ('呕吐', '吐了', 'similar'),
-            ('失眠', '睡不着', 'similar'),
-            ('失眠', '入睡困难', 'similar'),
-            ('咳嗽', '咳', 'similar'),
-            ('咳嗽', '干咳', 'similar'),
-            ('便秘', '排便困难', 'similar'),
-            ('头晕', '眩晕', 'related'),
-            ('头晕', '头昏', 'similar'),
-            ('过敏', '皮肤过敏', 'related'),
-            ('过敏', '起疹子', 'related'),
-            ('瘙痒', '皮肤痒', 'similar'),
-            ('关节痛', '关节疼', 'similar'),
-            ('肌肉痛', '肌肉酸痛', 'similar'),
-            ('咽喉痛', '喉咙痛', 'similar'),
-            ('咽喉痛', '嗓子疼', 'similar'),
-            ('咽喉痛', '喉咙发炎', 'related'),
-            ('流鼻涕', '流鼻水', 'similar'),
-            ('鼻塞', '鼻子不通', 'similar'),
-        ]
-        c.executemany(
-            "INSERT INTO symptom_synonyms (standard_term, synonym, match_type) VALUES (?, ?, ?)",
-            base_synonyms
-        )
-        conn.commit()
+    # 症状同义词：使用 INSERT OR IGNORE，重复运行安全，可持续补充新词条
+    # UNIQUE(standard_term, synonym) 保证不产生重复
+    all_synonyms = [
+        # ── 头部 ──────────────────────────────────────────────
+        ('头痛', '头疼', 'similar'),
+        ('头痛', '偏头痛', 'related'),
+        ('头痛', '脑袋疼', 'related'),
+        ('头痛', '头部胀痛', 'related'),
+        ('头晕', '眩晕', 'related'),
+        ('头晕', '头昏', 'similar'),
+        ('头晕', '天旋地转', 'related'),
+        # ── 发热 ──────────────────────────────────────────────
+        ('发热', '发烧', 'similar'),
+        ('发热', '体温高', 'related'),
+        ('发热', '身体发烫', 'related'),
+        ('发热', '高热', 'similar'),
+        # ── 呼吸道 ────────────────────────────────────────────
+        ('咳嗽', '咳', 'similar'),
+        ('咳嗽', '干咳', 'similar'),
+        ('咳嗽', '咳痰', 'related'),
+        ('流鼻涕', '流鼻水', 'similar'),
+        ('流鼻涕', '鼻涕多', 'similar'),
+        ('鼻塞', '鼻子不通', 'similar'),
+        ('鼻塞', '鼻子堵', 'similar'),
+        ('咽喉痛', '喉咙痛', 'similar'),
+        ('咽喉痛', '嗓子疼', 'similar'),
+        ('咽喉痛', '喉咙发炎', 'related'),
+        ('咽喉痛', '咽痛', 'similar'),
+        ('咽喉痛', '喉咙疼痛', 'similar'),
+        # ── 消化道 ────────────────────────────────────────────
+        ('腹泻', '拉肚子', 'similar'),
+        ('腹泻', '拉稀', 'similar'),
+        ('腹泻', '腹泻不止', 'related'),
+        ('腹痛', '肚子痛', 'similar'),
+        ('腹痛', '肚子疼', 'similar'),
+        ('腹痛', '胃痛', 'related'),
+        ('恶心', '想吐', 'similar'),
+        ('恶心', '反胃', 'related'),
+        ('呕吐', '吐了', 'similar'),
+        ('呕吐', '吐', 'similar'),
+        ('便秘', '排便困难', 'similar'),
+        ('便秘', '大便干燥', 'related'),
+        # ── 肌肉关节 ──────────────────────────────────────────
+        ('肌肉酸痛', '肌肉疼', 'similar'),
+        ('肌肉酸痛', '肌肉痛', 'similar'),
+        ('肌肉酸痛', '身体酸痛', 'related'),
+        ('肌肉酸痛', '浑身酸', 'related'),
+        ('关节痛', '关节疼', 'similar'),
+        ('关节痛', '关节酸痛', 'related'),
+        # ── 皮肤 ──────────────────────────────────────────────
+        ('皮疹', '长疹子', 'similar'),
+        ('皮疹', '起疹子', 'similar'),
+        ('皮疹', '皮肤出疹', 'related'),
+        ('皮疹', '红疹', 'similar'),
+        ('皮疹', '荨麻疹', 'related'),
+        ('瘙痒', '皮肤痒', 'similar'),
+        ('瘙痒', '痒', 'similar'),
+        ('瘙痒', '皮肤瘙痒', 'similar'),
+        ('过敏', '皮肤过敏', 'related'),
+        ('过敏', '起疹子', 'related'),
+        ('过敏', '过敏反应', 'similar'),
+        # ── 神经/睡眠 ─────────────────────────────────────────
+        ('失眠', '睡不着', 'similar'),
+        ('失眠', '入睡困难', 'similar'),
+        ('失眠', '睡眠不好', 'related'),
+        ('失眠', '睡眠障碍', 'related'),
+        ('嗜睡', '总想睡', 'similar'),
+        ('嗜睡', '嗜睡感', 'similar'),
+        ('嗜睡', '白天困倦', 'related'),
+        ('嗜睡', '睡不醒', 'similar'),
+        # ── 循环/体温 ─────────────────────────────────────────
+        ('手脚冰冷', '手脚冷', 'similar'),
+        ('手脚冰冷', '怕冷', 'related'),
+        ('手脚冰冷', '四肢冰凉', 'similar'),
+        ('手脚冰冷', '手足冰冷', 'similar'),
+        ('手脚冰冷', '畏寒', 'related'),
+    ]
+    c.executemany(
+        "INSERT OR IGNORE INTO symptom_synonyms (standard_term, synonym, match_type)"
+        " VALUES (?, ?, ?)",
+        all_synonyms
+    )
+    conn.commit()
 
     # 基础分类（与 inventory.category 字段值完全对齐）
     # INSERT OR IGNORE：重复运行安全，不会破坏已有数据
