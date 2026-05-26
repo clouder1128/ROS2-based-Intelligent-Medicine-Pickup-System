@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>智能药品管理系统 - 注册</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="login-container">
+    <div class="login-card">
+        <div class="login-header">
+            <div class="login-icon"><i class="bi bi-capsule"></i></div>
+            <h2>智能药品管理系统</h2>
+            <p>用户注册</p>
+        </div>
+        <div class="login-body">
+            <div id="registerHint" class="alert alert-info" style="display:none;"></div>
+
+            <div class="form-group">
+                <label>用户名 <span style="color:var(--danger-color)">*</span></label>
+                <input type="text" class="form-control" id="username" placeholder="至少2个字符" autocomplete="username">
+            </div>
+
+            <div class="form-group">
+                <label>邮箱</label>
+                <input type="email" class="form-control" id="email" placeholder="选填" autocomplete="email">
+            </div>
+
+            <div class="form-group">
+                <label>显示姓名</label>
+                <input type="text" class="form-control" id="displayName" placeholder="选填，默认使用用户名">
+            </div>
+
+            <div class="form-group">
+                <label>密码 <span style="color:var(--danger-color)">*</span></label>
+                <input type="password" class="form-control" id="password" placeholder="至少6位" autocomplete="new-password">
+            </div>
+
+            <div class="form-group">
+                <label>确认密码 <span style="color:var(--danger-color)">*</span></label>
+                <input type="password" class="form-control" id="confirmPassword" placeholder="再次输入密码" autocomplete="new-password">
+            </div>
+
+            <button class="btn btn-primary btn-lg" style="width:100%;" onclick="handleRegister()">
+                <i class="bi bi-person-plus"></i> 注 册
+            </button>
+        </div>
+        <div class="login-footer">
+            已有账号？<a href="index.html" style="color:var(--primary-color);text-decoration:none;font-weight:600;">立即登录</a>
+        </div>
+    </div>
+</div>
+
+<script src="js/api.js"></script>
+<script>
+function showHint(msg, type) {
+    const hint = document.getElementById('registerHint');
+    hint.textContent = msg;
+    hint.className = 'alert alert-' + type;
+    hint.style.display = 'block';
+}
+
+function hideHint() {
+    document.getElementById('registerHint').style.display = 'none';
+}
+
+async function handleRegister() {
+    hideHint();
+
+    const username = document.getElementById('username').value.trim();
+    const email = document.getElementById('email').value.trim();
+    const displayName = document.getElementById('displayName').value.trim();
+    const password = document.getElementById('password').value;
+    const confirmPassword = document.getElementById('confirmPassword').value;
+
+    if (!username || username.length < 2) {
+        showHint('用户名至少需要2个字符', 'warning');
+        return;
+    }
+    if (!password || password.length < 6) {
+        showHint('密码至少需要6位', 'warning');
+        return;
+    }
+    if (password !== confirmPassword) {
+        showHint('两次输入的密码不一致', 'warning');
+        return;
+    }
+
+    const btn = document.querySelector('.btn-primary');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="loading"></span> 注册中...';
+
+    const data = {
+        username: username,
+        password: password,
+        display_name: displayName || username,
+    };
+    if (email) {
+        data.email = email;
+    }
+
+    const result = await ApiClient.register(data);
+
+    btn.disabled = false;
+    btn.innerHTML = '<i class="bi bi-person-plus"></i> 注 册';
+
+    if (!result.success) {
+        showHint(result.message || '注册失败，请稍后重试', 'danger');
+        return;
+    }
+
+    showHint('注册成功！即将跳转到登录页...', 'success');
+    setTimeout(function () {
+        window.location.href = 'index.html';
+    }, 1500);
+}
+</script>
+</body>
+</html>

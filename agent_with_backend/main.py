@@ -29,6 +29,7 @@ from api.drug_controller import drug_bp
 from api.order_controller import order_bp
 from api.approval_controller import approval_bp
 from api.category_controller import category_bp
+from api.upload_controller import upload_bp
 
 # 组件3：智能筛选（必须用工厂函数创建蓝图）
 from screening.routes import create_screening_blueprint
@@ -104,6 +105,7 @@ app.register_blueprint(category_bp)
 screening_bp = create_screening_blueprint()
 app.register_blueprint(screening_bp)
 app.register_blueprint(ros_state_bp)
+app.register_blueprint(upload_bp)
 
 # 确保 RBAC 表存在（可安全重复调用）
 try:
@@ -117,6 +119,33 @@ try:
     init_screening_db()
 except Exception as e:
     print(f"[Main] Failed to init screening database: {e}")
+
+# ── 缓存过期清理后台任务（组件1第4周） ─────────────────────────────
+_CACHE_EVICT_INTERVAL_SEC = int(os.environ.get("CACHE_EVICT_INTERVAL_SEC", "60"))
+_cache_evict_started = False
+_cache_evict_lock = threading.Lock()
+
+
+def _cache_evict_loop() -> None:
+    from common.utils import get_drug_cache
+    cache = get_drug_cache()
+    while True:
+        try:
+            n = cache.evict_expired()
+            if n > 0:
+                print(f"[cache] 清理过期条目: {n}")
+        except Exception as e:
+            print(f"[cache] 清理异常: {e}")
+        time.sleep(_CACHE_EVICT_INTERVAL_SEC)
+
+
+def _boot_cache_evict_once() -> None:
+    global _cache_evict_started
+    with _cache_evict_lock:
+        if _cache_evict_started:
+            return
+        _cache_evict_started = True
+    threading.Thread(target=_cache_evict_loop, daemon=True).start()
 
 # Expiry sweep functionality
 _expiry_sweep_lock = threading.Lock()
@@ -237,6 +266,7 @@ def _boot_expiry_worker_once():
 
 if os.environ.get("WERKZEUG_RUN_MAIN") == "true":
     _boot_expiry_worker_once()
+    _boot_cache_evict_once()
 
 
 if __name__ == "__main__":
@@ -247,6 +277,7 @@ if __name__ == "__main__":
     _use_reloader = _debug
     if not (_debug and _use_reloader):
         _boot_expiry_worker_once()
+        _boot_cache_evict_once()
 
     app.run(
         host=Config.HOST, port=Config.PORT, debug=_debug, use_reloader=_use_reloader

@@ -7,6 +7,11 @@ from typing import Any, Dict, List, Optional
 
 from common.utils.database import get_db_connection
 
+
+def _like_escape(text: str) -> str:
+    """对 LIKE 通配符 % 和 _ 进行转义，防止用户输入被当作通配符。"""
+    return text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
 # ORDER BY 白名单 — 与 drug_controller 保持一致
 _SORT_SQL = {
     "drug_id": "drug_id",
@@ -73,21 +78,24 @@ def query_drugs(
     conn = get_db_connection()
     try:
         # ---- 症状查询路径 ----
-        if symptom is not None:
+        if symptom is not None and symptom.strip():
+            escaped = _like_escape(symptom.strip())
             base_where = (
                 "WHERE drug_id IN (SELECT DISTINCT drug_id FROM drug_indications "
-                "WHERE indication LIKE ?) AND quantity > 0 AND COALESCE(is_deleted, 0) = 0"
+                "WHERE indication LIKE ? ESCAPE '\\') AND quantity > 0 AND COALESCE(is_deleted, 0) = 0"
             )
-            drugs = _fetch_with_indications(conn, base_where, (f"%{symptom}%",))
+            drugs = _fetch_with_indications(conn, base_where, (f"%{escaped}%",))
 
             if not drugs:
                 cur = conn.execute(
-                    "SELECT DISTINCT standard_term FROM symptom_synonyms WHERE synonym LIKE ?",
-                    (f"%{symptom}%",),
+                    "SELECT DISTINCT standard_term FROM symptom_synonyms"
+                    " WHERE synonym LIKE ? ESCAPE '\\'",
+                    (f"%{escaped}%",),
                 )
                 standard_terms = [row["standard_term"] for row in cur.fetchall()]
                 for term in standard_terms:
-                    matched = _fetch_with_indications(conn, base_where, (f"%{term}%",))
+                    escaped_term = _like_escape(term)
+                    matched = _fetch_with_indications(conn, base_where, (f"%{escaped_term}%",))
                     drugs.extend(matched)
                 drugs = _deduplicate(drugs)
 

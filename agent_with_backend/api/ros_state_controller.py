@@ -5,6 +5,8 @@ ROS2 状态 API 控制器
 
 from flask import Blueprint, jsonify
 
+from auth.constants import PERM_UPDATE_INVENTORY
+from auth.middleware import require_auth, require_permission
 from ros_integration.state_store import RosStateStore
 
 ros_state_bp = Blueprint("ros_state", __name__, url_prefix="/api")
@@ -13,18 +15,21 @@ _store = RosStateStore()
 
 
 @ros_state_bp.route("/ros/car-states", methods=["GET"])
+@require_auth
 def get_car_states():
     """获取所有 AGV 小车最新状态"""
     return jsonify({"success": True, "data": _store.get_all_cars()})
 
 
 @ros_state_bp.route("/ros/task-states", methods=["GET"])
+@require_auth
 def get_task_states():
     """获取所有任务最新状态"""
     return jsonify({"success": True, "data": _store.get_all_tasks()})
 
 
 @ros_state_bp.route("/ros/task-states/<task_id>", methods=["GET"])
+@require_auth
 def get_task_state(task_id: str):
     """获取指定任务状态"""
     state = _store.get_task(task_id)
@@ -34,16 +39,19 @@ def get_task_state(task_id: str):
 
 
 @ros_state_bp.route("/ros/cabinet-states", methods=["GET"])
+@require_auth
 def get_cabinet_states():
     """获取所有药柜库存状态"""
     return jsonify({"success": True, "data": _store.get_all_cabinets()})
 
 
 @ros_state_bp.route("/ros/return-to-queue", methods=["POST"])
+@require_permission(PERM_UPDATE_INVENTORY)
 def return_to_queue():
     """通知 ROS2 小车返回初始队列"""
     try:
         from ros_integration.bridge import publish_return_to_queue
+
         publish_return_to_queue()
         return jsonify({"success": True, "message": "Return-to-queue command published"})
     except Exception as e:
@@ -51,6 +59,7 @@ def return_to_queue():
 
 
 @ros_state_bp.route("/ros/status", methods=["GET"])
+@require_auth
 def get_ros_status():
     """获取 ROS2 连接概览状态"""
     connected = _store.is_connected()
