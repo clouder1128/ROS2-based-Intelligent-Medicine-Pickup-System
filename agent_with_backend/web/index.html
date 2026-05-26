@@ -30,9 +30,11 @@
 
             <div class="form-group">
                 <label>用户名</label>
-                <select class="form-control" id="username" onchange="onUserChange()">
-                    <option value="">-- 选择账号 --</option>
-                </select>
+                <div id="usernameField">
+                    <select class="form-control" id="username" onchange="onUserChange()">
+                        <option value="">-- 选择账号 --</option>
+                    </select>
+                </div>
             </div>
             <div class="form-group">
                 <label>密码</label>
@@ -71,18 +73,30 @@ function selectRole(role, btn) {
     selectedRole = role;
     document.querySelectorAll('.role-tab').forEach(t => t.classList.remove('active'));
     btn.classList.add('active');
-    populateUsers(role);
     document.getElementById('password').value = '123456';
     document.getElementById('loginHint').style.display = 'none';
+    populateUsers(role);
 }
 
 function populateUsers(role) {
-    const select = document.getElementById('username');
-    select.innerHTML = '<option value="">-- 选择账号 --</option>';
-    for (const id of accountsByRole[role]) {
-        select.innerHTML += `<option value="${id}">${displayNames[id] || id} (${id})</option>`;
+    const container = document.getElementById('usernameField');
+    if (role === 'patient') {
+        // 患者支持手动输入用户名，同时提供预设账号快速填充
+        container.innerHTML = `
+            <input type="text" class="form-control" id="username" list="patientSuggestions"
+                   placeholder="输入患者用户名（如 patient1）" value="">
+            <datalist id="patientSuggestions">
+                ${accountsByRole.patient.map(id => `<option value="${id}">${displayNames[id] || id}</option>`).join('')}
+            </datalist>`;
+    } else {
+        let html = '<select class="form-control" id="username" onchange="onUserChange()"><option value="">-- 选择账号 --</option>';
+        for (const id of accountsByRole[role]) {
+            html += `<option value="${id}">${displayNames[id] || id} (${id})</option>`;
+        }
+        html += '</select>';
+        container.innerHTML = html;
+        document.getElementById('username').value = accountsByRole[role][0] || '';
     }
-    select.value = accountsByRole[role][0] || '';
 }
 
 function onUserChange() {
