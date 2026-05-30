@@ -150,7 +150,9 @@ function saveState() {
 // Sidebar
 document.getElementById('sidebarNav').innerHTML = renderSidebar([
     { label: '患者功能', items: [
-        { label: 'AI 医疗咨询', href: '#', icon: 'bi bi-robot', page: 'consult' },
+        { label: 'AI 医疗咨询', href: '#', icon: 'bi bi-robot', page: 'consult', onclick: "switchTab('consult')" },
+        { label: '取药状态跟踪', href: '#', icon: 'bi bi-truck', page: 'status', onclick: "switchTab('status')" },
+        { label: '咨询与取药历史', href: '#', icon: 'bi bi-clock-history', page: 'history', onclick: "switchTab('history')" },
     ]},
 ], 'consult');
 document.getElementById('sidebarFooter').innerHTML = `
@@ -164,7 +166,9 @@ document.getElementById('topUserBadge').innerHTML = `<i class="bi bi-person-circ
 let _statusRefreshTimer = null;
 window.switchTab = function(tab) {
     document.querySelectorAll('.tab-nav button').forEach(b => b.classList.remove('active'));
-    event.target.classList.add('active');
+    const idx = { consult: 1, status: 2, history: 3 }[tab] || 1;
+    const btn = document.querySelector('.tab-nav button:nth-child(' + idx + ')');
+    if (btn) btn.classList.add('active');
     document.getElementById('tab-consult').style.display = tab === 'consult' ? '' : 'none';
     document.getElementById('tab-status').style.display = tab === 'status' ? '' : 'none';
     document.getElementById('tab-history').style.display = tab === 'history' ? '' : 'none';

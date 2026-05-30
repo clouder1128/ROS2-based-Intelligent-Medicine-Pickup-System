@@ -119,8 +119,8 @@ function saveHistory() {
 // Sidebar
 document.getElementById('sidebarNav').innerHTML = renderSidebar([
     { label: '医生功能', items: [
-        { label: '待审批', href: '#', icon: 'bi bi-list-check', page: 'pending' },
-        { label: '审批历史', href: '#', icon: 'bi bi-clock-history', page: 'history' },
+        { label: '待审批', href: '#', icon: 'bi bi-list-check', page: 'pending', onclick: "switchTab('pending')" },
+        { label: '审批历史', href: '#', icon: 'bi bi-clock-history', page: 'history', onclick: "switchTab('history')" },
     ]},
 ], 'pending');
 document.getElementById('sidebarFooter').innerHTML = `
@@ -133,7 +133,8 @@ document.getElementById('topUserBadge').innerHTML = `<i class="bi bi-person-circ
 // ===== Tab 切换 =====
 window.switchTab = function(tab) {
     document.querySelectorAll('.tab-nav button').forEach(b => b.classList.remove('active'));
-    event.target.classList.add('active');
+    const btn = document.querySelector('.tab-nav button[onclick*="' + tab + '"]') || document.querySelector('.tab-nav button:nth-child(' + ({pending:1,history:2}[tab]||1) + ')');
+    if (btn) btn.classList.add('active');
     document.getElementById('tab-pending').style.display = tab === 'pending' ? '' : 'none';
     document.getElementById('tab-history').style.display = tab === 'history' ? '' : 'none';
     if (tab === 'history') loadHistory();

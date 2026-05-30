@@ -31,9 +31,9 @@
             <div class="form-group">
                 <label>用户名</label>
                 <div id="usernameField">
-                    <select class="form-control" id="username" onchange="onUserChange()">
-                        <option value="">-- 选择账号 --</option>
-                    </select>
+                    <input type="text" class="form-control" id="username" list="userSuggestions"
+                           placeholder="请输入用户名" value="" autocomplete="username">
+                    <datalist id="userSuggestions"></datalist>
                 </div>
             </div>
             <div class="form-group">
@@ -80,35 +80,21 @@ function selectRole(role, btn) {
 
 function populateUsers(role) {
     const container = document.getElementById('usernameField');
-    if (role === 'patient') {
-        // 患者支持手动输入用户名，同时提供预设账号快速填充
-        container.innerHTML = `
-            <input type="text" class="form-control" id="username" list="patientSuggestions"
-                   placeholder="输入患者用户名（如 patient1）" value="">
-            <datalist id="patientSuggestions">
-                ${accountsByRole.patient.map(id => `<option value="${id}">${displayNames[id] || id}</option>`).join('')}
-            </datalist>`;
-    } else {
-        let html = '<select class="form-control" id="username" onchange="onUserChange()"><option value="">-- 选择账号 --</option>';
-        for (const id of accountsByRole[role]) {
-            html += `<option value="${id}">${displayNames[id] || id} (${id})</option>`;
-        }
-        html += '</select>';
-        container.innerHTML = html;
-        document.getElementById('username').value = accountsByRole[role][0] || '';
-    }
-}
-
-function onUserChange() {
-    document.getElementById('loginHint').style.display = 'none';
+    const accounts = accountsByRole[role] || [];
+    container.innerHTML = `
+        <input type="text" class="form-control" id="username" list="userSuggestions"
+               placeholder="请输入用户名" value="" autocomplete="username">
+        <datalist id="userSuggestions">
+            ${accounts.map(id => `<option value="${id}">${displayNames[id] || id}</option>`).join('')}
+        </datalist>`;
 }
 
 async function handleLogin() {
-    const username = document.getElementById('username').value;
+    const username = document.getElementById('username').value.trim();
     const password = document.getElementById('password').value;
     if (!username) {
         document.getElementById('loginHint').style.display = 'block';
-        document.getElementById('loginHint').textContent = '请选择账号';
+        document.getElementById('loginHint').textContent = '请输入用户名';
         return;
     }
     document.getElementById('loginHint').style.display = 'none';

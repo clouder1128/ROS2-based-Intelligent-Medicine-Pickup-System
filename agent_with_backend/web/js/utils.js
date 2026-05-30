@@ -60,7 +60,8 @@ function renderSidebar(navItems, currentPage) {
         html += `<div class="nav-section">${section.label}</div>`;
         for (const item of section.items) {
             const cls = item.page === currentPage ? 'active' : '';
-            html += `<a href="${item.href}" class="${cls}"><i class="${item.icon}"></i>${item.label}</a>`;
+            const onclick = item.onclick ? ` onclick="${item.onclick}"` : '';
+            html += `<a href="${item.href}" class="${cls}"${onclick}><i class="${item.icon}"></i>${item.label}</a>`;
         }
     }
     return html;
