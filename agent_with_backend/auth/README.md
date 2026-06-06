@@ -60,7 +60,7 @@
 
 ## 环境变量
 
-在 **`agent_with_backend/.env`** 或 shell 环境中配置：
+在 **`agent_with_backend/.env`** 或 shell 环境中配置（`.env.example` 未列出 AUTH 项，可按需追加）：
 
 | 变量 | 说明 | 默认 |
 |------|------|------|
@@ -156,50 +156,74 @@ Authorization: Bearer <access_token>
 
 ## 与其它模块集成
 
-- `main.py`：`app.register_blueprint(auth_bp)` + **`ensure_auth_schema()`**（失败仅打印 warning，不阻断启动）。
-- 业务蓝图：`from auth import require_auth, require_permission, require_permissions` 及 **`PERM_*`**；或直接 `from auth.middleware import ...`。
-- 单元测试：`tests/unit/test_auth.py`（token 往返、schema 种子、`require_auth` 401）。
+- **`main.py`**：`app.register_blueprint(auth_bp)` + **`ensure_auth_schema()`**（失败仅打印 warning，不阻断启动）。
+- **`database/scripts/init_db.py`**：仅建业务表；认证表 **不** 在此脚本中创建（注释已说明由 `ensure_auth_schema()` 负责）。
+- **`database/scripts/seed_users.py`**：向 `auth_users` 插入演示账号（`INSERT` 遇重名跳过）；**`setup.sh`** 第五步会调用，也可手动 `python -m database.scripts.seed_users`。
+- **业务蓝图**：`from auth import require_auth, require_permission, require_permissions` 及 **`PERM_*`**；或直接 `from auth.middleware import ...`。
+- **单元测试**：`tests/unit/test_auth.py`（token 往返、schema 种子、`require_auth` 401）。
+
+## 初始化与用户来源
+
+| 方式 | 触发条件 | 说明 |
+|------|----------|------|
+| `ensure_auth_schema()` | `main.py` 启动（或测试显式调用） | 建表、RBAC 种子、迁移、`users` 视图 |
+| `seed_users.py` | `setup.sh` 或手动执行 | 演示用户（见下表） |
+| `AUTH_DEFAULT_ADMIN_*` | `auth_users` **为空** 且 env 设了密码 | 创建单个 admin（默认用户名 `admin`） |
+
+**演示账号**（`seed_users.py`，密码均为 **`123456`**）：
+
+| 用户名 | 角色 | 说明 |
+|--------|------|------|
+| `admin1` | admin | 全部权限 |
+| `doctor1` / `doctor2` | doctor | 与 pharmacist 同源权限 |
+| `patient1` / `patient2` | patient | 仅 `read:drug` |
+
+首次环境配置见仓库根目录 **`setup.sh`**；日常启动 **`agent_with_backend/quick_start.sh`**（默认端口 **8001** / 前端 **8080**）。
 
 ## 本地验证与令牌
 
-工作目录 **`agent_with_backend`**，服务默认 **`http://127.0.0.1:8001`**（若使用 **`PORT=9000`**，下列 URL 中的端口需改掉）。
+工作目录 **`agent_with_backend`**，服务默认 **`http://127.0.0.1:8001`**（若使用 **`PORT=9000`**，下列 URL 中的端口需改掉）。需先执行过 **`setup.sh`** 或至少 **`init_db` + `seed_users` + 启动 `main.py`**，否则无演示账号。
 
 ```bash
-# 注册（用户名已存在会返回 AUTH_VAL_003，请换名或改登录）
-curl -sS -X POST http://127.0.0.1:8001/api/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{"username":"demo","password":"secret12","email":"demo@test.local"}'
-
+# 使用 seed 演示账号登录（admin1 具备药品写权限）
 RESP=$(curl -sS -X POST http://127.0.0.1:8001/api/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"username":"demo","password":"secret12"}')
+  -d '{"username":"admin1","password":"123456"}')
 TOKEN=$(echo "$RESP" | python3 -c "import sys,json; print(json.load(sys.stdin)['access_token'])")
 
 curl -sS http://127.0.0.1:8001/api/auth/profile -H "Authorization: Bearer ${TOKEN}"
 ```
 
-- **`patient`** 仅能访问 `read:drug` 类接口；药品写操作需 **`create:drug` / `update:drug` / `delete:drug`** 等权限，请使用 **admin** 或 **doctor / pharmacist** 账号登录后取 token。
-- 调用受保护 API 时在 curl 加：`-H "Authorization: Bearer ${TOKEN}"`。
-- **`scripts/smoke_drug_api.sh`** 当前 **未** 携带 Bearer；直接运行会因 `AUTH_001` / `AUTH_403` 失败，需自行改脚本或手动带 token 测试。
+```bash
+# 自行注册 patient（默认角色 patient；用户名已存在则 AUTH_VAL_003）
+curl -sS -X POST http://127.0.0.1:8001/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"username":"newuser","password":"123456","email":"new@test.local"}'
+```
+
+- **`patient1`** 仅能访问 `read:drug` 类接口；药品 CRUD 请用 **`admin1`** 或 **`doctor1`** 登录取 token。
+- 调用受保护 API 时加：`-H "Authorization: Bearer ${TOKEN}"`。
+- **`scripts/smoke_drug_api.sh`** 当前 **未** 携带 Bearer；直接运行会因 `AUTH_001` / `AUTH_403` 失败，需先 `login` 取 token 再改脚本或手动 curl。
 
 ```bash
-# 示例：带 token 查询药品列表
+# 示例：admin1 token 查询药品列表
 curl -sS "http://127.0.0.1:8001/api/drugs?page=1&limit=5" \
   -H "Authorization: Bearer ${TOKEN}"
 ```
 
-- 勿在公开场合粘贴完整 JWT（等同于临时密码）。
+勿在公开场合粘贴完整 JWT（等同于临时密码）。
 
 ## 常见问题
 
 | 现象 | 处理 |
 |------|------|
 | `ModuleNotFoundError: No module named 'jwt'` | `pip install PyJWT`（已写入 **`agent_with_backend/requirements.txt`**） |
-| `AUTH_005` 登录失败 | 用户名或密码错误；或占位字符串「你的用户名」未改成真实账号 |
+| `AUTH_005` 登录失败 | 用户名或密码错误；或未执行 `seed_users`（演示账号为 `admin1`/`doctor1`/`patient1`，密码 `123456`） |
 | `AUTH_VAL_003` 注册失败 | 用户名已存在，更换 `username` 或使用已有账号登录 |
 | `AUTH_403` 调药品写接口 | 当前角色无对应 `PERM_*`，换 admin 或 doctor/pharmacist 账号 |
 | `AUTH_008` 刷新失败 | refresh 已用过（轮换后旧 token 失效）或已 logout 吊销 |
 | `Port ... is in use` | `PORT=9000 python3 main.py` 或结束占用端口的进程 |
+| 无演示用户 / 表为空 | 仓库根目录 `./setup.sh`，或 `python -m database.scripts.seed_users` |
 
 无 ROS2 时可能出现 `rclpy` 相关告警；HTTP 服务仍可在 fallback 下启动（详见 `ros_integration`）。
 
