@@ -65,7 +65,14 @@ agent_with_backend/tasks.db
 # Local reference
 组件完成情况.md
 
+# Test summary (local only)
+项目测试说明.md
+
 # Contributor stats (local only)
 docs/项目研发报告.md
 docs/代码说明文档.md
 docs/设计报告.md
+<<<<<<< Updated upstream
+=======
+./claude
+>>>>>>> Stashed changes
