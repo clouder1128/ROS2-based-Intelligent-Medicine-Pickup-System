@@ -8,6 +8,7 @@ def client(tmp_path, monkeypatch):
     db_path = tmp_path / "unit_test.db"
     monkeypatch.setenv("DATABASE_PATH", str(db_path))
     monkeypatch.setenv("ANTHROPIC_API_KEY", "pytest-dummy")
+    monkeypatch.setenv("AUTH_JWT_SECRET", "pytest-unit-secret-at-least-32-bytes")
     init_test_db(str(db_path))
 
     app = create_test_app()
