@@ -1,0 +1,31 @@
+[run]
+source =
+    agent
+    api
+    auth
+    backend
+    common
+    database
+    ros_integration
+    screening
+omit =
+    */tests/*
+    */test_*.py
+    .venv/*
+    cli/*
+    database/scripts/*
+    thought_logging/*
+    main.py
+
+[report]
+show_missing = True
+skip_empty = True
+exclude_lines =
+    pragma: no cover
+    if TYPE_CHECKING:
+    if __name__ == .__main__.:
+    raise NotImplementedError
+
+[html]
+directory = coverage_report
+title = Intelligent Medicine Pickup System - Coverage Report

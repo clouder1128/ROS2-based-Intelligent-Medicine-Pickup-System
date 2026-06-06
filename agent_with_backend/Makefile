@@ -1,12 +1,13 @@
 # Makefile for Backend-P1 Integration Project
 
-.PHONY: help test test-integration cli-start backend-start backend-stop clean
+.PHONY: help test coverage test-integration cli-start backend-start backend-stop clean
 
 help:
 	@echo "Backend-P1 Integration Project Makefile"
 	@echo ""
 	@echo "Available targets:"
 	@echo "  test              Run unit tests (mocked)"
+	@echo "  coverage          Run tests and generate coverage_report/index.html"
 	@echo "  patient           Start patient CLI"
 	@echo "  doctor            Start doctor CLI"
 	@echo "  backend-start      Start backend server"
@@ -17,6 +18,15 @@ help:
 test:
 	@echo "Running unit tests..."
 	@pytest tests/ -v --tb=short
+
+coverage:
+	@echo "Running tests with coverage..."
+	@pytest tests/ -v --tb=short \
+		--cov-config=.coveragerc \
+		--cov \
+		--cov-report=term-missing \
+		--cov-report=html
+	@echo "Coverage report: coverage_report/index.html"
 
 patient:
 	@echo "Starting patient cli..."
