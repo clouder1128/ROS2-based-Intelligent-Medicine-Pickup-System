@@ -188,7 +188,7 @@ curl -sS "http://127.0.0.1:8001/api/drugs?page=1&limit=5" \
   -H "Authorization: Bearer ${TOKEN}"
 ```
 
-- **勿**在公开场合粘贴完整 JWT（等同于临时密码）。
+- 勿在公开场合粘贴完整 JWT（等同于临时密码）。
 
 ## 常见问题
 
