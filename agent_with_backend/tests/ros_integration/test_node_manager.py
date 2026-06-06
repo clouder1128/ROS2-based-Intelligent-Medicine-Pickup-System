@@ -4,6 +4,8 @@
 每次运行前通过 reset_singletons fixture 重置 RosNodeManager._instance。
 """
 
+import gc
+import weakref
 import pytest
 from unittest.mock import MagicMock, patch
 from ros_integration.node_manager import RosNodeManager
@@ -33,6 +35,15 @@ class TestInitRos2:
         RosNodeManager._instance = None
         nm = RosNodeManager.get_instance()
         assert hasattr(nm, "_atexit_shutdown")
+
+    def test_atexit_callback_does_not_keep_discarded_instance_alive(self):
+        nm = RosNodeManager.get_instance()
+        nm_ref = weakref.ref(nm)
+        RosNodeManager._instance = None
+        del nm
+        gc.collect()
+
+        assert nm_ref() is None
 
 
 class TestCheckConnection:
@@ -79,6 +90,17 @@ class TestStartShutdown:
         nm._shutdown_requested = False
         nm.shutdown()
         assert nm._shutdown_requested is True
+
+    def test_atexit_shutdown_handles_invalid_test_doubles(self):
+        nm = RosNodeManager.get_instance()
+        nm._executor = "mock_executor"
+        nm._node = "mock_node"
+
+        nm._atexit_shutdown()
+
+        assert nm._shutdown_requested is True
+        assert nm._executor is None
+        assert nm._node is None
 
     def test_is_running_false_when_no_thread(self):
         nm = RosNodeManager.get_instance()

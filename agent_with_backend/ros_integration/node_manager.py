@@ -7,6 +7,7 @@ import threading
 import time
 import atexit
 import os
+import weakref
 from typing import Optional, Any
 from .config import Config
 
@@ -41,7 +42,15 @@ class RosNodeManager:
         self._initialized = True
 
         # 注册退出处理
-        atexit.register(self._atexit_shutdown)
+        instance_ref = weakref.ref(self)
+
+        def shutdown_instance():
+            instance = instance_ref()
+            if instance is not None:
+                instance._atexit_shutdown()
+
+        self._atexit_callback = shutdown_instance
+        atexit.register(self._atexit_callback)
 
     def _init_ros2(self):
         """初始化ROS2（线程安全）"""
@@ -116,19 +125,35 @@ class RosNodeManager:
         self._shutdown_requested = True
 
         # 等待执行器线程结束
-        if self._executor_thread is not None and self._executor_thread.is_alive():
-            self._executor_thread.join(timeout=5.0)
+        try:
+            if self._executor_thread is not None and self._executor_thread.is_alive():
+                self._executor_thread.join(timeout=5.0)
+        except Exception as e:
+            print(f"[ROS2] Failed to stop executor thread: {e}")
 
         # 清理资源
-        if self._executor is not None:
-            self._executor.shutdown()
+        try:
+            if self._executor is not None:
+                self._executor.shutdown()
+        except Exception as e:
+            print(f"[ROS2] Failed to shutdown executor: {e}")
+        finally:
+            self._executor = None
 
-        if self._node is not None:
-            self._node.destroy_node()
+        try:
+            if self._node is not None:
+                self._node.destroy_node()
+        except Exception as e:
+            print(f"[ROS2] Failed to destroy node: {e}")
+        finally:
+            self._node = None
 
-        import rclpy
-        if rclpy.ok():
-            rclpy.shutdown()
+        try:
+            import rclpy
+            if rclpy.ok():
+                rclpy.shutdown()
+        except Exception as e:
+            print(f"[ROS2] Failed to shutdown rclpy: {e}")
 
         print("[ROS2] Node manager shutdown complete")
 
