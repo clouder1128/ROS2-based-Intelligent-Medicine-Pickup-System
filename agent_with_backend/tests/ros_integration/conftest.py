@@ -8,6 +8,7 @@
 
 import os
 import sys
+import importlib
 from unittest.mock import MagicMock
 
 # ── 将项目根目录加入 sys.path ──────────────────────────────────
@@ -52,6 +53,11 @@ _mock_std_msgs_msg.String = MagicMock
 sys.modules["std_msgs"] = MagicMock()
 sys.modules["std_msgs.msg"] = _mock_std_msgs_msg
 
+# API tests may import ROS modules before this directory's conftest is loaded.
+# Reload the publisher after installing the fake ROS packages so its optional
+# imports and message classes consistently point at these test doubles.
+if "ros_integration.task_publisher" in sys.modules:
+    importlib.reload(sys.modules["ros_integration.task_publisher"])
 
 import pytest
 from ros_integration.state_store import RosStateStore

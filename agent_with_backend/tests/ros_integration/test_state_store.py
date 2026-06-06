@@ -5,6 +5,7 @@
 
 import time
 import threading
+from datetime import datetime, timezone
 from ros_integration.state_store import RosStateStore
 
 
@@ -123,12 +124,20 @@ class TestIsConnected:
     def test_connected_with_recent_update(self):
         store = RosStateStore()
         store.update_car(1, 0, 0, 1)
+        store._car_states[1]["updated_at"] = datetime.now(timezone.utc).isoformat()
         assert store.is_connected() is True
 
     def test_connected_with_recent_task_update(self):
         store = RosStateStore()
         store.update_task("t1", 1, 1)
+        store._task_states["t1"]["updated_at"] = datetime.now(timezone.utc).isoformat()
         assert store.is_connected() is True
+
+    def test_invalid_timestamp_is_ignored(self):
+        store = RosStateStore()
+        store.update_car(1, 0, 0, 1)
+        store._car_states[1]["updated_at"] = "not-a-timestamp"
+        assert store.is_connected() is False
 
 
 class TestThreadSafety:

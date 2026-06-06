@@ -27,21 +27,6 @@ os.environ["MAX_HISTORY_LEN"] = "50"
 os.environ["MAX_ITERATIONS"] = "5"
 os.environ["DATABASE_PATH"] = "/tmp/agent_test_pharmacy.db"
 
-# ── Mock LLM 第三方包（防止 LLMClient 因 import 失败而抛出异常） ──
-sys.modules["anthropic"] = MagicMock()
-sys.modules["anthropic.Anthropic"] = MagicMock
-sys.modules["openai"] = MagicMock()
-sys.modules["openai.OpenAI"] = MagicMock
-
-# ── Mock httpx（未安装，但 database.pharmacy_client 依赖它） ──
-sys.modules["httpx"] = MagicMock()
-
-# ── Mock database.pharmacy_client（内部依赖 httpx） ──
-mock_pharmacy = MagicMock()
-mock_pharmacy.query_drugs_by_symptom.return_value = []
-mock_pharmacy.query_drug_by_name.return_value = None
-sys.modules["database.pharmacy_client"] = mock_pharmacy
-
 import pytest
 
 
