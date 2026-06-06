@@ -51,6 +51,19 @@ class TestPublishTask:
         # 不应抛出异常
         bridge.publish_task(100, drug, 2)
 
+    def test_publish_task_unavailable_and_failed_result(self):
+        bridge.ros2_available = False
+        bridge.task_publisher_instance = None
+        bridge.NEW_MODULES_AVAILABLE = False
+        bridge.publish_task(1, {"shelf_x": 1, "shelf_y": 1}, 1)
+
+        bridge.ros2_available = True
+        bridge.task_publisher_instance = MagicMock()
+        bridge.task_publisher_instance.publish_task.return_value = False
+        bridge.publish_task(
+            1, {"name": "A", "shelf_x": 1, "shelf_y": 1}, 1
+        )
+
 
 class TestPublishExpiryRemoval:
     def test_publish_expiry_removal_calls_publish(self):
@@ -78,6 +91,16 @@ class TestPublishExpiryRemoval:
             bridge.publish_expiry_removal(drug, 5)
             assert MockTP.called
 
+    def test_publish_expiry_failure_and_exception(self):
+        bridge.ros2_available = True
+        bridge.task_publisher_instance = MagicMock()
+        bridge.task_publisher_instance.publish_expiry_removal.return_value = False
+        bridge.publish_expiry_removal({"drug_id": 1}, 1)
+        bridge.task_publisher_instance.publish_expiry_removal.side_effect = RuntimeError(
+            "fail"
+        )
+        bridge.publish_expiry_removal({"drug_id": 1}, 1)
+
 
 class TestPublishReturnToQueue:
     def test_publish_return_to_queue_calls_publish(self):
@@ -88,6 +111,21 @@ class TestPublishReturnToQueue:
         bridge.publish_return_to_queue("car_01")
 
         bridge.task_publisher_instance.publish_return_to_queue.assert_called_once_with("car_01")
+
+    def test_return_failure_exception_and_unavailable(self):
+        bridge.ros2_available = True
+        bridge.task_publisher_instance = MagicMock()
+        bridge.task_publisher_instance.publish_return_to_queue.return_value = False
+        bridge.publish_return_to_queue("car")
+        bridge.task_publisher_instance.publish_return_to_queue.side_effect = RuntimeError(
+            "fail"
+        )
+        bridge.publish_return_to_queue("car")
+
+        bridge.ros2_available = False
+        bridge.task_publisher_instance = None
+        bridge.NEW_MODULES_AVAILABLE = False
+        bridge.publish_return_to_queue("car")
 
 
 class TestCheckRos2Status:
@@ -119,3 +157,12 @@ class TestCheckRos2Status:
         status = bridge.check_ros2_status()
         assert status["integration"] == "new"
         assert status["available"] is True
+
+    def test_check_ros2_status_error(self):
+        bridge.NEW_MODULES_AVAILABLE = True
+        with patch(
+            "ros_integration.node_manager.RosNodeManager.get_instance",
+            side_effect=RuntimeError("broken"),
+        ):
+            status = bridge.check_ros2_status()
+        assert status["integration"] == "error"

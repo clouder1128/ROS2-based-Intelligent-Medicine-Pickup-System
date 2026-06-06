@@ -227,10 +227,14 @@ def init_database() -> None:
             config_name TEXT NOT NULL UNIQUE,
             config_json TEXT NOT NULL DEFAULT '{}',
             is_active INTEGER DEFAULT 1,
+            version INTEGER DEFAULT 1,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
+    _add_column_if_not_exists(
+        conn, "screening_config", "version", "INTEGER DEFAULT 1"
+    )
 
     conn.commit()
     conn.close()
