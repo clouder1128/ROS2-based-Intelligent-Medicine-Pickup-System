@@ -34,11 +34,22 @@ source venv/bin/activate
 
 # 2. 配置环境变量
 cp .env.example .env
-# 编辑 .env，设置 OPENAI_API_KEY
+# 编辑 .env，至少设置 OPENAI_API_KEY
 
-# 3. 一键启动
+# 3. 安装 Python 依赖
+pip install --upgrade pip setuptools wheel
+pip install -r requirements.txt
+
+# 4. 启动系统（需要 Bash/WSL 或 Linux）
 ./quick_start.sh
 ```
+
+如果你是从他人仓库直接复制到新环境，建议额外执行：
+
+- 确认 Python 3.12 可用
+- 配置 `.env` 并填入 `OPENAI_API_KEY`
+- 如果启用 ROS2 集成，需安装 ROS2 并在新环境下重新构建 `ros_workspace`
+- `ros_workspace/install/` 中已有的 ROS 生成产物通常依赖旧路径，最好重新运行 `colcon build`
 
 启动后访问 **http://localhost:8080**（演示账号：admin1 / 123456）。
 
