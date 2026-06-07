@@ -28,7 +28,6 @@ MANIFEST
 .env
 .venv
 env/
-venv/
 ENV/
 env.bak/
 venv.bak/
@@ -72,7 +71,4 @@ agent_with_backend/tasks.db
 docs/项目研发报告.md
 docs/代码说明文档.md
 docs/设计报告.md
-<<<<<<< Updated upstream
-=======
-./claude
->>>>>>> Stashed changes
+.claude/
