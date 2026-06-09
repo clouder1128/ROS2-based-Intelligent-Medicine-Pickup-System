@@ -1,0 +1,44 @@
+@startuml
+title ROS2智能药品拣选系统总体架构（横向）
+
+left to right direction
+
+skinparam packageStyle rectangle
+skinparam shadowing false
+skinparam componentStyle rectangle
+
+package "表现层\nPresentation" {
+
+    rectangle "Web前端\n(HTML/CSS/JS)" as Web
+
+    rectangle "CLI交互界面" as CLI
+}
+
+package "API层\nControllers" {
+
+    rectangle "药品管理\n订单管理\n审批管理\n类别管理\n文件上传\n\n智能筛选\n健康检查\nROS状态\n认证授权" as API
+}
+
+package "业务逻辑层\nServices" {
+
+    rectangle "AI医疗引擎\n\n智能筛选引擎\n药品排名\n症状标准化\n\n工作流管理\n会话管理\n任务规划\n工具执行" as Service
+}
+
+package "基础设施层\nInfrastructure" {
+
+    rectangle "配置管理\n缓存服务\n数据库连接\n日志系统\n异常处理\n\nLLM客户端\nJWT令牌\nRBAC权限\n审计日志" as Infra
+}
+
+package "数据与集成层\nData & Integration" {
+
+    rectangle "SQLite数据库\n\nROS2通信桥接\nUnity仿真接口\n\n药品数据\n订单数据\n审批数据\n筛选历史\n系统元数据" as Data
+}
+
+Web --> API : HTTP/JSON
+CLI --> API : HTTP/JSON
+
+API --> Service
+Service --> Infra
+Infra --> Data
+
+@enduml
