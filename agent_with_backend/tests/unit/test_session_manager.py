@@ -1,3 +1,5 @@
+"""测试会话管理器的创建、缓存、持久化、恢复和删除流程。"""
+
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
@@ -69,4 +71,3 @@ def test_session_manager_create_wrap_and_delete(tmp_path, monkeypatch):
     assert not (tmp_path / "patient-1.pkl").exists()
     assert not (tmp_path / "patient-1_form.pkl").exists()
     assert manager.get_active_count() == 0
-

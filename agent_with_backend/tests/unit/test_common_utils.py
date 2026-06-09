@@ -1,3 +1,5 @@
+"""测试数据校验、JSON 与文本处理、缓存、重试和分页等通用工具。"""
+
 from datetime import date
 
 import pytest

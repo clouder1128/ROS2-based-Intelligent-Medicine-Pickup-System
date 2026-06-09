@@ -1,3 +1,5 @@
+"""测试数据库初始化与迁移辅助函数，以及筛选模型的序列化行为。"""
+
 from datetime import date, datetime
 from types import SimpleNamespace
 

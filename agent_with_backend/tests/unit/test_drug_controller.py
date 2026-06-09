@@ -1,7 +1,11 @@
+"""测试药品控制器的新增、删除、查询、库存调整和临期预警接口。"""
+
 from tests.api_helpers import auth_headers, create_drug, drug_payload, json_body
 
 
 class TestDrugController:
+    """按药品管理业务场景组织控制器接口测试。"""
+
     def test_create_drug(self, client, admin_token):
         """UT-001-01 新增药品"""
 

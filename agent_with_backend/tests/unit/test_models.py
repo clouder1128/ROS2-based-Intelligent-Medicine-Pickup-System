@@ -1,3 +1,5 @@
+"""测试药品、分类、订单和审批等领域模型的转换、状态与序列化逻辑。"""
+
 from datetime import datetime, timedelta
 
 from database.models.approval import Approval

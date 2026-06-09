@@ -1,3 +1,5 @@
+"""测试配置服务的加载、增删改查以及数据库异常处理。"""
+
 import json
 
 from common.utils import database
@@ -121,4 +123,3 @@ def test_config_service_database_failures(monkeypatch):
 
     service._config_cache["temp"] = {"config_name": "temp"}
     assert service.delete_config("temp")["success"] is False
-

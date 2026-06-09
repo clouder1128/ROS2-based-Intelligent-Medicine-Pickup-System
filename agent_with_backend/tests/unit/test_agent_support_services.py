@@ -1,3 +1,5 @@
+"""测试症状提取、库存事务和报表生成等智能体辅助服务。"""
+
 import json
 from types import SimpleNamespace
 from unittest.mock import ANY, MagicMock

@@ -1,3 +1,5 @@
+"""测试大模型客户端统计、流式输出及 OpenAI 和 Claude 提供商适配逻辑。"""
+
 import asyncio
 from types import SimpleNamespace
 from unittest.mock import MagicMock

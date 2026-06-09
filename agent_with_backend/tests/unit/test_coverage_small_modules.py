@@ -1,3 +1,5 @@
+"""补充测试校验器、消息管理、待办任务、模型提供商及响应工具等小型模块。"""
+
 import logging
 from types import SimpleNamespace
 from unittest.mock import MagicMock

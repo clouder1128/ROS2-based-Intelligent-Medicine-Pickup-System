@@ -1,3 +1,5 @@
+"""测试文件上传、下载、删除生命周期以及扩展名和异常校验。"""
+
 import io
 
 from flask import Flask

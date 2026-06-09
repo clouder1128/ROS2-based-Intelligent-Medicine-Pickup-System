@@ -1,3 +1,5 @@
+"""测试症状标准化、药品筛选排序、历史记录和筛选配置服务。"""
+
 from datetime import datetime, timedelta
 
 import pytest

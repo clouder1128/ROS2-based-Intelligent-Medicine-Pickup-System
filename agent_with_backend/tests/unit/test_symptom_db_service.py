@@ -1,3 +1,5 @@
+"""测试症状同义词扩展和药品数据库查询中的库存与删除状态过滤。"""
+
 from common.utils import database
 from common.utils import symptom_db_service as service
 

@@ -1,3 +1,5 @@
+"""测试规划任务在 SQLite 与文件存储中的增删改查、筛选和异常处理。"""
+
 from datetime import datetime
 
 import pytest

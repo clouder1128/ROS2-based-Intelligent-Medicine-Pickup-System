@@ -1,3 +1,5 @@
+"""测试药品查询、过敏检查、剂量建议、审批提交和处方执行工具。"""
+
 import asyncio
 import json
 from types import SimpleNamespace

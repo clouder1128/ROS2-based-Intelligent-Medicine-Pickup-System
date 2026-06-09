@@ -1,3 +1,5 @@
+"""测试审批状态流转和药房数据库客户端的查询、库存更新及异常降级。"""
+
 from unittest.mock import MagicMock
 
 from database.approval_manager import ApprovalManager

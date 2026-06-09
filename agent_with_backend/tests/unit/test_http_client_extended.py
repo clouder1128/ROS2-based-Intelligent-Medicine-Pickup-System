@@ -1,3 +1,5 @@
+"""测试药房 HTTP 客户端的请求处理、异步接口、导出功能及同步包装方法。"""
+
 import asyncio
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
