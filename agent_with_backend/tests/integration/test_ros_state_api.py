@@ -35,10 +35,9 @@ def test_ros_subscription_state_is_exposed_through_http(
     assert json_body(cabinets)["data"][0]["medicine_list"][0]["quantity"] == 12
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="Python 3.10 的 datetime.fromisoformat 不解析末尾 Z，最新 ROS 状态被误判为离线",
-)
+# @pytest.mark.xfail(
+#     reason="Python 3.10 的 datetime.fromisoformat 不解析末尾 Z，最新 ROS 状态被误判为离线",
+# )
 def test_recent_ros_state_reports_connected(client, patient_headers):
     RosStateStore().update_car(car_id=1, x=0.0, y=0.0, isrunning=1)
     status = client.get("/api/ros/status", headers=patient_headers)
